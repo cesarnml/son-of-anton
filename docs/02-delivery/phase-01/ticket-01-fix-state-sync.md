@@ -41,9 +41,10 @@ if (primaryPath && resolve(primaryPath) !== resolve(cwd)) {
 
 ## Rationale
 
-> Append here (do not edit above) when behavior or trade-offs change during implementation.
+Red first: `SyntaxError: Export named 'syncStateToPrimaryIfNeeded' not found` — test file failed to import the not-yet-exported function, confirming the red state before any implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Why this path: Extracted the sync logic to `syncStateToPrimaryIfNeeded(cwd, state, findPrimaryPath)` rather than inlining three lines in the advance case. The injected `findPrimaryPath` callback keeps the function unit-testable without module mocking — tests pass a closure returning a temp dir, production passes `(wt) => findPrimaryWorktreePath(wt, context.config)`.
+
+Alternative considered: Inline the guard directly in the advance case (no helper extraction). Rejected because the `resolve()` comparison and the no-op-when-same-path invariant are subtle enough to deserve a named function with dedicated tests.
+
+Deferred: Syncing `reviews/` and `handoffs/` artifacts to primary on advance — the delivery-orchestrator doc recommends this but it is multi-worktree state management beyond the ticket scope.
