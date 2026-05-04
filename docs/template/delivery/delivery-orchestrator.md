@@ -343,7 +343,7 @@ bun run deliver --plan <plan> subagent-review clean    # subagent found nothing 
 bun run deliver --plan <plan> subagent-review patched <sha...>  # subagent findings were applied
 ```
 
-The CLI is a state recorder only — it does not invoke the subagent. The primary agent runs the subagent skill, then calls this command. A recorded subagent patch commit must use a subject suffix of `[subagentReview]`.
+The CLI is a state recorder only — it does not invoke the subagent. The primary agent runs the subagent skill, then calls this command. A recorded subagent patch commit must use a subject suffix of `[subagent-review]`.
 
 **Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 

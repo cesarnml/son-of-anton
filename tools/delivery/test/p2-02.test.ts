@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { buildTicketHandoff } from '../ticket-flow';
+import { buildTicketHandoff, writeTicketHandoff } from '../ticket-flow';
 import type { DeliveryState } from '../types';
 
 const REPO_ROOT = resolve(import.meta.dir, '../../..');
@@ -74,5 +75,25 @@ describe('P2.02 — delivery-orchestrator.md cleanliness and gated handoff RESUM
       ticketBoundaryMode: 'cook',
     });
     expect(handoff).not.toContain('## RESUME COMMAND');
+  });
+
+  it('writeTicketHandoff persists the gated resume command in the artifact', async () => {
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'p2-02-handoff-'));
+
+    try {
+      const result = await writeTicketHandoff(gatedState, tempDir, 'P2.02', {
+        relativeToRepo: (_cwd, absolutePath) => absolutePath,
+        subagentReviewPolicy: 'required',
+        ticketBoundaryMode: 'gated',
+      });
+
+      const content = await readFile(result.relativePath, 'utf8');
+      expect(content).toContain('## RESUME COMMAND');
+      expect(content).toContain(
+        'bun run deliver --plan docs/product/delivery/phase-02/implementation-plan.md subagent-review',
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });

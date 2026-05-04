@@ -169,6 +169,8 @@ export async function writeTicketHandoff(
   ticketId: string,
   dependencies: {
     relativeToRepo: (cwd: string, absolutePath: string) => string;
+    subagentReviewPolicy?: string;
+    ticketBoundaryMode?: string;
   },
 ): Promise<{ relativePath: string; generatedAt: string }> {
   const ticket = state.tickets.find((candidate) => candidate.id === ticketId);
@@ -191,7 +193,10 @@ export async function writeTicketHandoff(
   await mkdir(dirname(absolutePath), { recursive: true });
   await writeFile(
     absolutePath,
-    buildTicketHandoff(state, ticket, modifiedSectionsNote),
+    buildTicketHandoff(state, ticket, modifiedSectionsNote, {
+      ticketBoundaryMode: dependencies.ticketBoundaryMode,
+      subagentReviewPolicy: dependencies.subagentReviewPolicy,
+    }),
     'utf8',
   );
 
@@ -252,6 +257,8 @@ export async function startTicket(
       ticketId: string,
     ) => Promise<void>;
     relativeToRepo: (cwd: string, absolutePath: string) => string;
+    subagentReviewPolicy?: string;
+    ticketBoundaryMode?: string;
   },
 ): Promise<DeliveryState> {
   const active = state.tickets.find(
@@ -301,6 +308,8 @@ export async function startTicket(
 
   const handoff = await writeTicketHandoff(state, cwd, target.id, {
     relativeToRepo: dependencies.relativeToRepo,
+    subagentReviewPolicy: dependencies.subagentReviewPolicy,
+    ticketBoundaryMode: dependencies.ticketBoundaryMode,
   });
 
   const nextState: DeliveryState = {
