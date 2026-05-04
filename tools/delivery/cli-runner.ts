@@ -239,15 +239,16 @@ export async function runDeliveryOrchestrator(
         return 0;
       }
       case 'subagent-review': {
-        const subagentPositionals = parsed.positionals;
-        const subagentOutcome =
-          subagentPositionals[0] === 'clean' ||
-          subagentPositionals[0] === 'patched'
-            ? subagentPositionals[0]
-            : undefined;
-        const subagentTarget = state.tickets.find(
-          (t) => t.status === 'verified',
-        );
+        const {
+          auditOutcome: subagentOutcome,
+          auditPatchCommitArgs: subagentPatchCommitArgs,
+          auditTicketId: subagentTicketId,
+        } = parseSelfAuditArgs(parsed.positionals);
+        const subagentTarget =
+          (subagentTicketId
+            ? state.tickets.find((t) => t.id === subagentTicketId)
+            : state.tickets.find((t) => t.status === 'verified')) ??
+          undefined;
         const isDocOnly = subagentTarget
           ? isPlatformLocalBranchDocOnly(
               subagentTarget.worktreePath,
@@ -264,11 +265,13 @@ export async function runDeliveryOrchestrator(
             ? resolveInternalReviewPatchCommits(
                 subagentTarget?.worktreePath ?? cwd,
                 context,
-                subagentPositionals.slice(1),
-                '[self-audit]',
+                subagentPatchCommitArgs,
+                '[subagent-review]',
                 'Subagent review',
               )
             : undefined,
+          context.config.reviewSubagentOverride,
+          subagentTicketId,
         );
         const justRecorded = nextState.tickets.find(
           (t) =>
@@ -745,6 +748,7 @@ export function recordSubagentReview(
   policy?: ReviewPolicyStageValue,
   patchCommits?: InternalReviewPatchCommit[],
   agentName?: string,
+  ticketId?: string,
 ): DeliveryState {
   if (!policy) {
     throw new Error('recordSubagentReview requires an explicit policy.');
@@ -757,6 +761,8 @@ export function recordSubagentReview(
     policy,
     patchCommits,
     agentName,
+    undefined,
+    ticketId,
   );
 }
 

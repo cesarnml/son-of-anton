@@ -370,14 +370,25 @@ export function recordSubagentReview(
   patchCommits?: InternalReviewPatchCommit[],
   agentName?: string,
   now: () => string = () => new Date().toISOString(),
+  ticketId?: string,
 ): DeliveryState {
-  const target = state.tickets.find(
-    (ticket) => ticket.status === 'verified',
-  );
+  const target =
+    (ticketId
+      ? state.tickets.find((ticket) => ticket.id === ticketId)
+      : state.tickets.find((ticket) => ticket.status === 'verified')) ??
+    undefined;
 
   if (!target) {
     throw new Error(
-      'No ticket at verified status found to record subagent review.',
+      ticketId
+        ? `Unknown ticket ${ticketId}.`
+        : 'No ticket at verified status found to record subagent review.',
+    );
+  }
+
+  if (target.status !== 'verified') {
+    throw new Error(
+      `Ticket ${target.id} must be at verified status before subagent review can be recorded.`,
     );
   }
 

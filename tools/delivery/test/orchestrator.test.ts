@@ -1045,7 +1045,7 @@ describe('delivery orchestrator', () => {
           {
             sha: 'bbbbbbbbbbbb2222222222222222222222222222',
             subject:
-              'fix: surface subagent review patch commits [self-audit]',
+              'fix: surface subagent review patch commits [subagent-review]',
           },
         ],
         status: 'subagent_review_complete',
@@ -1071,7 +1071,7 @@ describe('delivery orchestrator', () => {
       '[`aaaaaaaaaaaa`](https://github.com/cesarnml/Test-Project/commit/aaaaaaaaaaaa1111111111111111111111111111) fix: clarify PR body review state [self-audit]',
     );
     expect(body).toContain(
-      '[`bbbbbbbbbbbb`](https://github.com/cesarnml/Test-Project/commit/bbbbbbbbbbbb2222222222222222222222222222) fix: surface subagent review patch commits [self-audit]',
+      '[`bbbbbbbbbbbb`](https://github.com/cesarnml/Test-Project/commit/bbbbbbbbbbbb2222222222222222222222222222) fix: surface subagent review patch commits [subagent-review]',
     );
   });
 

@@ -548,7 +548,7 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
         {
           sha: 'bbbbbbbbbbbb2222222222222222222222222222',
           subject:
-            'fix: surface subagent review patch commits [self-audit]',
+            'fix: surface subagent review patch commits [subagent-review]',
         },
       ],
     );
@@ -556,10 +556,45 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     expect(nextState.tickets[0]?.subagentReviewPatchCommits).toEqual([
       {
         sha: 'bbbbbbbbbbbb2222222222222222222222222222',
-        subject: 'fix: surface subagent review patch commits [self-audit]',
+        subject: 'fix: surface subagent review patch commits [subagent-review]',
       },
     ]);
     expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
+  });
+
+  it('records subagent review for the requested ticket id', () => {
+    const multiTicketState: DeliveryState = {
+      ...basePostAuditState,
+      tickets: [
+        {
+          ...basePostAuditState.tickets[0]!,
+          id: 'P3.01',
+        },
+        {
+          ...basePostAuditState.tickets[0]!,
+          id: 'P3.02',
+          title: 'Second Ticket',
+          slug: 'second-ticket',
+          ticketFile:
+            'docs/product/delivery/phase-03/ticket-02-second-ticket.md',
+          branch: 'agents/p3-02-second-ticket',
+        },
+      ],
+    };
+
+    const nextState = recordSubagentReview(
+      multiTicketState,
+      'clean',
+      false,
+      baseConfig.reviewPolicy.subagentReview,
+      undefined,
+      undefined,
+      'P3.02',
+    );
+
+    expect(nextState.tickets[0]?.status).toBe('verified');
+    expect(nextState.tickets[1]?.status).toBe('subagent_review_complete');
+    expect(nextState.tickets[1]?.subagentReviewOutcome).toBe('clean');
   });
 
   it('records subagentReviewOutcome: skipped for doc-only tickets', () => {
@@ -609,6 +644,17 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
         baseConfig.reviewPolicy.subagentReview,
       ),
     ).toThrow(/No ticket at verified status/);
+    expect(() =>
+      recordSubagentReview(
+        inProgressState,
+        'clean',
+        false,
+        baseConfig.reviewPolicy.subagentReview,
+        undefined,
+        undefined,
+        'P3.01',
+      ),
+    ).toThrow(/must be at verified status/);
   });
 
   it('rejects patched subagent-review outcomes without recorded patch commits', () => {
