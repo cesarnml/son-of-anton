@@ -93,7 +93,7 @@ Add `Scope: <codebase-area>  (optional — omit if scope is unclear)` below the 
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Red first: `buildPullRequestTitle({ ticketFile: 'ticket-01-fix-state-sync.md', scope: 'cli', id: 'P1.01', ... })` produced `feat: ...` instead of `fix(cli): ...` — the old implementation ignored ticketFile and scope entirely.
+Why this path: regex on basename is the smallest change that removes commit-order dependency without touching state hydration; readFileSync in parsePlan keeps scope loading co-located with ticket file path construction.
+Alternative considered: async parsePlan with `readFile` — rejected because it would require propagating async through cli-runner callers and is more surface area than needed.
+Deferred: removing `readFirstCommitSubject` from platform.ts and platform-adapters.ts (still referenced by the platform interface; opportunistic cleanup deferred to Phase 02).
