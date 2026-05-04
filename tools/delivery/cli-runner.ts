@@ -832,7 +832,6 @@ export async function openPullRequest(
     editPullRequest: platform.editPullRequest,
     ensureBranchPushed: platform.ensureBranchPushed,
     findOpenPullRequest: platform.findOpenPullRequest,
-    readFirstCommitSubject: platform.readFirstCommitSubject,
     reportProgress: (message: string) => console.log(message),
     resolveGitHubRepo: platform.resolveGitHubRepoForOrchestrator,
   });

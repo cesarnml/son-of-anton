@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -38,11 +38,15 @@ export function parsePlan(
 
   const planDir = dirname(planPath);
 
-  return titles.map((ticket, index) => ({
-    ...ticket,
-    slug: slugify(ticket.title),
-    ticketFile: join(planDir, files[index] ?? ''),
-  }));
+  return titles.map((ticket, index) => {
+    const ticketFile = join(planDir, files[index] ?? '');
+    return {
+      ...ticket,
+      slug: slugify(ticket.title),
+      scope: parseTicketScope(ticketFile),
+      ticketFile,
+    };
+  });
 }
 
 export function derivePlanKey(planPath: string): string {
@@ -158,6 +162,16 @@ async function listImplementationPlans(
     )
     .filter((planPath) => existsSync(resolve(cwd, planPath)))
     .sort();
+}
+
+function parseTicketScope(ticketFilePath: string): string | undefined {
+  try {
+    const content = readFileSync(ticketFilePath, 'utf8');
+    const match = content.match(/^Scope:\s*(.+)$/im);
+    return match ? match[1]!.trim().toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeRepoPath(value: string): string {

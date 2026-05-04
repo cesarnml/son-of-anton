@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import type {
   AiReviewComment,
@@ -1169,24 +1169,13 @@ export function buildReviewMetadataRefreshBody(
 }
 
 export function buildPullRequestTitle(
-  ticket: Pick<TicketState, 'id' | 'title'>,
-  commitSubject?: string,
+  ticket: Pick<TicketState, 'id' | 'title' | 'ticketFile' | 'scope'>,
 ): string {
-  const fallbackSubject = `feat: ${ticket.title.toLowerCase()}`;
-  const normalizedSubject = (commitSubject?.trim() || '')
-    .replace(/\s+\[(?:self-audit|codexPreflight)\]$/i, '')
-    .replace(/\s+\[[A-Z0-9.]+\]$/, '');
-  const baseSubject = isConventionalCommitSubject(normalizedSubject)
-    ? normalizedSubject
-    : fallbackSubject;
-
-  return `${baseSubject} [${ticket.id}]`;
-}
-
-function isConventionalCommitSubject(subject: string): boolean {
-  return /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?:\s+\S/.test(
-    subject,
-  );
+  const typeMatch = basename(ticket.ticketFile).match(/^ticket-\d+-([a-z]+)-/);
+  const type = typeMatch?.[1] ?? 'feat';
+  const scopePart = ticket.scope ? `(${ticket.scope})` : '';
+  const subject = ticket.title.toLowerCase();
+  return `${type}${scopePart}: ${subject} [${ticket.id}]`;
 }
 
 export function updatePullRequestBody(

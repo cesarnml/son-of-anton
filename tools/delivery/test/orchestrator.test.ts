@@ -547,35 +547,20 @@ describe('delivery orchestrator', () => {
 
   it('uses the repo delivery PR title format', () => {
     expect(
-      buildPullRequestTitle(
-        { id: 'P3.02', title: 'Reconcile Torrent Lifecycle From Transmission' },
-        'feat: add torrent lifecycle reconciliation',
-      ),
-    ).toBe('feat: add torrent lifecycle reconciliation [P3.02]');
-    expect(
-      buildPullRequestTitle(
-        { id: 'P3.02', title: 'Reconcile Torrent Lifecycle From Transmission' },
-        'feat: add torrent lifecycle reconciliation [P3.02]',
-      ),
-    ).toBe('feat: add torrent lifecycle reconciliation [P3.02]');
-    expect(
-      buildPullRequestTitle(
-        { id: 'P3.02', title: 'Reconcile Torrent Lifecycle From Transmission' },
-        'fix: tighten review provenance [self-audit]',
-      ),
-    ).toBe('fix: tighten review provenance [P3.02]');
-    expect(
-      buildPullRequestTitle(
-        { id: 'P3.02', title: 'Reconcile Torrent Lifecycle From Transmission' },
-        'fix: tighten review provenance [codexPreflight]',
-      ),
-    ).toBe('fix: tighten review provenance [P3.02]');
+      buildPullRequestTitle({
+        id: 'P3.02',
+        title: 'Reconcile Torrent Lifecycle From Transmission',
+        ticketFile: 'ticket-02-feat-torrent-lifecycle.md',
+      }),
+    ).toBe('feat: reconcile torrent lifecycle from transmission [P3.02]');
     expect(
       buildPullRequestTitle({
         id: 'P3.02',
         title: 'Reconcile Torrent Lifecycle From Transmission',
+        ticketFile: 'ticket-02-feat-torrent-lifecycle.md',
+        scope: 'transmission',
       }),
-    ).toBe('feat: reconcile torrent lifecycle from transmission [P3.02]');
+    ).toBe('feat(transmission): reconcile torrent lifecycle from transmission [P3.02]');
   });
 
   it('derives PR title from ticket filename type and scope field', () => {

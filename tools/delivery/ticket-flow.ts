@@ -437,8 +437,7 @@ export function openPullRequest(
       },
     ) => string;
     buildPullRequestTitle: (
-      ticket: Pick<TicketState, 'id' | 'title'>,
-      commitSubject?: string,
+      ticket: Pick<TicketState, 'id' | 'title' | 'ticketFile' | 'scope'>,
     ) => string;
     codexPreflightPolicy?: ReviewPolicyStageValue;
     createPullRequest: (
@@ -464,7 +463,6 @@ export function openPullRequest(
       cwd: string,
       branch: string,
     ) => PullRequestSummary | undefined;
-    readFirstCommitSubject: (cwd: string, baseBranch: string) => string;
     reportProgress?: (message: string) => void;
     resolveGitHubRepo?: (
       cwd: string,
@@ -518,10 +516,7 @@ export function openPullRequest(
   );
   dependencies.ensureBranchPushed(target.worktreePath, target.branch);
 
-  const title = dependencies.buildPullRequestTitle(
-    target,
-    dependencies.readFirstCommitSubject(target.worktreePath, target.baseBranch),
-  );
+  const title = dependencies.buildPullRequestTitle(target);
   const body = dependencies.buildPullRequestBody(state, target, {
     githubRepo: dependencies.resolveGitHubRepo?.(target.worktreePath),
   });
