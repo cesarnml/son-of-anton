@@ -17,7 +17,7 @@ set -euo pipefail
 artifact_json_path="${1:-}"
 
 if [[ -z "$artifact_json_path" ]]; then
-  echo "Usage: triage_ai_review.sh <artifact-json-path>" >&2
+  echo "Usage: triage_pr_review.sh <artifact-json-path>" >&2
   exit 1
 fi
 

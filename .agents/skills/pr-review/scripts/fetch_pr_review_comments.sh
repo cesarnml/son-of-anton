@@ -11,6 +11,22 @@ set -euo pipefail
 
 pr_number="${1:-}"
 
+# Early exit if prReview disabled
+config_file="$(git rev-parse --show-toplevel)/orchestrator.config.json"
+if [[ -f "$config_file" ]]; then
+  pr_review_policy="$(jq -r '(.reviewPolicy.prReview // "")' "$config_file")"
+  if [[ "$pr_review_policy" == "disabled" ]]; then
+    echo '{"agents":[],"detected":false,"vendors":[],"comments":[]}'
+    exit 0
+  fi
+fi
+
+# Load prReviewAgents from config for dynamic login identification
+pr_review_agents='[]'
+if [[ -f "$config_file" ]]; then
+  pr_review_agents="$(jq -c '(.prReviewAgents // [])' "$config_file" 2>/dev/null || echo '[]')"
+fi
+
 if ! command -v gh >/dev/null 2>&1; then
   echo "gh CLI is required." >&2
   exit 1
@@ -282,7 +298,8 @@ jq -n \
   --argjson pr "$pr_json" \
   --argjson review_comments "$review_comments_json" \
   --argjson review_threads "$review_threads_json" \
-  --argjson sonarqube_annotations "$sonarqube_annotations_json" '
+  --argjson sonarqube_annotations "$sonarqube_annotations_json" \
+  --argjson pr_review_agents "$pr_review_agents" '
     def normalize_text:
       tostring
       | gsub("\r"; "")
@@ -304,7 +321,7 @@ jq -n \
 
     def looks_like_supported_ai_identity:
       (author_login | ascii_downcase) as $login
-      | ($login | test("qodo|coderabbit|greptile|sonarqube"));
+      | ($pr_review_agents | map(.login | ascii_downcase) | any(. == $login));
 
     def looks_like_supported_ai_text:
       (body_text | normalize_text) as $body
@@ -321,10 +338,12 @@ jq -n \
     def vendor_name:
       (author_login | ascii_downcase) as $login
       | (body_text | normalize_text) as $body
-      | if ($login | test("coderabbit")) or ($body | test("coderabbit|code rabbit")) then "coderabbit"
-        elif ($login | test("qodo")) or ($body | test("qodo")) then "qodo"
-        elif ($login | test("greptile")) or ($body | test("greptile")) then "greptile"
-        elif ($login | test("sonarqube|sonarcloud")) then "sonarqube"
+      | ($pr_review_agents | map({login: (.login | ascii_downcase), name: .name}) | map(select(.login == $login)) | .[0].name) as $by_login
+      | if $by_login != null then $by_login
+        elif ($body | test("coderabbit|code rabbit")) then "coderabbit"
+        elif ($body | test("qodo")) then "qodo"
+        elif ($body | test("greptile")) then "greptile"
+        elif ($body | test("sonarqube|sonarcloud")) then "sonarqube"
         else null
         end;
 

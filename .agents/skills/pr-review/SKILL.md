@@ -1,5 +1,5 @@
 ---
-name: ai-code-review
+name: pr-review
 description: Detect and triage AI-generated pull request review comments for the delivery orchestrator flow. Use when poll-review finds AI review feedback or when you need to inspect recent AI review comments on the current PR.
 ---
 
@@ -23,7 +23,7 @@ When triager returns `needs_patch`, follow-up must conclude as `patched` or `ope
 ## Workflow
 
 1. Resolve PR number with `gh pr view` if not provided.
-2. Fetch with `.agents/skills/ai-code-review/scripts/fetch_ai_pr_comments.sh <pr-number>`.
+2. Fetch with `.agents/skills/pr-review/scripts/fetch_pr_review_comments.sh <pr-number>`.
 3. If orchestrator already saved `review.fetch.json`, use that as the source of truth for vendor attribution and comment shape.
 4. Detection policy: supported vendor identities, explicit vendor wording in comment body, check-run annotations. Human drive-by comments do not count. Preserve head SHA, inline resolution/outdated state, and native thread identity.
 5. Return fetcher contract when inside `poll-review`: `detected=false` → keep polling or auto-clean; `detected=true` → orchestrator inspects agent state and decides.

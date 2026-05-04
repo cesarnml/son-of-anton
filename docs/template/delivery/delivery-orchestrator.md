@@ -83,10 +83,14 @@ behavior, and review policy are not hardcoded:
   "packageManager": "bun",
   "ticketBoundaryMode": "cook",
   "reviewPolicy": {
-    "selfAudit": "skip_doc_only",
-    "codexPreflight": "skip_doc_only",
-    "externalReview": "skip_doc_only"
-  }
+    "subagentReview": "skip_doc_only",
+    "prReview": "skip_doc_only"
+  },
+  "reviewSubagentOverride": "codex:codex-rescue",
+  "prReviewAgents": [
+    { "login": "coderabbitai", "name": "coderabbit" },
+    { "login": "qodo-merge",   "name": "qodo" }
+  ]
 }
 ```
 
@@ -97,9 +101,8 @@ All fields are optional. When the file is absent, the orchestrator infers sensib
 - `runtime`: `"bun"` (`"bun"` uses `Bun.spawnSync`, `"node"` uses `child_process.spawnSync` inside the orchestrator implementation)
 - `packageManager`: inferred from lockfile (`bun.lock` → `"bun"`, `pnpm-lock.yaml` → `"pnpm"`, `yarn.lock` → `"yarn"`, `package-lock.json` → `"npm"`, fallback `"npm"`) for worktree bootstrap behavior
 - `ticketBoundaryMode`: `"cook"`
-- `reviewPolicy.selfAudit`: `"skip_doc_only"`
-- `reviewPolicy.codexPreflight`: `"skip_doc_only"`
-- `reviewPolicy.externalReview`: `"skip_doc_only"`
+- `reviewPolicy.subagentReview`: `"skip_doc_only"`
+- `reviewPolicy.prReview`: `"skip_doc_only"`
 
 Valid `reviewPolicy` stage values are:
 
@@ -108,6 +111,8 @@ Valid `reviewPolicy` stage values are:
 - `"disabled"` — the stage is never run, regardless of PR content.
 
 Invalid values and unknown keys are rejected at config load with a clear error.
+
+`reviewPolicy.subagentReview` governs the pre-PR internal agent review step (`subagent-review` command). `reviewPolicy.prReview` governs the external AI PR review polling window. `reviewSubagentOverride` sets the subagent invocation string for the `subagent-review` step (e.g. `"codex:codex-rescue"`). `prReviewAgents` is a list of `{ login, name }` entries used by the fetcher script to identify external review bots by GitHub login — replaces the old hardcoded vendor list.
 
 Supported `ticketBoundaryMode` values are:
 
@@ -149,7 +154,7 @@ The orchestrator owns process mechanics:
 - stacked PR base chaining
 - idempotent PR open/update behavior for already-pushed ticket branches
 - a 6/12-minute AI-review polling loop after PR open (two checkpoints: 6 minutes and 12 minutes)
-- invoking the repo-local `ai-code-review` fetcher and persisting split review artifacts when AI review is detected
+- invoking the repo-local `pr-review` fetcher and persisting split review artifacts when AI review is detected
 - optional Telegram milestone notifications for long-running delivery runs
 - blocking advancement until review is explicitly recorded or auto-recorded as `clean` after the final polling check
 - refreshing the current PR body from recorded follow-up notes immediately before advancing to the next ticket
@@ -158,7 +163,7 @@ The orchestrator owns process mechanics:
 
 The orchestrator does **not** own AI-review detection heuristics or triage judgment.
 
-That boundary is intentional. The repo-local `ai-code-review` skill under `.agents/skills/ai-code-review/` already defines the repo stance for AI review:
+That boundary is intentional. The repo-local `pr-review` skill under `.agents/skills/pr-review/` already defines the repo stance for AI review:
 
 - comments are advisory, not gospel
 - weak or mis-scoped comments should be pushed back on
@@ -188,7 +193,7 @@ For `sonarqube`, the repo-local fetcher reads GitHub check-run annotations rathe
 
 The absence of `ai-code-review` comments after the final 12-minute polling check is not itself a blocker. In that case, the orchestrator records the review as `clean`, updates the PR metadata, and continues unless another real ambiguity or prerequisite issue exists.
 
-Doc-only PRs (where the diff touches only `.md` files) skip the review window only when `reviewPolicy.externalReview` is `"skip_doc_only"` (or the stage is fully `"disabled"` for all PRs). External AI agents review code; the developer reads docs. When `open-pr` detects a doc-only diff, it sets a `doc_only` flag in state, and `poll-review` uses the configured policy to decide whether to auto-record `skipped` immediately or wait through the normal review window.
+Doc-only PRs (where the diff touches only `.md` files) skip the review window only when `reviewPolicy.prReview` is `"skip_doc_only"` (or the stage is fully `"disabled"` for all PRs). External AI agents review code; the developer reads docs. When `open-pr` detects a doc-only diff, it sets a `doc_only` flag in state, and `poll-review` uses the configured policy to decide whether to auto-record `skipped` immediately or wait through the normal review window.
 
 When the triager hook resolves to `clean` or `patched`, `poll-review` records that result immediately. When it resolves to `needs_patch`, the ticket moves into an intermediate `needs_patch` state with the saved fetch/triage artifacts and triage note. From there the follow-up must conclude as either `patched` or `operator_input_needed`. PR body updates remain best-effort in either case.
 
@@ -284,9 +289,9 @@ If a phase was already partially delivered before the orchestrator was introduce
 
 That inference is intentionally conservative. It reconstructs enough state to resume a stacked phase without requiring a fresh restart.
 
-## Post-verify self-audit (ticket stacks)
+## Post-verify (ticket stacks)
 
-After **build mode** (implementation and automated verification), the agent switches to **self-audit mode**: a deliberate pass over the diff and ticket acceptance before publishing the branch for external AI code review. Stay in the same implementation session—this is a mode switch, not a handoff.
+After **build mode** (implementation and automated verification), the agent switches to **self-audit mode**: a deliberate pass over the diff and ticket acceptance before publishing the branch for external AI code review. Stay in the same implementation session — this is a mode switch, not a handoff.
 
 Use the verification commands with two distinct purposes:
 
@@ -294,59 +299,57 @@ Use the verification commands with two distinct purposes:
 - Use your repo's full CI command as the pre-`open-pr` gate for code tickets (e.g. `bun run ci:quiet`).
 - Keep format and scoped tests in the inner loop as needed.
 
-The `post-verify-self-audit` command **records** that self-audit mode completed (ticket status, outcome, and timestamp in local delivery state). It does **not** run checks or read the diff; the agent performs verification in build mode and the diff review in self-audit mode, then invokes this command.
+The `post-verify` command **records** that self-audit mode completed (ticket status, outcome, and timestamp in local delivery state). It does **not** run checks or read the diff; the agent performs verification in build mode and the diff review in self-audit mode, then invokes this command.
 
 The command accepts an optional outcome argument. When the outcome is `patched`,
 record one or more patch-commit SHAs so the PR body can link the exact
-self-audit follow-up commits:
+post-verify follow-up commits:
 
 ```bash
-bun run deliver --plan <plan> post-verify-self-audit          # defaults to "clean"
-bun run deliver --plan <plan> post-verify-self-audit clean    # no changes during self-audit
-bun run deliver --plan <plan> post-verify-self-audit patched <sha...>  # self-audit found and fixed issues
+bun run deliver --plan <plan> post-verify          # defaults to "clean"
+bun run deliver --plan <plan> post-verify clean    # no changes during self-audit
+bun run deliver --plan <plan> post-verify patched <sha...>  # self-audit found and fixed issues
 ```
 
-When omitted, outcome defaults to `clean`. The `status` command renders the outcome alongside the completion timestamp. A recorded self-audit patch commit must use a subject suffix of `[self-audit]`.
+When omitted, outcome defaults to `clean`. The `status` command renders the outcome alongside the completion timestamp. A recorded post-verify patch commit must use a subject suffix of `[post-verify]`.
 
-**Before `post-verify-self-audit`, confirm at least:**
+**Before `post-verify`, confirm at least:**
 
 - The diff matches the ticket and handoff; no unrelated scope crept in.
 - Automated verification for this change is green, with `bun run ci:quiet` completed for code tickets before publishing.
 - Higher-risk areas changed in the diff (data shape, migrations, auth, API contracts) got a second read in self-audit mode.
 - The delivery ticket doc has an updated **Rationale** when behavior or trade-offs changed (repo policy).
 
-Then run `post-verify-self-audit`, then (if Codex preflight is enabled) `codex-preflight`, then `open-pr`. The deprecated alias `internal-review` still works and prints a notice.
+Then run `post-verify`, then (if `subagentReview` is enabled) `subagent-review`, then `open-pr`.
 
-## Codex preflight (ticket stacks)
+## Subagent review (ticket stacks)
 
-When `reviewPolicy.codexPreflight` is `"required"`, the agent must record a Codex preflight outcome before `open-pr` is allowed for code tickets.
+When `reviewPolicy.subagentReview` is `"required"`, the agent must record a subagent review outcome before `open-pr` is allowed for code tickets.
 
 **Role split:**
 
-- **Claude** executes and patches during build and self-audit mode.
-- **Codex** reviews and patches its own findings autonomously — a second AI pass before the PR is published. Claude does not triage Codex output; Codex acts on what it finds.
-- **External AI vendors** (CodeRabbit, Qodo, Greptile, SonarQube) review post-publication during `poll-review`.
+- **Primary agent** executes and patches during build and post-verify mode.
+- **Review subagent** (configured via `reviewSubagentOverride`, e.g. `"codex:codex-rescue"`) reviews and patches its own findings autonomously — a second AI pass before the PR is published. The primary agent does not triage subagent output; the subagent acts on what it finds.
+- **External AI vendors** (e.g. CodeRabbit, Qodo) review post-publication during `poll-review`.
 
-**Running Codex preflight:**
+**Running subagent review:**
 
-1. Invoke Codex via the Agent tool with `subagent_type: "codex:codex-rescue"`. Codex will patch what it finds autonomously.
-2. **Stay idle. No read-ahead.** Wait for the Codex subagent to complete before doing anything else. Do not implement, read files, or plan the next ticket while Codex runs.
-3. Record the outcome. When the outcome is `patched`, include one or more patch-commit SHAs so the PR body can link the exact Codex follow-up commits:
+1. Invoke the review subagent via the Agent tool using the `reviewSubagentOverride` value (e.g. `subagent_type: "codex:codex-rescue"`). The subagent will patch what it finds autonomously.
+2. **Stay idle. No read-ahead.** Wait for the subagent to complete before doing anything else.
+3. Record the outcome. When the outcome is `patched`, include one or more patch-commit SHAs:
 
 ```bash
-bun run deliver --plan <plan> codex-preflight clean    # Codex found nothing worth patching
-bun run deliver --plan <plan> codex-preflight patched <sha...>  # Codex findings were applied
+bun run deliver --plan <plan> subagent-review clean    # subagent found nothing worth patching
+bun run deliver --plan <plan> subagent-review patched <sha...>  # subagent findings were applied
 ```
 
-The CLI is a state recorder only — it does not invoke Codex. The agent runs the Codex skill, then calls this command. A recorded Codex patch commit must use a subject suffix of `[codexPreflight]`.
+The CLI is a state recorder only — it does not invoke the subagent. The primary agent runs the subagent skill, then calls this command. A recorded subagent patch commit must use a subject suffix of `[subagentReview]`.
 
-**Codex scope contract:** Codex reviews and patches implementation code only. Ticket doc files under `docs/product/delivery/` (including `## Rationale` updates written by Claude during implementation) are part of the ticket deliverable — Codex must not revert them. If Codex touches a ticket doc, that change should be rejected.
+**Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 
-**Doc-only tickets** auto-skip Codex preflight only when `reviewPolicy.codexPreflight` is `"skip_doc_only"`. The orchestrator detects doc-only by inspecting the local git diff at `codex-preflight` time (all changed files are `.md`) and records `skipped` without requiring an outcome arg. A clear message is printed: "Doc-only ticket — Codex preflight auto-skipped."
+When `reviewPolicy.subagentReview` is `"disabled"`, `open-pr` does not require `subagent_review_complete` status and tickets at `verified` may proceed directly to `open-pr`.
 
-When `reviewPolicy.codexPreflight` is `"disabled"`, `open-pr` does not require `codex_preflight_complete` status and tickets at `post_verify_self_audit_complete` may proceed directly to `open-pr`.
-
-If `codex-plugin-cc` is unavailable, set `codexPreflight: "disabled"` in `orchestrator.config.json` to bypass the gate.
+If the subagent is unavailable, set `subagentReview: "disabled"` in `orchestrator.config.json` to bypass the gate.
 
 ## Commands
 
@@ -363,8 +366,8 @@ Available commands:
 - `repair-state`
 - `ai-review [--pr <number>]`
 - `start [ticket-id]`
-- `post-verify-self-audit [ticket-id] [clean|patched] [patch-commit-sha ...]` (alias: `internal-review`, deprecated)
-- `codex-preflight [clean|patched] [patch-commit-sha ...]`
+- `post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]`
+- `subagent-review [clean|patched] [patch-commit-sha ...]`
 - `open-pr [ticket-id]`
 - `poll-review [ticket-id]`
 - `reconcile-late-review <ticket-id>`
@@ -384,25 +387,25 @@ Default `cook` flow (with repo-default `skip_doc_only` review policy):
 
 ```bash
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
-bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify-self-audit [clean|patched] [patch-commit-sha ...]
-# for code tickets, invoke codex:codex-rescue via Agent tool (subagent_type: "codex:codex-rescue"); Codex patches autonomously, then record:
-bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md codex-preflight [clean|patched] [patch-commit-sha ...]
-# for doc-only tickets under skip_doc_only, codex-preflight auto-records skipped
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
+# for code tickets when subagentReview is required, invoke the subagent (e.g. codex:codex-rescue); subagent patches autonomously, then record:
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
+# for doc-only tickets under skip_doc_only, subagent-review auto-records skipped
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
-# poll-review auto-records clean/skipped when externalReview is disabled or no findings detected — skip record-review in those cases
+# poll-review auto-records clean/skipped when prReview is disabled or no findings detected — skip record-review in those cases
 # only run record-review when poll-review leaves the ticket in needs_patch state
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md record-review PN.NN patched "patched the two actionable correctness issues"
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md advance
 ```
 
-With `codexPreflight: "required"` in `orchestrator.config.json`, add the Codex preflight step after self-audit:
+With `subagentReview: "required"` in `orchestrator.config.json`, the subagent step is mandatory before `open-pr` for code tickets:
 
 ```bash
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
-bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify-self-audit [clean|patched] [patch-commit-sha ...]
-# run codex:review skill, apply prudent findings, then record:
-bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md codex-preflight [clean|patched] [patch-commit-sha ...]
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
+# invoke subagent (reviewSubagentOverride value), apply prudent findings, then record:
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md advance
@@ -441,11 +444,11 @@ For standalone PRs, the internal review contract is behavior-first, not state-re
 - for non-trivial code changes, run `codex:codex-rescue` informally before `ai-review`
 - run standalone `ai-review` as the orchestrator-visible external review gate
 
-In standalone mode, `selfAudit` and `codexPreflight` are expected preflight discipline, not orchestrator gates. The orchestrator can tell the agent to do them, but without standalone state it cannot verify, audit, or block on them. Only standalone `ai-review` is an orchestrator-visible gate today.
+In standalone mode, `post-verify` and `subagent-review` are expected preflight discipline, not orchestrator gates. The orchestrator can tell the agent to do them, but without standalone state it cannot verify, audit, or block on them. Only standalone `ai-review` is an orchestrator-visible gate today.
 
-The ticket-only commands `post-verify-self-audit`, `codex-preflight`, `open-pr`, `poll-review`, `record-review`, and `advance` do not apply to standalone PRs because there is no ticket state to update. That architectural constraint does not remove the underlying review discipline; it does mean the self-audit and optional Codex pass remain guided discretion in standalone mode rather than durable workflow state.
+The ticket-only commands `post-verify`, `subagent-review`, `open-pr`, `poll-review`, `record-review`, and `advance` do not apply to standalone PRs because there is no ticket state to update. That architectural constraint does not remove the underlying review discipline; it does mean the self-audit and optional subagent pass remain guided discretion in standalone mode rather than durable workflow state.
 
-If standalone delivery ever needs true self-audit or Codex gate semantics, add a lightweight standalone state artifact first. Do not present soft preflight discipline as a hard gate without durable evidence.
+If standalone delivery ever needs true post-verify or subagent-review gate semantics, add a lightweight standalone state artifact first. Do not present soft preflight discipline as a hard gate without durable evidence.
 
 If a parent ticket was squash-merged onto `main`, run:
 

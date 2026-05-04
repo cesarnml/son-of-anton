@@ -148,6 +148,18 @@ export function buildTicketHandoff(
     '- Stop if the work requires a broader redesign beyond the ticket scope.',
   );
 
+  if (options?.ticketBoundaryMode === 'gated') {
+    const nextCommand =
+      options.subagentReviewPolicy === 'disabled' ||
+      options.subagentReviewPolicy === undefined
+        ? 'open-pr'
+        : 'subagent-review';
+    lines.push('', '## RESUME COMMAND', '');
+    lines.push(
+      `\`bun run deliver --plan ${state.planPath} ${nextCommand}\``,
+    );
+  }
+
   return lines.join('\n') + '\n';
 }
 
