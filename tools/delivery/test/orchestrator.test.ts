@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -138,6 +138,50 @@ describe('delivery orchestrator', () => {
           'docs/02-delivery/phase-02/ticket-02-movie-matcher-allows-missing-codec.md',
       },
     ]);
+  });
+
+  it('parses ticket scope relative to the provided repo root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'pr-title-scope-'));
+    const planDir = join(repoRoot, 'docs/02-delivery/phase-99');
+
+    try {
+      await mkdir(planDir, { recursive: true });
+      await writeFile(
+        join(planDir, 'ticket-01-fix-relative-scope.md'),
+        ['# P9.01 Relative Scope', '', 'Scope: CLI', ''].join('\n'),
+      );
+
+      const tickets = parsePlan(
+        `
+# Phase 99 Implementation Plan
+
+## Ticket Order
+
+1. \`P9.01 Relative Scope\`
+
+## Ticket Files
+
+- \`ticket-01-fix-relative-scope.md\`
+
+## Exit Condition
+`,
+        'docs/02-delivery/phase-99/implementation-plan.md',
+        repoRoot,
+      );
+
+      expect(tickets).toEqual([
+        {
+          id: 'P9.01',
+          title: 'Relative Scope',
+          slug: 'relative-scope',
+          scope: 'cli',
+          ticketFile:
+            'docs/02-delivery/phase-99/ticket-01-fix-relative-scope.md',
+        },
+      ]);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('builds options from a plan path', () => {

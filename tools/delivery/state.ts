@@ -511,7 +511,7 @@ async function loadPlanContext(
   dependencies: RepoInferenceDependencies,
 ): Promise<LoadPlanContextResult> {
   const planMarkdown = await readFile(resolve(cwd, options.planPath), 'utf8');
-  const ticketDefinitions = parsePlan(planMarkdown, options.planPath);
+  const ticketDefinitions = parsePlan(planMarkdown, options.planPath, cwd);
   const absoluteStatePath = resolve(cwd, options.statePath);
   const inferred = inferStateFromRepo(
     cwd,

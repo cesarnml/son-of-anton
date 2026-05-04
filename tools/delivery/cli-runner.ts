@@ -518,8 +518,9 @@ export function findPrimaryWorktreePath(
 export function parsePlan(
   markdown: string,
   planPath: string,
+  cwd?: string,
 ): TicketDefinition[] {
-  return parsePlanImpl(markdown, planPath);
+  return parsePlanImpl(markdown, planPath, cwd);
 }
 
 export function syncStateFromScratch(

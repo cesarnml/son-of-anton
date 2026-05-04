@@ -8,6 +8,7 @@ import { DEFAULT_REVIEW_POLLING_PROFILE } from './review-polling-profile';
 export function parsePlan(
   markdown: string,
   planPath: string,
+  cwd?: string,
 ): TicketDefinition[] {
   const ticketOrderSection = markdown.match(
     /## Ticket Order\s+([\s\S]*?)\n## Ticket Files/,
@@ -43,7 +44,7 @@ export function parsePlan(
     return {
       ...ticket,
       slug: slugify(ticket.title),
-      scope: parseTicketScope(ticketFile),
+      scope: parseTicketScope(resolve(cwd ?? '', ticketFile)),
       ticketFile,
     };
   });
@@ -103,7 +104,7 @@ export async function inferPlanPathFromBranch(
     const markdown = await readFile(resolve(cwd, planPath), 'utf8');
     planIndex.push({
       planPath,
-      tickets: parsePlan(markdown, planPath),
+      tickets: parsePlan(markdown, planPath, cwd),
     });
   }
 
