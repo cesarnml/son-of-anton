@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { getUsage, parseCliArgs, resolveOptionsForCommand } from './cli';
 import { ensureEnvReady as ensureEnvReadyImpl } from './env';
 import {
@@ -448,6 +449,11 @@ export async function runDeliveryOrchestrator(
           context,
         );
         await saveState(cwd, nextState);
+        await syncStateToPrimaryIfNeeded(
+          cwd,
+          nextState,
+          (wt) => findPrimaryWorktreePath(wt, context.config),
+        );
         console.log(formatStatus(nextState, context.config));
         const boundaryGuidance = formatAdvanceBoundaryGuidance(
           state,
@@ -630,6 +636,17 @@ export async function saveState(
   state: DeliveryState,
 ): Promise<void> {
   await saveStateImpl(cwd, state);
+}
+
+export async function syncStateToPrimaryIfNeeded(
+  cwd: string,
+  state: DeliveryState,
+  findPrimaryPath: (cwd: string) => string | undefined,
+): Promise<void> {
+  const primaryPath = findPrimaryPath(cwd);
+  if (primaryPath && resolve(primaryPath) !== resolve(cwd)) {
+    await saveState(primaryPath, state);
+  }
 }
 
 export function summarizeStateDifferences(
