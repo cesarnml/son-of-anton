@@ -69,6 +69,7 @@ export function buildTicketHandoff(
     'id' | 'title' | 'ticketFile' | 'branch' | 'baseBranch' | 'worktreePath'
   >,
   modifiedSectionsNote?: string,
+  options?: { ticketBoundaryMode?: string; subagentReviewPolicy?: string },
 ): string {
   const ticketIndex = state.tickets.findIndex(
     (candidate) => candidate.id === ticket.id,
