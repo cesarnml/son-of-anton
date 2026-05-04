@@ -578,6 +578,38 @@ describe('delivery orchestrator', () => {
     ).toBe('feat: reconcile torrent lifecycle from transmission [P3.02]');
   });
 
+  it('derives PR title from ticket filename type and scope field', () => {
+    expect(
+      buildPullRequestTitle({
+        id: 'P1.01',
+        title: 'Fix state.json sync in advance',
+        ticketFile: 'ticket-01-fix-state-sync.md',
+        scope: 'cli',
+      }),
+    ).toBe('fix(cli): fix state.json sync in advance [P1.01]');
+    expect(
+      buildPullRequestTitle({
+        id: 'P1.01',
+        title: 'Fix state.json sync in advance',
+        ticketFile: 'ticket-01-fix-state-sync.md',
+      }),
+    ).toBe('fix: fix state.json sync in advance [P1.01]');
+    expect(
+      buildPullRequestTitle({
+        id: 'P1.01',
+        title: 'Fix state.json sync in advance',
+        ticketFile: 'ticket-01-FIX-state-sync.md',
+      }),
+    ).toBe('feat: fix state.json sync in advance [P1.01]');
+    expect(
+      buildPullRequestTitle({
+        id: 'P1.01',
+        title: 'Fix state.json sync in advance',
+        ticketFile: 'no-convention-here.md',
+      }),
+    ).toBe('feat: fix state.json sync in advance [P1.01]');
+  });
+
   it('resolves the notifier from Telegram env vars', () => {
     const originalToken = process.env.TELEGRAM_BOT_TOKEN;
     const originalChatId = process.env.TELEGRAM_CHAT_ID;
