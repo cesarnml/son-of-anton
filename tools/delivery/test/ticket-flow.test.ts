@@ -4,11 +4,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import type { CodexPreflightOutcome, DeliveryState } from '../types';
+import type { SubagentReviewOutcome, DeliveryState } from '../types';
 import {
   createOptions,
   openPullRequest,
-  recordCodexPreflight,
+  recordSubagentReview,
   recordPostVerifySelfAudit,
   shouldAutoRecordReviewSkippedForPollReview,
   syncStateFromExisting,
@@ -38,9 +38,8 @@ const baseConfig: ResolvedOrchestratorConfig = {
   packageManager: 'bun',
   ticketBoundaryMode: 'cook',
   reviewPolicy: {
-    selfAudit: 'skip_doc_only',
-    codexPreflight: 'skip_doc_only',
-    externalReview: 'skip_doc_only',
+    subagentReview: 'skip_doc_only',
+    prReview: 'skip_doc_only',
   },
 };
 
@@ -309,20 +308,20 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
     ],
   };
 
-  it('records selfAuditOutcome: clean when outcome arg is "clean"', async () => {
+  it('records verifyOutcome: clean when outcome arg is "clean"', async () => {
     const nextState = await recordPostVerifySelfAudit(
       baseInProgressState,
       undefined,
       'clean',
       baseConfig,
     );
-    expect(nextState.tickets[0]?.selfAuditOutcome).toBe('clean');
+    expect(nextState.tickets[0]?.verifyOutcome).toBe('clean');
     expect(nextState.tickets[0]?.status).toBe(
-      'post_verify_self_audit_complete',
+      'verified',
     );
   });
 
-  it('records selfAuditOutcome: patched when outcome arg is "patched"', async () => {
+  it('records verifyOutcome: patched when outcome arg is "patched"', async () => {
     const nextState = await recordPostVerifySelfAudit(
       baseInProgressState,
       undefined,
@@ -336,28 +335,28 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
         },
       ],
     );
-    expect(nextState.tickets[0]?.selfAuditOutcome).toBe('patched');
-    expect(nextState.tickets[0]?.selfAuditPatchCommits).toEqual([
+    expect(nextState.tickets[0]?.verifyOutcome).toBe('patched');
+    expect(nextState.tickets[0]?.verifyPatchCommits).toEqual([
       {
         sha: 'aaaaaaaaaaaa1111111111111111111111111111',
         subject: 'fix: tighten self-audit evidence [self-audit]',
       },
     ]);
     expect(nextState.tickets[0]?.status).toBe(
-      'post_verify_self_audit_complete',
+      'verified',
     );
   });
 
-  it('defaults selfAuditOutcome to clean when no outcome arg is passed', async () => {
+  it('defaults verifyOutcome to clean when no outcome arg is passed', async () => {
     const nextState = await recordPostVerifySelfAudit(
       baseInProgressState,
       undefined,
       undefined,
       baseConfig,
     );
-    expect(nextState.tickets[0]?.selfAuditOutcome).toBe('clean');
+    expect(nextState.tickets[0]?.verifyOutcome).toBe('clean');
     expect(nextState.tickets[0]?.status).toBe(
-      'post_verify_self_audit_complete',
+      'verified',
     );
   });
 
@@ -372,9 +371,9 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
         selfAuditPolicy: 'skip_doc_only',
       },
     );
-    expect(nextState.tickets[0]?.selfAuditOutcome).toBe('skipped');
+    expect(nextState.tickets[0]?.verifyOutcome).toBe('skipped');
     expect(nextState.tickets[0]?.status).toBe(
-      'post_verify_self_audit_complete',
+      'verified',
     );
   });
 
@@ -409,7 +408,7 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
     );
     const output = formatStatus(state, baseConfig);
     expect(output).toMatch(
-      /post_verify_self_audit=completed at .+ \(patched\)/,
+      /post_verify=completed at .+ \(patched\)/,
     );
   });
 
@@ -430,14 +429,13 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
     const config: ResolvedOrchestratorConfig = {
       ...baseConfig,
       reviewPolicy: {
-        selfAudit: 'required',
-        codexPreflight: 'disabled',
-        externalReview: 'required',
+        subagentReview: 'required',
+        prReview: 'required',
       },
     };
     const output = formatStatus(baseInProgressState, config);
     expect(output).toContain(
-      'review_policy=selfAudit:required codexPreflight:disabled externalReview:required',
+      'review_policy=subagentReview:required prReview:required',
     );
   });
 
@@ -448,17 +446,18 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
         join(tempDir, 'orchestrator.config.json'),
         JSON.stringify({
           reviewPolicy: {
-            selfAudit: 'required',
-            codexPreflight: 'disabled',
-            externalReview: 'skip_doc_only',
+            subagentReview: 'required',
+            prReview: 'skip_doc_only',
           },
+          prReviewAgents: [
+            { name: 'CodeRabbit', login: 'coderabbitai', resolveThreads: true },
+          ],
         }),
       );
       const config = await loadOrchestratorConfig(tempDir);
       expect(config.reviewPolicy).toEqual({
-        selfAudit: 'required',
-        codexPreflight: 'disabled',
-        externalReview: 'skip_doc_only',
+        subagentReview: 'required',
+        prReview: 'skip_doc_only',
       });
     } finally {
       await rm(tempDir, { recursive: true });
@@ -472,12 +471,12 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
         join(tempDir, 'orchestrator.config.json'),
         JSON.stringify({
           reviewPolicy: {
-            codexPreflight: 'always',
+            prReview: 'always',
           },
         }),
       );
       await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
-        /Invalid reviewPolicy\.codexPreflight "always"/,
+        /Invalid reviewPolicy\.prReview "always"/,
       );
     } finally {
       await rm(tempDir, { recursive: true });
@@ -487,9 +486,8 @@ describe('EE8.01 — self-audit observability and reviewPolicy config', () => {
   it('resolves missing reviewPolicy key to per-stage defaults', () => {
     const resolved = resolveOrchestratorConfig({}, '/tmp');
     expect(resolved.reviewPolicy).toEqual({
-      selfAudit: 'skip_doc_only',
-      codexPreflight: 'skip_doc_only',
-      externalReview: 'skip_doc_only',
+      subagentReview: 'skip_doc_only',
+      prReview: 'skip_doc_only',
     });
   });
 
@@ -518,53 +516,53 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
         slug: 'persist-transmission-identity-for-queued-torrents',
         ticketFile:
           'docs/product/delivery/phase-03/ticket-01-persist-transmission-identity-for-queued-torrents.md',
-        status: 'post_verify_self_audit_complete',
+        status: 'verified',
         branch:
           'agents/p3-01-persist-transmission-identity-for-queued-torrents',
         baseBranch: 'main',
         worktreePath: '/tmp/p3_01',
-        postVerifySelfAuditCompletedAt: '2026-04-14T00:00:00.000Z',
+        verifiedAt: '2026-04-14T00:00:00.000Z',
       },
     ],
   };
 
-  it('records codexPreflightOutcome: clean and transitions to codex_preflight_complete', () => {
-    const nextState = recordCodexPreflight(
+  it('records subagentReviewOutcome: clean and transitions to subagent_review_complete', () => {
+    const nextState = recordSubagentReview(
       basePostAuditState,
       'clean',
       false,
-      baseConfig.reviewPolicy.codexPreflight,
+      baseConfig.reviewPolicy.subagentReview,
     );
-    expect(nextState.tickets[0]?.codexPreflightOutcome).toBe('clean');
-    expect(nextState.tickets[0]?.status).toBe('codex_preflight_complete');
-    expect(nextState.tickets[0]?.codexPreflightCompletedAt).toBeTruthy();
+    expect(nextState.tickets[0]?.subagentReviewOutcome).toBe('clean');
+    expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
+    expect(nextState.tickets[0]?.subagentReviewCompletedAt).toBeTruthy();
   });
 
-  it('records codexPreflightOutcome: patched and transitions to codex_preflight_complete', () => {
-    const nextState = recordCodexPreflight(
+  it('records subagentReviewOutcome: patched and transitions to subagent_review_complete', () => {
+    const nextState = recordSubagentReview(
       basePostAuditState,
       'patched',
       false,
-      baseConfig.reviewPolicy.codexPreflight,
+      baseConfig.reviewPolicy.subagentReview,
       [
         {
           sha: 'bbbbbbbbbbbb2222222222222222222222222222',
           subject:
-            'fix: surface codex preflight patch commits [codexPreflight]',
+            'fix: surface subagent review patch commits [self-audit]',
         },
       ],
     );
-    expect(nextState.tickets[0]?.codexPreflightOutcome).toBe('patched');
-    expect(nextState.tickets[0]?.codexPreflightPatchCommits).toEqual([
+    expect(nextState.tickets[0]?.subagentReviewOutcome).toBe('patched');
+    expect(nextState.tickets[0]?.subagentReviewPatchCommits).toEqual([
       {
         sha: 'bbbbbbbbbbbb2222222222222222222222222222',
-        subject: 'fix: surface codex preflight patch commits [codexPreflight]',
+        subject: 'fix: surface subagent review patch commits [self-audit]',
       },
     ]);
-    expect(nextState.tickets[0]?.status).toBe('codex_preflight_complete');
+    expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
   });
 
-  it('records codexPreflightOutcome: skipped for doc-only tickets', () => {
+  it('records subagentReviewOutcome: skipped for doc-only tickets', () => {
     const docOnlyState: DeliveryState = {
       ...basePostAuditState,
       tickets: basePostAuditState.tickets.map((t) => ({
@@ -572,14 +570,14 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
         docOnly: true,
       })),
     };
-    const nextState = recordCodexPreflight(
+    const nextState = recordSubagentReview(
       docOnlyState,
       undefined,
       true,
-      baseConfig.reviewPolicy.codexPreflight,
+      baseConfig.reviewPolicy.subagentReview,
     );
-    expect(nextState.tickets[0]?.codexPreflightOutcome).toBe('skipped');
-    expect(nextState.tickets[0]?.status).toBe('codex_preflight_complete');
+    expect(nextState.tickets[0]?.subagentReviewOutcome).toBe('skipped');
+    expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
   });
 
   it('requires an explicit codex preflight outcome for doc-only tickets when policy is required', () => {
@@ -591,11 +589,11 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
       })),
     };
     expect(() =>
-      recordCodexPreflight(docOnlyState, undefined, true, 'required'),
-    ).toThrow(/requires a Codex preflight outcome/);
+      recordSubagentReview(docOnlyState, undefined, true, 'required'),
+    ).toThrow(/requires a subagent review outcome/);
   });
 
-  it('rejects codex-preflight when ticket is not at post_verify_self_audit_complete', () => {
+  it('rejects subagent-review when ticket is not at verified status', () => {
     const inProgressState: DeliveryState = {
       ...basePostAuditState,
       tickets: basePostAuditState.tickets.map((t) => ({
@@ -604,40 +602,40 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
       })),
     };
     expect(() =>
-      recordCodexPreflight(
+      recordSubagentReview(
         inProgressState,
         'clean',
         false,
-        baseConfig.reviewPolicy.codexPreflight,
+        baseConfig.reviewPolicy.subagentReview,
       ),
-    ).toThrow(/No ticket at post_verify_self_audit_complete status/);
+    ).toThrow(/No ticket at verified status/);
   });
 
-  it('rejects patched codex-preflight outcomes without recorded patch commits', () => {
+  it('rejects patched subagent-review outcomes without recorded patch commits', () => {
     expect(() =>
-      recordCodexPreflight(
+      recordSubagentReview(
         basePostAuditState,
         'patched',
         false,
-        baseConfig.reviewPolicy.codexPreflight,
+        baseConfig.reviewPolicy.subagentReview,
       ),
     ).toThrow(
-      /Codex preflight recorded as patched requires at least one patch commit/,
+      /Subagent review recorded as patched requires at least one patch commit/,
     );
   });
 
-  it('rejects codex-preflight on a code ticket with no outcome arg', () => {
+  it('rejects subagent-review on a code ticket with no outcome arg', () => {
     expect(() =>
-      recordCodexPreflight(
+      recordSubagentReview(
         basePostAuditState,
         undefined,
         false,
-        baseConfig.reviewPolicy.codexPreflight,
+        baseConfig.reviewPolicy.subagentReview,
       ),
-    ).toThrow(/requires a Codex preflight outcome/);
+    ).toThrow(/requires a subagent review outcome/);
   });
 
-  it('statusRank orders: post_verify_self_audit_complete < codex_preflight_complete < in_review', () => {
+  it('statusRank orders: verified < subagent_review_complete < in_review', () => {
     // Verify via syncStateFromExisting status selection: higher rank wins
     const options = createOptions({
       planPath: 'docs/product/delivery/phase-03/implementation-plan.md',
@@ -652,7 +650,7 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
           slug: 'persist-transmission-identity-for-queued-torrents',
           ticketFile:
             'docs/product/delivery/phase-03/ticket-01-persist-transmission-identity-for-queued-torrents.md',
-          status: 'codex_preflight_complete',
+          status: 'subagent_review_complete',
           branch:
             'agents/p3-01-persist-transmission-identity-for-queued-torrents',
           baseBranch: 'main',
@@ -660,12 +658,12 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
         },
       ],
     };
-    // inferred state has lower rank (post_verify_self_audit_complete) — existing wins
+    // inferred state has lower rank (verified) — existing wins
     const inferred: DeliveryState = {
       ...existing,
       tickets: existing.tickets.map((t) => ({
         ...t,
-        status: 'post_verify_self_audit_complete' as const,
+        status: 'verified' as const,
       })),
     };
     const synced = syncStateFromExisting(
@@ -676,49 +674,46 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
       baseConfig,
       inferred,
     );
-    expect(synced.tickets[0]?.status).toBe('codex_preflight_complete');
+    expect(synced.tickets[0]?.status).toBe('subagent_review_complete');
   });
 
-  it('open-pr rejects code ticket at post_verify_self_audit_complete when policy is required', async () => {
+  it('open-pr rejects code ticket at verified when policy is required', async () => {
     const context = testContext({
       reviewPolicy: {
-        selfAudit: 'required',
-        codexPreflight: 'required',
-        externalReview: 'required',
+        subagentReview: 'required',
+        prReview: 'required',
       },
     });
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/requires Codex preflight before opening a PR/);
+    ).rejects.toThrow(/requires subagent review before opening a PR/);
   });
 
-  it('open-pr rejects code ticket at post_verify_self_audit_complete when policy is skip_doc_only', async () => {
+  it('open-pr rejects code ticket at verified when policy is skip_doc_only', async () => {
     const context = testContext({
       reviewPolicy: {
-        selfAudit: 'skip_doc_only',
-        codexPreflight: 'skip_doc_only',
-        externalReview: 'skip_doc_only',
+        subagentReview: 'skip_doc_only',
+        prReview: 'skip_doc_only',
       },
     });
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/requires Codex preflight before opening a PR/);
+    ).rejects.toThrow(/requires subagent review before opening a PR/);
   });
 
-  it('open-pr error message includes codex-plugin-cc and config escape hatch', async () => {
+  it('open-pr error message includes subagent-review command and config escape hatch', async () => {
     const context = testContext({
       reviewPolicy: {
-        selfAudit: 'required',
-        codexPreflight: 'required',
-        externalReview: 'required',
+        subagentReview: 'required',
+        prReview: 'required',
       },
     });
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/codex-plugin-cc/);
+    ).rejects.toThrow(/subagent-review/);
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/codexPreflight.*disabled.*orchestrator\.config\.json/);
+    ).rejects.toThrow(/subagentReview.*disabled.*orchestrator\.config\.json/);
   });
 
   it('open-pr reports publication progress for a new PR', () => {
@@ -738,7 +733,7 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
           slug: 'persist-transmission-identity-for-queued-torrents',
           ticketFile:
             'docs/product/delivery/phase-03/ticket-01-persist-transmission-identity-for-queued-torrents.md',
-          status: 'codex_preflight_complete',
+          status: 'subagent_review_complete',
           branch:
             'agents/p3-01-persist-transmission-identity-for-queued-torrents',
           baseBranch: 'main',
@@ -827,35 +822,35 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     expect(nextState.tickets[0]?.prNumber).toBe(23);
   });
 
-  it('formats codex_preflight outcome in formatStatus', () => {
+  it('formats subagent_review outcome in formatStatus', () => {
     const state: DeliveryState = {
       ...basePostAuditState,
       tickets: basePostAuditState.tickets.map((t) => ({
         ...t,
-        status: 'codex_preflight_complete' as const,
-        codexPreflightOutcome: 'clean' as CodexPreflightOutcome,
-        codexPreflightCompletedAt: '2026-04-14T10:00:00.000Z',
+        status: 'subagent_review_complete' as const,
+        subagentReviewOutcome: 'clean' as SubagentReviewOutcome,
+        subagentReviewCompletedAt: '2026-04-14T10:00:00.000Z',
       })),
     };
     const output = formatStatus(state, baseConfig);
     expect(output).toContain(
-      'codex_preflight=completed at 2026-04-14T10:00:00.000Z (clean)',
+      'subagent_review=completed at 2026-04-14T10:00:00.000Z (clean)',
     );
   });
 
-  it('formats skipped codex_preflight outcome in formatStatus', () => {
+  it('formats skipped subagent_review outcome in formatStatus', () => {
     const state: DeliveryState = {
       ...basePostAuditState,
       tickets: basePostAuditState.tickets.map((t) => ({
         ...t,
-        status: 'codex_preflight_complete' as const,
-        codexPreflightOutcome: 'skipped' as CodexPreflightOutcome,
-        codexPreflightCompletedAt: '2026-04-14T10:00:00.000Z',
+        status: 'subagent_review_complete' as const,
+        subagentReviewOutcome: 'skipped' as SubagentReviewOutcome,
+        subagentReviewCompletedAt: '2026-04-14T10:00:00.000Z',
       })),
     };
     const output = formatStatus(state, baseConfig);
     expect(output).toContain(
-      'codex_preflight=completed at 2026-04-14T10:00:00.000Z (skipped)',
+      'subagent_review=completed at 2026-04-14T10:00:00.000Z (skipped)',
     );
   });
 
@@ -922,14 +917,14 @@ describe('P2.01 — post-verify transitions to verified; subagent-review transit
       ...baseInProgressState2,
       tickets: baseInProgressState2.tickets.map((t) => ({
         ...t,
-        status: 'post_verify_self_audit_complete' as const,
+        status: 'verified' as const,
       })),
     };
-    const nextState = recordCodexPreflight(
+    const nextState = recordSubagentReview(
       verifiedState,
       'clean',
       false,
-      baseConfig.reviewPolicy.codexPreflight,
+      baseConfig.reviewPolicy.subagentReview,
     );
     expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
   });

@@ -14,15 +14,15 @@ import type { ReviewActionCommit } from './pr-metadata';
 import { saveState as saveStateImpl } from './state';
 import type { ReviewPolicyStageValue } from './config';
 import type {
-  CodexPreflightOutcome,
   DeliveryState,
   InternalReviewPatchCommit,
   ReviewOutcome,
+  SubagentReviewOutcome,
   TicketState,
 } from './types';
 
 function validateInternalReviewPatchCommits(input: {
-  outcome: ReviewOutcome | CodexPreflightOutcome;
+  outcome: ReviewOutcome | SubagentReviewOutcome;
   patchCommits: InternalReviewPatchCommit[] | undefined;
   stageLabel: string;
 }): void {
@@ -324,17 +324,17 @@ export function recordPostVerifySelfAudit(
 
   if (!target) {
     throw new Error(
-      'No in-progress ticket found to mark post-verify self-audit complete.',
+      'No in-progress ticket found to mark verified.',
     );
   }
 
-  if (target.status === 'post_verify_self_audit_complete') {
+  if (target.status === 'verified') {
     return state;
   }
 
   if (target.status !== 'in_progress') {
     throw new Error(
-      `Ticket ${target.id} must be in progress before post-verify self-audit can be recorded.`,
+      `Ticket ${target.id} must be in progress before post-verify can be recorded.`,
     );
   }
 
@@ -352,40 +352,37 @@ export function recordPostVerifySelfAudit(
       ticket.id === target.id
         ? {
             ...ticket,
-            status: 'post_verify_self_audit_complete',
-            postVerifySelfAuditCompletedAt: completedAt,
-            selfAuditOutcome: resolvedOutcome,
-            selfAuditPatchCommits: patchCommits,
+            status: 'verified' as const,
+            verifiedAt: completedAt,
+            verifyOutcome: resolvedOutcome,
+            verifyPatchCommits: patchCommits,
           }
         : ticket,
     ),
   };
 }
 
-/** @deprecated Use `recordPostVerifySelfAudit`. */
-export const recordInternalReview = recordPostVerifySelfAudit;
-
-export function recordCodexPreflight(
+export function recordSubagentReview(
   state: DeliveryState,
   outcome?: 'clean' | 'patched',
   isDocOnly?: boolean,
   policy: ReviewPolicyStageValue = 'skip_doc_only',
   patchCommits?: InternalReviewPatchCommit[],
-  note?: string,
+  agentName?: string,
   now: () => string = () => new Date().toISOString(),
 ): DeliveryState {
   const target = state.tickets.find(
-    (ticket) => ticket.status === 'post_verify_self_audit_complete',
+    (ticket) => ticket.status === 'verified',
   );
 
   if (!target) {
     throw new Error(
-      'No ticket at post_verify_self_audit_complete status found to record Codex preflight.',
+      'No ticket at verified status found to record subagent review.',
     );
   }
 
   const docOnly = isDocOnly ?? !!target.docOnly;
-  let resolvedOutcome: CodexPreflightOutcome;
+  let resolvedOutcome: SubagentReviewOutcome;
 
   if (policy === 'skip_doc_only' && docOnly) {
     resolvedOutcome = 'skipped';
@@ -393,13 +390,13 @@ export function recordCodexPreflight(
     resolvedOutcome = outcome;
   } else {
     throw new Error(
-      `Ticket ${target.id} requires a Codex preflight outcome. Pass \`clean\` or \`patched\`.`,
+      `Ticket ${target.id} requires a subagent review outcome. Pass \`clean\` or \`patched\`.`,
     );
   }
   validateInternalReviewPatchCommits({
     outcome: resolvedOutcome,
     patchCommits,
-    stageLabel: 'Codex preflight',
+    stageLabel: 'Subagent review',
   });
 
   const completedAt = now();
@@ -410,16 +407,22 @@ export function recordCodexPreflight(
       ticket.id === target.id
         ? {
             ...ticket,
-            status: 'codex_preflight_complete',
-            codexPreflightOutcome: resolvedOutcome,
-            codexPreflightCompletedAt: completedAt,
-            codexPreflightNote: note,
-            codexPreflightPatchCommits: patchCommits,
+            status: 'subagent_review_complete' as const,
+            subagentReviewOutcome: resolvedOutcome,
+            subagentReviewCompletedAt: completedAt,
+            subagentReviewPatchCommits: patchCommits,
+            subagentReviewAgent: agentName,
           }
         : ticket,
     ),
   };
 }
+
+/** @deprecated Use recordPostVerifySelfAudit (transitional alias). */
+export const recordCodexPreflight = recordSubagentReview;
+
+/** @deprecated Use recordPostVerifySelfAudit (transitional alias). */
+export const recordInternalReview = recordPostVerifySelfAudit;
 
 export function openPullRequest(
   state: DeliveryState,
@@ -439,7 +442,7 @@ export function openPullRequest(
     buildPullRequestTitle: (
       ticket: Pick<TicketState, 'id' | 'title' | 'ticketFile' | 'scope'>,
     ) => string;
-    codexPreflightPolicy?: ReviewPolicyStageValue;
+    subagentReviewPolicy?: ReviewPolicyStageValue;
     createPullRequest: (
       cwd: string,
       options: {
@@ -473,10 +476,10 @@ export function openPullRequest(
     (ticketId
       ? state.tickets.find((ticket) => ticket.id === ticketId)
       : (state.tickets.find(
-          (ticket) => ticket.status === 'codex_preflight_complete',
+          (ticket) => ticket.status === 'subagent_review_complete',
         ) ??
         state.tickets.find(
-          (ticket) => ticket.status === 'post_verify_self_audit_complete',
+          (ticket) => ticket.status === 'verified',
         ) ??
         state.tickets.find((ticket) => ticket.status === 'in_review'))) ??
     undefined;
@@ -487,23 +490,23 @@ export function openPullRequest(
 
   if (target.status === 'in_progress') {
     throw new Error(
-      `Ticket ${target.id} must complete post-verify self-audit before opening a PR.`,
+      `Ticket ${target.id} must complete post-verify before opening a PR.`,
     );
   }
 
   if (
-    target.status === 'post_verify_self_audit_complete' &&
-    dependencies.codexPreflightPolicy !== undefined &&
-    dependencies.codexPreflightPolicy !== 'disabled'
+    target.status === 'verified' &&
+    dependencies.subagentReviewPolicy !== undefined &&
+    dependencies.subagentReviewPolicy !== 'disabled'
   ) {
     throw new Error(
-      `Ticket ${target.id} requires Codex preflight before opening a PR. Run \`bun run deliver codex-preflight <clean|patched>\` after completing the Codex review step. If codex-plugin-cc is unavailable, set codexPreflight to "disabled" in orchestrator.config.json to bypass.`,
+      `Ticket ${target.id} requires subagent review before opening a PR. Run \`bun run deliver subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
     );
   }
 
   if (
-    target.status !== 'post_verify_self_audit_complete' &&
-    target.status !== 'codex_preflight_complete' &&
+    target.status !== 'verified' &&
+    target.status !== 'subagent_review_complete' &&
     target.status !== 'in_review'
   ) {
     throw new Error(

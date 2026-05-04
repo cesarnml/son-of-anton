@@ -37,13 +37,12 @@ type TicketReviewMetadataRefreshTarget = Pick<
   | 'title'
   | 'ticketFile'
   | 'baseBranch'
-  | 'postVerifySelfAuditCompletedAt'
-  | 'selfAuditOutcome'
-  | 'selfAuditPatchCommits'
-  | 'codexPreflightOutcome'
-  | 'codexPreflightCompletedAt'
-  | 'codexPreflightNote'
-  | 'codexPreflightPatchCommits'
+  | 'verifiedAt'
+  | 'verifyOutcome'
+  | 'verifyPatchCommits'
+  | 'subagentReviewOutcome'
+  | 'subagentReviewCompletedAt'
+  | 'subagentReviewPatchCommits'
   | 'reviewActionSummary'
   | 'reviewArtifactJsonPath'
   | 'reviewArtifactPath'
@@ -979,14 +978,14 @@ export function buildPullRequestBody(
     ticket.status === 'needs_patch' ||
     ticket.status === 'operator_input_needed';
   assertPatchedStageHasCommitEvidence({
-    outcome: ticket.selfAuditOutcome,
-    patchCommits: ticket.selfAuditPatchCommits,
+    outcome: ticket.verifyOutcome,
+    patchCommits: ticket.verifyPatchCommits,
     stageLabel: 'Self-audit',
   });
   assertPatchedStageHasCommitEvidence({
-    outcome: ticket.codexPreflightOutcome,
-    patchCommits: ticket.codexPreflightPatchCommits,
-    stageLabel: 'Codex preflight',
+    outcome: ticket.subagentReviewOutcome,
+    patchCommits: ticket.subagentReviewPatchCommits,
+    stageLabel: 'Subagent review',
   });
 
   const lines = [
@@ -1007,28 +1006,25 @@ export function buildPullRequestBody(
   lines.push(`- stacked base branch: \`${ticket.baseBranch}\``);
 
   const selfAuditLine = buildInternalReviewStageLine({
-    completedAt: ticket.postVerifySelfAuditCompletedAt,
-    outcome: ticket.selfAuditOutcome,
+    completedAt: ticket.verifiedAt,
+    outcome: ticket.verifyOutcome,
     stageLabel: 'self-audit',
   });
   if (selfAuditLine) {
     lines.push(selfAuditLine);
   }
 
-  const codexPreflightLine = buildInternalReviewStageLine({
-    completedAt: ticket.codexPreflightCompletedAt,
-    outcome: ticket.codexPreflightOutcome,
-    stageLabel: 'codexPreflight',
+  const subagentReviewLine = buildInternalReviewStageLine({
+    completedAt: ticket.subagentReviewCompletedAt,
+    outcome: ticket.subagentReviewOutcome,
+    stageLabel: 'subagentReview',
   });
-  if (codexPreflightLine) {
-    lines.push(codexPreflightLine);
-    if (ticket.codexPreflightNote) {
-      lines.push(`  > ${ticket.codexPreflightNote}`);
-    }
+  if (subagentReviewLine) {
+    lines.push(subagentReviewLine);
   }
 
   const selfAuditPatchCommitBullets = buildRecordedPatchCommitBullets(
-    ticket.selfAuditPatchCommits,
+    ticket.verifyPatchCommits,
     options.githubRepo,
   );
   if (selfAuditPatchCommitBullets.length > 0) {
@@ -1040,16 +1036,16 @@ export function buildPullRequestBody(
     );
   }
 
-  const codexPatchCommitBullets = buildRecordedPatchCommitBullets(
-    ticket.codexPreflightPatchCommits,
+  const subagentPatchCommitBullets = buildRecordedPatchCommitBullets(
+    ticket.subagentReviewPatchCommits,
     options.githubRepo,
   );
-  if (codexPatchCommitBullets.length > 0) {
+  if (subagentPatchCommitBullets.length > 0) {
     lines.push(
       '',
-      '### Codex Preflight Patch Commits',
+      '### Subagent Review Patch Commits',
       '',
-      ...codexPatchCommitBullets,
+      ...subagentPatchCommitBullets,
     );
   }
 

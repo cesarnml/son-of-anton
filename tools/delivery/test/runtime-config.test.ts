@@ -18,9 +18,8 @@ const baseConfig: ResolvedOrchestratorConfig = {
   packageManager: 'bun',
   ticketBoundaryMode: 'cook',
   reviewPolicy: {
-    selfAudit: 'skip_doc_only',
-    codexPreflight: 'skip_doc_only',
-    externalReview: 'skip_doc_only',
+    subagentReview: 'skip_doc_only',
+    prReview: 'skip_doc_only',
   },
 };
 
@@ -176,9 +175,8 @@ describe('orchestrator config', () => {
         packageManager: 'npm',
         ticketBoundaryMode: 'cook',
         reviewPolicy: {
-          selfAudit: 'skip_doc_only',
-          codexPreflight: 'skip_doc_only',
-          externalReview: 'skip_doc_only',
+          subagentReview: 'skip_doc_only',
+          prReview: 'skip_doc_only',
         },
       });
     } finally {

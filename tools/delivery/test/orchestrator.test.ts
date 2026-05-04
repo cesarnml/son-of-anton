@@ -81,9 +81,8 @@ const baseConfig: ResolvedOrchestratorConfig = {
   packageManager: 'bun',
   ticketBoundaryMode: 'cook',
   reviewPolicy: {
-    selfAudit: 'skip_doc_only',
-    codexPreflight: 'skip_doc_only',
-    externalReview: 'skip_doc_only',
+    subagentReview: 'skip_doc_only',
+    prReview: 'skip_doc_only',
   },
 };
 
@@ -271,9 +270,8 @@ describe('delivery orchestrator', () => {
           packageManager: 'bun',
           ticketBoundaryMode: 'glide',
           reviewPolicy: {
-            selfAudit: 'skip_doc_only',
-            codexPreflight: 'skip_doc_only',
-            externalReview: 'skip_doc_only',
+            subagentReview: 'skip_doc_only',
+            prReview: 'skip_doc_only',
           },
         },
       ),
@@ -955,8 +953,8 @@ describe('delivery orchestrator', () => {
           ticketFile:
             'docs/product/delivery/engineering-epic-02/ticket-05-shared-review-metadata-refresh-adapter.md',
           baseBranch: 'agents/e2-04-shared-clean-and-timeout-recording-core',
-          postVerifySelfAuditCompletedAt: '2026-04-07T00:00:00.000Z',
-          selfAuditOutcome: 'clean',
+          verifiedAt: '2026-04-07T00:00:00.000Z',
+          verifyOutcome: 'clean',
           reviewActionSummary: reviewState.actionSummary,
           reviewIncompleteAgents: undefined,
           reviewComments: reviewState.comments,
@@ -1033,24 +1031,24 @@ describe('delivery orchestrator', () => {
         ticketFile:
           'docs/product/delivery/engineering-epic-08/ticket-04-pr-body-internal-review-observability.md',
         baseBranch: 'main',
-        postVerifySelfAuditCompletedAt: '2026-04-14T08:33:00.000Z',
-        selfAuditOutcome: 'patched',
-        selfAuditPatchCommits: [
+        verifiedAt: '2026-04-14T08:33:00.000Z',
+        verifyOutcome: 'patched',
+        verifyPatchCommits: [
           {
             sha: 'aaaaaaaaaaaa1111111111111111111111111111',
             subject: 'fix: clarify PR body review state [self-audit]',
           },
         ],
-        codexPreflightCompletedAt: '2026-04-14T08:48:00.000Z',
-        codexPreflightOutcome: 'patched',
-        codexPreflightPatchCommits: [
+        subagentReviewCompletedAt: '2026-04-14T08:48:00.000Z',
+        subagentReviewOutcome: 'patched',
+        subagentReviewPatchCommits: [
           {
             sha: 'bbbbbbbbbbbb2222222222222222222222222222',
             subject:
-              'fix: surface codex preflight patch commits [codexPreflight]',
+              'fix: surface subagent review patch commits [self-audit]',
           },
         ],
-        status: 'codex_preflight_complete',
+        status: 'subagent_review_complete',
       },
       {
         githubRepo: {
@@ -1065,15 +1063,15 @@ describe('delivery orchestrator', () => {
       '- self-audit: outcome `patched` completed at 2026-04-14 08:33 UTC',
     );
     expect(body).toContain(
-      '- codexPreflight: outcome `patched` completed at 2026-04-14 08:48 UTC',
+      '- subagentReview: outcome `patched` completed at 2026-04-14 08:48 UTC',
     );
     expect(body).toContain('### Self-Audit Patch Commits');
-    expect(body).toContain('### Codex Preflight Patch Commits');
+    expect(body).toContain('### Subagent Review Patch Commits');
     expect(body).toContain(
       '[`aaaaaaaaaaaa`](https://github.com/cesarnml/Test-Project/commit/aaaaaaaaaaaa1111111111111111111111111111) fix: clarify PR body review state [self-audit]',
     );
     expect(body).toContain(
-      '[`bbbbbbbbbbbb`](https://github.com/cesarnml/Test-Project/commit/bbbbbbbbbbbb2222222222222222222222222222) fix: surface codex preflight patch commits [codexPreflight]',
+      '[`bbbbbbbbbbbb`](https://github.com/cesarnml/Test-Project/commit/bbbbbbbbbbbb2222222222222222222222222222) fix: surface subagent review patch commits [self-audit]',
     );
   });
 
@@ -1097,10 +1095,10 @@ describe('delivery orchestrator', () => {
           ticketFile:
             'docs/product/delivery/engineering-epic-08/ticket-04-pr-body-internal-review-observability.md',
           baseBranch: 'main',
-          postVerifySelfAuditCompletedAt: '2026-04-14T08:33:00.000Z',
-          selfAuditOutcome: 'patched',
-          selfAuditPatchCommits: [],
-          status: 'post_verify_self_audit_complete',
+          verifiedAt: '2026-04-14T08:33:00.000Z',
+          verifyOutcome: 'patched',
+          verifyPatchCommits: [],
+          status: 'verified',
         },
       ),
     ).toThrow(/Self-audit PR metadata requires recorded patch commits/);
@@ -1124,9 +1122,9 @@ describe('delivery orchestrator', () => {
         ticketFile:
           'docs/product/delivery/engineering-epic-08/ticket-04-pr-body-internal-review-observability.md',
         baseBranch: 'main',
-        postVerifySelfAuditCompletedAt: '2026-04-14T08:33:00.000Z',
-        selfAuditOutcome: 'patched',
-        status: 'post_verify_self_audit_complete',
+        verifiedAt: '2026-04-14T08:33:00.000Z',
+        verifyOutcome: 'patched',
+        status: 'verified',
       },
     );
 
@@ -1924,9 +1922,9 @@ describe('delivery orchestrator', () => {
     );
 
     expect(nextState.tickets[0]?.status).toBe(
-      'post_verify_self_audit_complete',
+      'verified',
     );
-    expect(nextState.tickets[0]?.postVerifySelfAuditCompletedAt).toBeTruthy();
+    expect(nextState.tickets[0]?.verifiedAt).toBeTruthy();
   });
 
   it('normalizes legacy persisted ticket status and timestamps', () => {
@@ -1953,8 +1951,8 @@ describe('delivery orchestrator', () => {
       ],
     };
     const next = normalizeDeliveryStateFromPersisted(raw);
-    expect(next.tickets[0]?.status).toBe('post_verify_self_audit_complete');
-    expect(next.tickets[0]?.postVerifySelfAuditCompletedAt).toBe(
+    expect(next.tickets[0]?.status).toBe('verified');
+    expect(next.tickets[0]?.verifiedAt).toBe(
       '2026-01-01T00:00:00.000Z',
     );
   });
@@ -2057,7 +2055,7 @@ describe('delivery orchestrator', () => {
     await expect(
       openPullRequest(state, '/tmp/test_project', testContext(), 'P3.01'),
     ).rejects.toThrow(
-      'Ticket P3.01 must complete post-verify self-audit before opening a PR.',
+      'Ticket P3.01 must complete post-verify before opening a PR.',
     );
   });
 

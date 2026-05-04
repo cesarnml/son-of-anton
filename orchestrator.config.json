@@ -5,8 +5,7 @@
   "packageManager": "pnpm",
   "ticketBoundaryMode": "gated",
   "reviewPolicy": {
-    "selfAudit": "disabled",
-    "codexPreflight": "disabled",
-    "externalReview": "disabled"
+    "subagentReview": "disabled",
+    "prReview": "disabled"
   }
 }

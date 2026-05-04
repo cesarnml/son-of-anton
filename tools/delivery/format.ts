@@ -77,7 +77,7 @@ export function formatStatus(
     `review_poll_interval_minutes=${state.reviewPollIntervalMinutes}`,
     `review_poll_max_wait_minutes=${state.reviewPollMaxWaitMinutes}`,
     `boundary_mode=${config.ticketBoundaryMode}`,
-    `review_policy=selfAudit:${config.reviewPolicy.selfAudit} codexPreflight:${config.reviewPolicy.codexPreflight} externalReview:${config.reviewPolicy.externalReview}`,
+    `review_policy=subagentReview:${config.reviewPolicy.subagentReview} prReview:${config.reviewPolicy.prReview}`,
     '',
     ...state.tickets.map((ticket) =>
       [
@@ -85,11 +85,11 @@ export function formatStatus(
         `title=${ticket.title}`,
         `worktree=${ticket.worktreePath}`,
         ticket.handoffPath ? `handoff=${ticket.handoffPath}` : undefined,
-        ticket.postVerifySelfAuditCompletedAt
-          ? `post_verify_self_audit=completed at ${ticket.postVerifySelfAuditCompletedAt}${ticket.selfAuditOutcome ? ` (${ticket.selfAuditOutcome})` : ''}`
+        ticket.verifiedAt
+          ? `post_verify=completed at ${ticket.verifiedAt}${ticket.verifyOutcome ? ` (${ticket.verifyOutcome})` : ''}`
           : undefined,
-        ticket.codexPreflightCompletedAt
-          ? `codex_preflight=completed at ${ticket.codexPreflightCompletedAt} (${ticket.codexPreflightOutcome ?? 'unknown'})`
+        ticket.subagentReviewCompletedAt
+          ? `subagent_review=completed at ${ticket.subagentReviewCompletedAt} (${ticket.subagentReviewOutcome ?? 'unknown'})`
           : undefined,
         ticket.prUrl ? `pr=${ticket.prUrl}` : undefined,
         ticket.reviewFetchArtifactPath
