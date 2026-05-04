@@ -1,3 +1,4 @@
+import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { getUsage, parseCliArgs, resolveOptionsForCommand } from './cli';
 import { ensureEnvReady as ensureEnvReadyImpl } from './env';
@@ -644,7 +645,24 @@ export async function syncStateToPrimaryIfNeeded(
   findPrimaryPath: (cwd: string) => string | undefined,
 ): Promise<void> {
   const primaryPath = findPrimaryPath(cwd);
-  if (primaryPath && resolve(primaryPath) !== resolve(cwd)) {
+  if (!primaryPath) {
+    return;
+  }
+
+  const canonicalizePath = async (path: string): Promise<string> => {
+    try {
+      return await realpath(path);
+    } catch {
+      return resolve(path);
+    }
+  };
+
+  const [primaryCanonicalPath, cwdCanonicalPath] = await Promise.all([
+    canonicalizePath(primaryPath),
+    canonicalizePath(cwd),
+  ]);
+
+  if (primaryCanonicalPath !== cwdCanonicalPath) {
     await saveState(primaryPath, state);
   }
 }

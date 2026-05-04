@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -58,6 +58,22 @@ describe('syncStateToPrimaryIfNeeded (P1.01)', () => {
       const stateFile = join(primaryWt, baseState.statePath);
       expect(existsSync(stateFile)).toBe(false);
     } finally {
+      await rm(primaryWt, { recursive: true, force: true });
+    }
+  });
+
+  it('does not write to primary when cwd is a symlink alias to primary', async () => {
+    const primaryWt = await mkdtemp(join(tmpdir(), 'primary-wt-'));
+    const aliasWt = join(tmpdir(), `primary-wt-alias-${Date.now()}`);
+
+    try {
+      await symlink(primaryWt, aliasWt, 'dir');
+      await syncStateToPrimaryIfNeeded(aliasWt, baseState, () => primaryWt);
+
+      const stateFile = join(primaryWt, baseState.statePath);
+      expect(existsSync(stateFile)).toBe(false);
+    } finally {
+      await rm(aliasWt, { recursive: true, force: true });
       await rm(primaryWt, { recursive: true, force: true });
     }
   });

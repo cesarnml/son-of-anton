@@ -48,3 +48,5 @@ Why this path: Extracted the sync logic to `syncStateToPrimaryIfNeeded(cwd, stat
 Alternative considered: Inline the guard directly in the advance case (no helper extraction). Rejected because the `resolve()` comparison and the no-op-when-same-path invariant are subtle enough to deserve a named function with dedicated tests.
 
 Deferred: Syncing `reviews/` and `handoffs/` artifacts to primary on advance — the delivery-orchestrator doc recommends this but it is multi-worktree state management beyond the ticket scope.
+
+Late review follow-up: CodeRabbit correctly flagged that the initial `resolve()` equality check was only lexical, so symlink aliases to the same checkout could still trigger a duplicate write. The follow-up switches the comparison to canonical paths via `realpath()` with a `resolve()` fallback when canonicalization is unavailable, and adds a regression test for a symlink alias.
