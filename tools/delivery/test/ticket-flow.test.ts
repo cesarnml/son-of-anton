@@ -883,3 +883,54 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     ).toBe(false);
   });
 });
+
+describe('P2.01 — post-verify transitions to verified; subagent-review transitions to subagent_review_complete', () => {
+  const baseInProgressState2: DeliveryState = {
+    planKey: 'phase-03',
+    planPath: 'docs/product/delivery/phase-03/implementation-plan.md',
+    statePath: '.agents/delivery/phase-03/state.json',
+    reviewsDirPath: '.agents/delivery/phase-03/reviews',
+    handoffsDirPath: '.agents/delivery/phase-03/handoffs',
+    reviewPollIntervalMinutes: 6,
+    reviewPollMaxWaitMinutes: 12,
+    tickets: [
+      {
+        id: 'P3.01',
+        title: 'A ticket',
+        slug: 'a-ticket',
+        ticketFile: 'docs/ticket-01.md',
+        status: 'in_progress',
+        branch: 'agents/p3-01-a-ticket',
+        baseBranch: 'main',
+        worktreePath: '/tmp/p3_01',
+      },
+    ],
+  };
+
+  it('in_progress → verified via post-verify', async () => {
+    const nextState = await recordPostVerifySelfAudit(
+      baseInProgressState2,
+      undefined,
+      'clean',
+      baseConfig,
+    );
+    expect(nextState.tickets[0]?.status).toBe('verified');
+  });
+
+  it('verified → subagent_review_complete via subagent-review', () => {
+    const verifiedState: DeliveryState = {
+      ...baseInProgressState2,
+      tickets: baseInProgressState2.tickets.map((t) => ({
+        ...t,
+        status: 'post_verify_self_audit_complete' as const,
+      })),
+    };
+    const nextState = recordCodexPreflight(
+      verifiedState,
+      'clean',
+      false,
+      baseConfig.reviewPolicy.codexPreflight,
+    );
+    expect(nextState.tickets[0]?.status).toBe('subagent_review_complete');
+  });
+});
