@@ -527,7 +527,7 @@ export function openPullRequest(
     dependencies.subagentReviewPolicy !== 'disabled'
   ) {
     throw new Error(
-      `Ticket ${target.id} is at status verified and requires subagent-review before opening a PR. Run \`bun run deliver subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
+      `Ticket ${target.id} is at status verified and requires subagent-review before opening a PR. Run \`bun run deliver --plan ${state.planPath} subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
     );
   }
 

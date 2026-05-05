@@ -49,34 +49,40 @@ const baseState: DeliveryState = {
 describe('assertWorktreeGuard (P3.01)', () => {
   it('throws when a guarded command is run from outside the ticket worktree', () => {
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'post-verify', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'post-verify', [], baseState, baseConfig),
     ).toThrow(/P3\.01/);
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'post-verify', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'post-verify', [], baseState, baseConfig),
     ).toThrow(/son-of-anton_p3_01/);
   });
 
   it('includes the recovery cd command in the error message', () => {
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'post-verify', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'post-verify', [], baseState, baseConfig),
     ).toThrow(/cd .* && bun run deliver/);
+  });
+
+  it('includes positional args in the recovery command', () => {
+    expect(() =>
+      assertWorktreeGuard('/wrong/path', 'post-verify', ['patched', 'abc123'], baseState, baseConfig),
+    ).toThrow(/post-verify patched abc123/);
   });
 
   it('does not throw for exempt command: status', () => {
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'status', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'status', [], baseState, baseConfig),
     ).not.toThrow();
   });
 
   it('does not throw for exempt command: sync', () => {
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'sync', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'sync', [], baseState, baseConfig),
     ).not.toThrow();
   });
 
   it('does not throw for exempt command: start', () => {
     expect(() =>
-      assertWorktreeGuard('/wrong/path', 'start', baseState, baseConfig),
+      assertWorktreeGuard('/wrong/path', 'start', [], baseState, baseConfig),
     ).not.toThrow();
   });
 
@@ -98,6 +104,7 @@ describe('assertWorktreeGuard (P3.01)', () => {
         assertWorktreeGuard(
           realpathSync(realDir),
           'post-verify',
+          [],
           symlinkState,
           baseConfig,
         ),

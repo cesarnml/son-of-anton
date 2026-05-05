@@ -106,6 +106,7 @@ export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 export function assertWorktreeGuard(
   cwd: string,
   command: string,
+  positionals: string[],
   state: DeliveryState,
   config: ResolvedOrchestratorConfig,
 ): void {
@@ -133,7 +134,8 @@ export function assertWorktreeGuard(
 
   if (resolvedCwd !== expectedPath) {
     const invoke = generateRunDeliverInvocation(config.packageManager);
-    const recovery = `cd ${expectedPath} && ${invoke} --plan ${state.planPath} ${command}`;
+    const recoveryArgs = [command, ...positionals].join(' ');
+    const recovery = `cd ${expectedPath} && ${invoke} --plan ${state.planPath} ${recoveryArgs}`;
     const nextCommand = resolveNextCommand(
       activeTicket.status,
       config,
@@ -229,7 +231,7 @@ export async function runDeliveryOrchestrator(
     const state = await loadState(cwd, options, context.config);
 
     const resolvedCwd = await realpath(cwd).catch(() => cwd);
-    assertWorktreeGuard(resolvedCwd, parsed.command, state, context.config);
+    assertWorktreeGuard(resolvedCwd, parsed.command, parsed.positionals, state, context.config);
 
     switch (parsed.command) {
       case 'sync': {
