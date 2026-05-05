@@ -2055,7 +2055,7 @@ describe('delivery orchestrator', () => {
     await expect(
       openPullRequest(state, '/tmp/test_project', testContext(), 'P3.01'),
     ).rejects.toThrow(
-      'Ticket P3.01 must complete post-verify before opening a PR.',
+      'Ticket P3.01 is at status in_progress. Complete post-verify before opening a PR.',
     );
   });
 

@@ -732,7 +732,7 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     });
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/requires subagent review before opening a PR/);
+    ).rejects.toThrow(/requires subagent-review before opening a PR/);
   });
 
   it('open-pr rejects code ticket at verified when policy is skip_doc_only', async () => {
@@ -744,7 +744,7 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     });
     await expect(
       openPullRequest(basePostAuditState, '/tmp/test_project', context, 'P3.01'),
-    ).rejects.toThrow(/requires subagent review before opening a PR/);
+    ).rejects.toThrow(/requires subagent-review before opening a PR/);
   });
 
   it('open-pr error message includes subagent-review command and config escape hatch', async () => {

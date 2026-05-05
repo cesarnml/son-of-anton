@@ -517,7 +517,7 @@ export function openPullRequest(
 
   if (target.status === 'in_progress') {
     throw new Error(
-      `Ticket ${target.id} must complete post-verify before opening a PR.`,
+      `Ticket ${target.id} is at status in_progress. Complete post-verify before opening a PR.`,
     );
   }
 
@@ -527,7 +527,7 @@ export function openPullRequest(
     dependencies.subagentReviewPolicy !== 'disabled'
   ) {
     throw new Error(
-      `Ticket ${target.id} requires subagent review before opening a PR. Run \`bun run deliver subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
+      `Ticket ${target.id} is at status verified and requires subagent-review before opening a PR. Run \`bun run deliver subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
     );
   }
 
@@ -614,6 +614,18 @@ export async function advanceToNextTicket(
   const current = state.tickets.find((ticket) => ticket.status === 'reviewed');
 
   if (!current) {
+    const activeTicket =
+      state.tickets.find((t) => t.status === 'in_progress') ??
+      state.tickets.find((t) => t.status === 'verified') ??
+      state.tickets.find((t) => t.status === 'subagent_review_complete') ??
+      state.tickets.find((t) => t.status === 'in_review') ??
+      state.tickets.find((t) => t.status === 'needs_patch') ??
+      state.tickets.find((t) => t.status === 'operator_input_needed');
+    if (activeTicket) {
+      throw new Error(
+        `No reviewed ticket is ready to advance. Active ticket ${activeTicket.id} is at status ${activeTicket.status}.`,
+      );
+    }
     throw new Error('No reviewed ticket is ready to advance.');
   }
 

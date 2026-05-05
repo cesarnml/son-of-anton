@@ -42,7 +42,7 @@ All tests green. Manual smoke test: from primary checkout (`main` branch, no act
 
 ## CI Baseline
 
-> To be recorded at P3.01 red commit.
+> At the P3.01 red commit (d8a7be0): 172 pass, 3 fail (the 3 new failing tests introduced by this ticket), 0 pre-existing CI failures.
 
 ## Review Rules
 

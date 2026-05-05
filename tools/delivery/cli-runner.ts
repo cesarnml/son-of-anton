@@ -79,6 +79,7 @@ import {
   formatStandaloneAiReviewResult,
   formatStatus,
   resolveEffectiveAdvanceBoundaryMode,
+  resolveNextCommand,
   type RepairStateResult,
 } from './format';
 import {
@@ -98,6 +99,50 @@ import {
   restackTicket as restackTicketImpl,
   startTicket as startTicketImpl,
 } from './ticket-flow';
+
+export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
+
+export function assertWorktreeGuard(
+  cwd: string,
+  command: string,
+  state: DeliveryState,
+  config: ResolvedOrchestratorConfig,
+): void {
+  if (WORKTREE_EXEMPT.has(command)) return;
+
+  const activeTicket =
+    state.tickets.find((t) => t.status === 'in_progress') ??
+    state.tickets.find((t) => t.status === 'verified') ??
+    state.tickets.find((t) => t.status === 'subagent_review_complete') ??
+    state.tickets.find((t) => t.status === 'in_review') ??
+    state.tickets.find((t) => t.status === 'needs_patch') ??
+    state.tickets.find((t) => t.status === 'operator_input_needed') ??
+    state.tickets.find((t) => t.status === 'reviewed');
+
+  if (!activeTicket) return;
+
+  const resolvedCwd = cwd;
+  const expectedPath = activeTicket.worktreePath;
+
+  if (resolvedCwd !== expectedPath) {
+    const invoke = generateRunDeliverInvocation(config.packageManager);
+    const recovery = `cd ${expectedPath} && ${invoke} --plan ${state.planPath} ${command}`;
+    const nextCommand = resolveNextCommand(
+      activeTicket.status,
+      config,
+      state.planPath,
+      activeTicket.id,
+    );
+    const nextCommandHint = nextCommand ? `\nNext command from worktree: ${nextCommand}` : '';
+    throw new Error(
+      `Command '${command}' for ticket ${activeTicket.id} must be run from its worktree.\n` +
+        `Current directory: ${resolvedCwd}\n` +
+        `Expected worktree: ${expectedPath}\n` +
+        `Recovery: ${recovery}` +
+        nextCommandHint,
+    );
+  }
+}
 
 export async function runDeliveryOrchestrator(
   argv: string[],
@@ -176,6 +221,9 @@ export async function runDeliveryOrchestrator(
 
     const state = await loadState(cwd, options, context.config);
 
+    const resolvedCwd = await realpath(cwd).catch(() => cwd);
+    assertWorktreeGuard(resolvedCwd, parsed.command, state, context.config);
+
     switch (parsed.command) {
       case 'sync': {
         await saveState(cwd, state);
@@ -231,7 +279,7 @@ export async function runDeliveryOrchestrator(
           auditTicketId,
           auditOutcome,
           context.config,
-          {},
+          { hasLocalBranchCommits: context.platform.hasLocalBranchCommits },
           auditPatchCommits,
         );
         await saveState(cwd, nextState);
@@ -706,6 +754,7 @@ export async function recordPostVerifySelfAudit(
       baseBranch: string,
       runtime: Runtime,
     ) => boolean;
+    hasLocalBranchCommits?: (cwd: string, baseBranch: string) => boolean;
     selfAuditPolicy?: ReviewPolicyStageValue;
   } = {},
   patchCommits?: InternalReviewPatchCommit[],
@@ -729,6 +778,18 @@ export async function recordPostVerifySelfAudit(
       target.baseBranch,
       config.runtime,
     );
+
+  if (isDocOnly && target && dependencies.hasLocalBranchCommits !== undefined) {
+    const hasCommits = dependencies.hasLocalBranchCommits(
+      target.worktreePath,
+      target.baseBranch,
+    );
+    if (!hasCommits) {
+      throw new Error(
+        `No commits on branch for doc-only ticket ${target.id}. Add or update documentation files before continuing.`,
+      );
+    }
+  }
 
   if (subagentReviewPolicy === 'skip_doc_only' && isDocOnly) {
     return recordPostVerifySelfAuditImpl(state, ticketId, 'skipped', undefined);

@@ -118,9 +118,10 @@ Do not write any implementation until this commit exists on the branch.
 
 ## Rationale
 
-> Append here (do not edit above) when behavior or trade-offs change during implementation.
+Red first: All three test files failed at import — `resolveNextCommand`, `assertWorktreeGuard`, and `hasLocalBranchCommits` did not exist yet.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Why this path: `resolveNextCommand` as a pure function in `format.ts` is the single chokepoint for all status→command mappings, keeping `formatStatus` and `assertWorktreeGuard` both consuming the same source of truth. `hasLocalBranchCommits` mirrors `isLocalBranchDocOnly` structurally; the `runProcessOverride` parameter enables unit-testing without a real git context.
+
+Alternative considered: Adding the doc-only early failure check directly in the CLI switch (`post-verify` case) rather than as a dependency in `recordPostVerifySelfAudit`. Rejected because the DI approach keeps the check unit-testable and consistent with `isLocalBranchDocOnly`'s existing pattern.
+
+Deferred: Using `realpath` for symlink-safe worktree path comparison in `assertWorktreeGuard` unit tests — the guard in the CLI resolves via `realpath` but the unit tests use simple string paths.
