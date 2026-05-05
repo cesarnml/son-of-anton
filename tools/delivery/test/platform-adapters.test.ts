@@ -49,15 +49,24 @@ describe('hasLocalBranchCommits (P3.01)', () => {
   });
 
   it('returns true when git diff returns non-empty output', () => {
-    const mockRunProcess = (_cwd: string, _cmd: string[]) =>
-      'tools/delivery/platform.ts\n';
+    let seenCommand: string[] | undefined;
+    const mockRunProcess = (_cwd: string, cmd: string[]) => {
+      seenCommand = cmd;
+      return '2\n';
+    };
     expect(
       hasLocalBranchCommits('ignored', 'main', 'bun', mockRunProcess),
     ).toBe(true);
+    expect(seenCommand).toEqual([
+      'git',
+      'rev-list',
+      '--count',
+      'origin/main..HEAD',
+    ]);
   });
 
-  it('returns false when git diff returns empty output', () => {
-    const mockRunProcess = (_cwd: string, _cmd: string[]) => '';
+  it('returns false when git rev-list count is zero', () => {
+    const mockRunProcess = (_cwd: string, _cmd: string[]) => '0\n';
     expect(
       hasLocalBranchCommits('ignored', 'main', 'bun', mockRunProcess),
     ).toBe(false);

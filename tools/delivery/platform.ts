@@ -730,13 +730,15 @@ export function hasLocalBranchCommits(
   runProcessOverride?: (cwd: string, cmd: string[]) => string,
 ): boolean {
   try {
-    const runner = runProcessOverride ?? ((c, cmd) => runProcess(c, cmd, runtime));
-    const stdout = runner(cwd, ['git', 'diff', `origin/${baseBranch}...HEAD`, '--name-only']);
-    const files = stdout
-      .split('\n')
-      .map((f) => f.trim())
-      .filter(Boolean);
-    return files.length > 0;
+    const runner =
+      runProcessOverride ?? ((c, cmd) => runProcess(c, cmd, runtime));
+    const stdout = runner(cwd, [
+      'git',
+      'rev-list',
+      '--count',
+      `origin/${baseBranch}..HEAD`,
+    ]);
+    return Number.parseInt(stdout.trim(), 10) > 0;
   } catch {
     return false;
   }

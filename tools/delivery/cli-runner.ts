@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { getUsage, parseCliArgs, resolveOptionsForCommand } from './cli';
@@ -122,7 +123,13 @@ export function assertWorktreeGuard(
   if (!activeTicket) return;
 
   const resolvedCwd = cwd;
-  const expectedPath = activeTicket.worktreePath;
+  const expectedPath = (() => {
+    try {
+      return realpathSync(activeTicket.worktreePath);
+    } catch {
+      return resolve(activeTicket.worktreePath);
+    }
+  })();
 
   if (resolvedCwd !== expectedPath) {
     const invoke = generateRunDeliverInvocation(config.packageManager);

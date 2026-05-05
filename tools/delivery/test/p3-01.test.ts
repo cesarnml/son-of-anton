@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { assertWorktreeGuard } from '../cli-runner';
 import { recordPostVerifySelfAudit } from '../cli-runner';
@@ -75,6 +78,33 @@ describe('assertWorktreeGuard (P3.01)', () => {
     expect(() =>
       assertWorktreeGuard('/wrong/path', 'start', baseState, baseConfig),
     ).not.toThrow();
+  });
+
+  it('accepts a canonical cwd when the saved worktree path is a symlink', () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'p3-01-worktree-'));
+    const realDir = join(tempRoot, 'real');
+    const linkDir = join(tempRoot, 'link');
+
+    mkdirSync(realDir);
+    symlinkSync(realDir, linkDir);
+
+    const symlinkState: DeliveryState = {
+      ...baseState,
+      tickets: [{ ...baseTicket, worktreePath: linkDir }],
+    };
+
+    try {
+      expect(() =>
+        assertWorktreeGuard(
+          realpathSync(realDir),
+          'post-verify',
+          symlinkState,
+          baseConfig,
+        ),
+      ).not.toThrow();
+    } finally {
+      rmSync(tempRoot, { force: true, recursive: true });
+    }
   });
 });
 
