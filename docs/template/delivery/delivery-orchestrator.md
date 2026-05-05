@@ -378,6 +378,64 @@ Recovery: cd <worktreePath> && bun run deliver --plan <plan> <cmd>
 
 All other commands are guarded. The guard fires after `loadState` so the expected worktree path is always derived from recorded state, not from the invoking directory.
 
+### Stable workflow contract boundary
+
+Some delivery-tool workflow and state-guard failures carry a stable
+machine-readable identity in addition to the human-readable operator message.
+This boundary is intentionally narrow:
+
+- targeted workflow/state guards such as `open-pr` missing `post-verify`
+- targeted workflow/state guards such as `open-pr` missing `subagent-review`
+- ticket-advance guards that block advancement before review is recorded
+- the closely related wrong-worktree guard in `assertWorktreeGuard`
+
+These codes are a contributor contract for tests and automation. The human
+message is still the operator-facing guidance and may be clarified or rewritten
+without changing the contract identity.
+
+Current examples:
+
+- `workflow.open_pr.requires_post_verify`
+- `workflow.open_pr.requires_subagent_review`
+- `workflow.open_pr.invalid_state`
+- `workflow.advance.requires_reviewed_ticket`
+- `workflow.worktree_guard.wrong_worktree`
+
+This is not a repo-wide error framework. Low-level config, runtime, platform,
+and general process failures remain plain errors unless a later phase expands
+the boundary deliberately.
+
+### Optional-DI extension rule
+
+When adding a new optional dependency hook to a delivery helper, optional means
+the existing behavior must remain unchanged when the hook is omitted. New
+behavior runs only when the hook is explicitly supplied.
+
+Treat this as an extension rule, not a suggestion:
+
+- omitted optional hooks must be no-ops by default
+- tests should cover both omitted-hook and supplied-hook paths
+- adding an optional hook must not force unrelated callers or tests to change
+
+### Testing stance for stable workflow contracts
+
+For contract-bearing workflow/state guards, assert the stable code first and
+only then check narrow message content that is intentionally part of the
+operator guidance.
+
+Good test stance:
+
+- assert `workflow.open_pr.requires_post_verify`
+- assert the message still mentions `post-verify`
+
+Bad test stance:
+
+- assert the full English sentence verbatim when the code already carries the
+  machine-stable identity
+
+Outside this narrow workflow-contract boundary, tests may still assert prose
+directly when no machine-readable contract exists.
+
 Available commands:
 
 - `sync`

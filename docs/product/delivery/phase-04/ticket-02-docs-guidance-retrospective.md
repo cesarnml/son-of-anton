@@ -64,3 +64,5 @@ Alternative considered: allowing small cleanup code changes here if documentatio
 Deferred: any broader cleanup to CLI wording or non-workflow error surfaces discovered while documenting the boundary.
 
 Contract note: this ticket originally omitted `Type:` because the template did not require it when Phase 04 was decomposed. `Scope:` already pointed at docs work, but it is now normalized to `delivery-docs` so the metadata can flow directly into a conventional-commit subject.
+
+Implementation note: the docs deliberately name only the targeted delivery workflow/state guards and the adjacent wrong-worktree guard as contract-bearing. They also make the optional-DI rule explicit as an extension rule for delivery helpers, while avoiding any claim that the repo now has a general error-framework policy.
