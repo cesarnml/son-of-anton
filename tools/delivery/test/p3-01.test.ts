@@ -75,6 +75,25 @@ describe('assertWorktreeGuard (P3.01)', () => {
     ).toThrow(/son-of-anton_p3_01/);
   });
 
+  it('exposes the wrong-worktree contract code alongside recovery guidance', () => {
+    try {
+      assertWorktreeGuard(
+        '/wrong/path',
+        'post-verify',
+        [],
+        baseState,
+        baseConfig,
+      );
+      throw new Error('Expected assertWorktreeGuard to throw.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'workflow.worktree_guard.wrong_worktree',
+      });
+      expect((error as Error).message).toContain('Recovery: cd');
+      expect((error as Error).message).toContain('Next command from worktree');
+    }
+  });
+
   it('includes the recovery cd command in the error message', () => {
     expect(() =>
       assertWorktreeGuard(

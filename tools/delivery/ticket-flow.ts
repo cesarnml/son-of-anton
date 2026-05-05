@@ -546,7 +546,8 @@ export function openPullRequest(
           (ticket) => ticket.status === 'subagent_review_complete',
         ) ??
         state.tickets.find((ticket) => ticket.status === 'verified') ??
-        state.tickets.find((ticket) => ticket.status === 'in_review'))) ??
+        state.tickets.find((ticket) => ticket.status === 'in_review') ??
+        state.tickets.find((ticket) => ticket.status === 'in_progress'))) ??
     undefined;
 
   if (!target) {
