@@ -21,6 +21,40 @@ import type {
   TicketState,
 } from './types';
 
+type WorkflowContractCode =
+  | 'workflow.advance.requires_reviewed_ticket'
+  | 'workflow.open_pr.invalid_state'
+  | 'workflow.open_pr.requires_post_verify'
+  | 'workflow.open_pr.requires_subagent_review'
+  | 'workflow.worktree_guard.wrong_worktree';
+
+type WorkflowContractError = Error & { code: WorkflowContractCode };
+
+export function createWorkflowContractError(
+  code: WorkflowContractCode,
+  message: string,
+): WorkflowContractError {
+  return Object.assign(new Error(message), { code });
+}
+
+export async function runOptionalDependencyHook<TArgs extends unknown[]>(
+  hook: ((...args: TArgs) => Promise<void> | void) | undefined,
+  ...args: TArgs
+): Promise<void> {
+  if (!hook) {
+    return;
+  }
+
+  await hook(...args);
+}
+
+function runOptionalDependencyHookSync<TArgs extends unknown[]>(
+  hook: ((...args: TArgs) => void) | undefined,
+  ...args: TArgs
+): void {
+  hook?.(...args);
+}
+
 function validateInternalReviewPatchCommits(input: {
   outcome: ReviewOutcome | SubagentReviewOutcome;
   patchCommits: InternalReviewPatchCommit[] | undefined;
@@ -288,7 +322,12 @@ export async function startTicket(
   }
 
   if (target.status === 'in_progress') {
-    await dependencies.materializeTicketContext?.(state, cwd, target.id);
+    await runOptionalDependencyHook(
+      dependencies.materializeTicketContext,
+      state,
+      cwd,
+      target.id,
+    );
     return state;
   }
 
@@ -324,7 +363,12 @@ export async function startTicket(
     ),
   };
 
-  await dependencies.materializeTicketContext?.(nextState, cwd, target.id);
+  await runOptionalDependencyHook(
+    dependencies.materializeTicketContext,
+    nextState,
+    cwd,
+    target.id,
+  );
 
   return nextState;
 }
@@ -506,11 +550,15 @@ export function openPullRequest(
     undefined;
 
   if (!target) {
-    throw new Error('No ticket in a PR-openable state found to open as a PR.');
+    throw createWorkflowContractError(
+      'workflow.open_pr.invalid_state',
+      'No ticket in a PR-openable state found to open as a PR.',
+    );
   }
 
   if (target.status === 'in_progress') {
-    throw new Error(
+    throw createWorkflowContractError(
+      'workflow.open_pr.requires_post_verify',
       `Ticket ${target.id} is at status in_progress. Complete post-verify before opening a PR.`,
     );
   }
@@ -520,7 +568,8 @@ export function openPullRequest(
     dependencies.subagentReviewPolicy !== undefined &&
     dependencies.subagentReviewPolicy !== 'disabled'
   ) {
-    throw new Error(
+    throw createWorkflowContractError(
+      'workflow.open_pr.requires_subagent_review',
       `Ticket ${target.id} is at status verified and requires subagent-review before opening a PR. Run \`bun run deliver --plan ${state.planPath} subagent-review <clean|patched>\` after completing the subagent review step. If the subagent is unavailable, set subagentReview to "disabled" in orchestrator.config.json to bypass.`,
     );
   }
@@ -530,12 +579,14 @@ export function openPullRequest(
     target.status !== 'subagent_review_complete' &&
     target.status !== 'in_review'
   ) {
-    throw new Error(
+    throw createWorkflowContractError(
+      'workflow.open_pr.invalid_state',
       `Ticket ${target.id} is not in a PR-openable state. Current status: ${target.status}.`,
     );
   }
 
-  dependencies.reportProgress?.(
+  runOptionalDependencyHookSync(
+    dependencies.reportProgress,
     `open-pr: publishing branch ${target.branch} to origin (push hooks may take a bit)...`,
   );
   dependencies.ensureBranchPushed(target.worktreePath, target.branch);
@@ -553,7 +604,8 @@ export function openPullRequest(
   let prNumber: number;
 
   if (existingPullRequest) {
-    dependencies.reportProgress?.(
+    runOptionalDependencyHookSync(
+      dependencies.reportProgress,
       `open-pr: updating PR #${existingPullRequest.number} on GitHub...`,
     );
     dependencies.editPullRequest(
@@ -567,7 +619,10 @@ export function openPullRequest(
     prUrl = existingPullRequest.url;
     prNumber = existingPullRequest.number;
   } else {
-    dependencies.reportProgress?.('open-pr: creating PR on GitHub...');
+    runOptionalDependencyHookSync(
+      dependencies.reportProgress,
+      'open-pr: creating PR on GitHub...',
+    );
     const pullRequest = dependencies.createPullRequest(target.worktreePath, {
       base: target.baseBranch,
       body,
@@ -578,7 +633,10 @@ export function openPullRequest(
     prNumber = pullRequest.number;
   }
 
-  dependencies.reportProgress?.(`open-pr: PR ready ${prUrl}`);
+  runOptionalDependencyHookSync(
+    dependencies.reportProgress,
+    `open-pr: PR ready ${prUrl}`,
+  );
 
   const now = new Date().toISOString();
 
@@ -616,11 +674,15 @@ export async function advanceToNextTicket(
       state.tickets.find((t) => t.status === 'needs_patch') ??
       state.tickets.find((t) => t.status === 'operator_input_needed');
     if (activeTicket) {
-      throw new Error(
+      throw createWorkflowContractError(
+        'workflow.advance.requires_reviewed_ticket',
         `No reviewed ticket is ready to advance. Active ticket ${activeTicket.id} is at status ${activeTicket.status}.`,
       );
     }
-    throw new Error('No reviewed ticket is ready to advance.');
+    throw createWorkflowContractError(
+      'workflow.advance.requires_reviewed_ticket',
+      'No reviewed ticket is ready to advance.',
+    );
   }
 
   if (!canAdvanceTicket(current)) {

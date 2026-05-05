@@ -761,6 +761,45 @@ describe('EE8.02 — codex preflight command, status, and gate', () => {
     ).rejects.toThrow(/subagentReview.*disabled.*orchestrator\.config\.json/);
   });
 
+  it('open-pr exposes a stable contract code when post-verify is missing', async () => {
+    try {
+      await openPullRequest(
+        {
+          planKey: 'phase-03',
+          planPath: 'docs/product/delivery/phase-03/implementation-plan.md',
+          statePath: '.agents/delivery/phase-03/state.json',
+          reviewsDirPath: '.agents/delivery/phase-03/reviews',
+          handoffsDirPath: '.agents/delivery/phase-03/handoffs',
+          reviewPollIntervalMinutes: 6,
+          reviewPollMaxWaitMinutes: 12,
+          tickets: [
+            {
+              id: 'P3.01',
+              title: 'Persist Transmission Identity For Queued Torrents',
+              slug: 'persist-transmission-identity-for-queued-torrents',
+              ticketFile:
+                'docs/product/delivery/phase-03/ticket-01-persist-transmission-identity-for-queued-torrents.md',
+              status: 'in_progress',
+              branch:
+                'agents/p3-01-persist-transmission-identity-for-queued-torrents',
+              baseBranch: 'main',
+              worktreePath: '/tmp/p3_01',
+            },
+          ],
+        },
+        '/tmp/test_project',
+        testContext(),
+        'P3.01',
+      );
+      throw new Error('Expected openPullRequest to reject.');
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'workflow.open_pr.requires_post_verify',
+      });
+      expect((error as Error).message).toContain('post-verify');
+    }
+  });
+
   it('open-pr reports publication progress for a new PR', () => {
     const progress: string[] = [];
     const state: DeliveryState = {

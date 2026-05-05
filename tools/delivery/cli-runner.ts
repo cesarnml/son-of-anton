@@ -93,6 +93,7 @@ import {
 } from './review';
 import {
   advanceToNextTicket,
+  createWorkflowContractError,
   materializeTicketContext,
   openPullRequest as openPullRequestImpl,
   recordSubagentReview as recordSubagentReviewImpl,
@@ -145,7 +146,8 @@ export function assertWorktreeGuard(
     const nextCommandHint = nextCommand
       ? `\nNext command from worktree: ${nextCommand}`
       : '';
-    throw new Error(
+    throw createWorkflowContractError(
+      'workflow.worktree_guard.wrong_worktree',
       `Command '${command}' for ticket ${activeTicket.id} must be run from its worktree.\n` +
         `Current directory: ${resolvedCwd}\n` +
         `Expected worktree: ${expectedPath}\n` +

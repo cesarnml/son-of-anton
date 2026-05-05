@@ -80,3 +80,5 @@ Alternative considered: patching tests and call sites individually with no share
 Deferred: migrating low-level config/platform/runtime failures into the same contract. Those errors are intentionally out of scope for this phase and would inflate the ticket.
 
 Contract note: this ticket originally omitted `Type:` and used the free-form scope `delivery tooling / tests`, which is not conventional-commit compliant. That happened because the active ticket template still documented only an optional `Scope:` line and did not require normalized commit metadata. The ticket now records `Type: fix` and `Scope: delivery-tooling` so the contract is explicit and machine-usable.
+
+Implementation note: the delivered boundary stayed narrow. Stable machine-readable codes were added only to the targeted workflow/state guards touched by this ticket (`open-pr`, `advance`, and the closely related worktree guard), while low-level runtime/config/platform failures remain plain errors. Optional hook execution now goes through one small helper so omitted hooks stay true no-ops and tests can assert that extension rule directly.

@@ -3918,11 +3918,19 @@ describe('delivery orchestrator', () => {
         ),
       };
 
-      await expect(
-        advanceToNextTicket(noReviewedState, '/tmp', {
+      try {
+        await advanceToNextTicket(noReviewedState, '/tmp', {
           updatePullRequestBody: () => {},
-        }),
-      ).rejects.toThrow('No reviewed ticket is ready to advance.');
+        });
+        throw new Error('Expected advanceToNextTicket to reject.');
+      } catch (error) {
+        expect(error).toMatchObject({
+          code: 'workflow.advance.requires_reviewed_ticket',
+        });
+        expect((error as Error).message).toContain(
+          'No reviewed ticket is ready to advance.',
+        );
+      }
     });
   });
 
