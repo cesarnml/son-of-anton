@@ -37,7 +37,7 @@ Both the product plan and implementation docs must be committed to `main` **befo
 ## Resuming in-progress work
 
 ```bash
-bun run deliver --plan <plan-path> status        # show current state
+bun run deliver --plan <plan-path> status        # shows active ticket, current status, and one next command
 bun run deliver --plan <plan-path> start         # resume from current ticket
 ```
 

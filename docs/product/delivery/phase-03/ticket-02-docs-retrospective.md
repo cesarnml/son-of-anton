@@ -66,9 +66,10 @@ None — doc-only ticket.
 
 ## Rationale
 
-> Append here (do not edit above) when behavior or trade-offs change during implementation.
+Red first: Confirmed `delivery-orchestrator.md` contained no mention of "worktree guard", "exempt", or "status" one-command format before implementation. `start-here.md` status comment was generic (`# show current state`), not format-specific.
 
-Red first: [what doc assertion validated the content was missing]
-Why this path: [why this doc structure]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Why this path: Worktree guard and `status` format documentation added as named subsections under `## Commands` so agents re-reading the orchestrator doc get the new behavior as part of the command reference, not buried in a separate doc section. Retrospective written as a provisional artifact per the implementation plan trigger condition — first consumer-repo delivery will validate the Phase 03 hypothesis.
+
+Alternative considered: Adding the worktree guard documentation under `## What It Owns` rather than as a `## Commands` subsection. Rejected because the exempt/guarded split is command-invocation behavior, not ownership scope — it belongs alongside the command list.
+
+Deferred: Surfacing `ai-code-review` skill absence as a warning at `open-pr` time (currently an ENOENT error at `poll-review`). Noted in retrospective follow-up for Phase 04 consideration.

@@ -359,6 +359,25 @@ Use the supported repo command:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md status
 ```
 
+### Worktree guard
+
+Most commands require execution from the **active ticket's worktree** — the directory set as `worktreePath` in the ticket state. Running a guarded command from any other directory fails immediately with the exact recovery command:
+
+```
+Error: Command '<cmd>' for ticket <id> must be run from its worktree.
+Current directory: <cwd>
+Expected worktree: <worktreePath>
+Recovery: cd <worktreePath> && bun run deliver --plan <plan> <cmd>
+```
+
+**Commands exempt from the worktree guard** (safe to run from any directory):
+
+- `status`
+- `sync`
+- `start`
+
+All other commands are guarded. The guard fires after `loadState` so the expected worktree path is always derived from recorded state, not from the invoking directory.
+
 Available commands:
 
 - `sync`
@@ -380,6 +399,44 @@ Separate post-delivery closeout command:
 - `bun run closeout-stack --plan <plan-path>`
 
 For a fresh phase start, `start` initializes ticket `01` context. Do not expect prior PR/review handoff state for the first ticket.
+
+### `status` output format
+
+`status` always prints one next command derived from the active ticket's current status:
+
+```
+Active ticket: <id> — <title>
+Status: <state>
+Next command: bun run deliver --plan <path> <next-command>
+```
+
+When all tickets are `done`, it prints the phase-complete signal instead:
+
+```
+Phase complete. Awaiting developer review.
+```
+
+No next command is printed in that case. A cook-mode agent self-terminates; the developer controls closeout.
+
+### `post-verify` — doc-only early failure
+
+When `post-verify` is run on a doc-only ticket (a ticket whose branch diff touches only `.md` files) and there are **no commits** on the branch ahead of origin, the command fails immediately with:
+
+```
+Error: No commits on branch for doc-only ticket <id>. Add or update documentation files before continuing.
+```
+
+This prevents the ticket from silently advancing to `open-pr` with an empty diff. The check runs before any state update.
+
+### `advance` — phase-complete signal
+
+When `advance` marks the **final ticket** `done` and no pending tickets remain, it prints:
+
+```
+Phase complete. Awaiting developer review.
+```
+
+No next command follows. In cook mode the agent self-terminates at this point; gated mode was already stopped. The developer runs `closeout-stack` to merge.
 
 ## Typical Flow
 
