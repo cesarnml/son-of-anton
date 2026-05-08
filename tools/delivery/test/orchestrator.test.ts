@@ -58,7 +58,10 @@ import {
   generateRunDeliverInvocation,
   type ResolvedOrchestratorConfig,
 } from '../runtime-config';
-import { normalizeDeliveryStateFromPersisted } from '../state';
+import {
+  normalizeDeliveryStateFromPersisted,
+  syncStateFromScratch,
+} from '../state';
 import {
   advanceToNextTicket,
   buildTicketHandoff,
@@ -637,6 +640,58 @@ describe('delivery orchestrator', () => {
         ticketFile: 'no-convention-here.md',
       }),
     ).toBe('feat: fix state.json sync in advance [P1.01]');
+  });
+
+  const syncDeps = {
+    cwd: '/tmp',
+    defaultBranch: 'main',
+    deriveBranchName: (d: { id: string; slug: string }) =>
+      `agents/${d.id.toLowerCase()}-${d.slug}`,
+    deriveWorktreePath: (cwd: string, id: string) =>
+      `${cwd}/worktree-${id.toLowerCase()}`,
+  };
+
+  it('includes scope in PR title when TicketDefinition has scope', () => {
+    const state = syncStateFromScratch(
+      [
+        {
+          id: 'P5.03',
+          title: 'PR Scope Propagation From Ticket Metadata',
+          slug: 'pr-scope-propagation-from-ticket-metadata',
+          ticketFile:
+            'docs/product/delivery/phase-05/ticket-03-pr-scope-propagation.md',
+          scope: 'pr-metadata',
+        },
+      ],
+      createOptions({
+        planPath:
+          'docs/product/delivery/phase-05/implementation-plan.md',
+      }),
+      undefined,
+      syncDeps,
+    );
+    expect(buildPullRequestTitle(state.tickets[0])).toContain('(pr-metadata)');
+  });
+
+  it('omits scope parens in PR title when TicketDefinition has no scope', () => {
+    const state = syncStateFromScratch(
+      [
+        {
+          id: 'P5.03',
+          title: 'PR Scope Propagation From Ticket Metadata',
+          slug: 'pr-scope-propagation-from-ticket-metadata',
+          ticketFile:
+            'docs/product/delivery/phase-05/ticket-03-pr-scope-propagation.md',
+        },
+      ],
+      createOptions({
+        planPath:
+          'docs/product/delivery/phase-05/implementation-plan.md',
+      }),
+      undefined,
+      syncDeps,
+    );
+    expect(buildPullRequestTitle(state.tickets[0])).not.toContain('(');
   });
 
   it('resolves the notifier from Telegram env vars', () => {
