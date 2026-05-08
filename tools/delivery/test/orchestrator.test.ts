@@ -664,8 +664,7 @@ describe('delivery orchestrator', () => {
         },
       ],
       createOptions({
-        planPath:
-          'docs/product/delivery/phase-05/implementation-plan.md',
+        planPath: 'docs/product/delivery/phase-05/implementation-plan.md',
       }),
       undefined,
       syncDeps,
@@ -685,8 +684,7 @@ describe('delivery orchestrator', () => {
         },
       ],
       createOptions({
-        planPath:
-          'docs/product/delivery/phase-05/implementation-plan.md',
+        planPath: 'docs/product/delivery/phase-05/implementation-plan.md',
       }),
       undefined,
       syncDeps,
