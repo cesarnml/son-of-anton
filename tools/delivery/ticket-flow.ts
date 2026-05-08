@@ -507,7 +507,10 @@ export function openPullRequest(
       },
     ) => string;
     buildPullRequestTitle: (
-      ticket: Pick<TicketState, 'id' | 'title' | 'ticketFile' | 'scope'>,
+      ticket: Pick<
+        TicketState,
+        'id' | 'title' | 'ticketFile' | 'type' | 'scope'
+      >,
     ) => string;
     subagentReviewPolicy?: ReviewPolicyStageValue;
     createPullRequest: (

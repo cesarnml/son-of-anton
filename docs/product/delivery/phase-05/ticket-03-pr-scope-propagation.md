@@ -6,7 +6,7 @@ Scope: pr-metadata
 
 ## Outcome
 
-- PR titles produced by the orchestrator include scope when the ticket's `Scope:` field is populated: `type(scope): subject [P.NN]`
+- PR titles produced by the orchestrator use the ticket's `Type:` field as the Conventional Commit type and include scope when the ticket's `Scope:` field is populated: `type(scope): subject [P.NN]`
 - PR titles for tickets without a `Scope:` field continue to produce `type: subject [P.NN]` (no parens, no regression)
 - Both cases are covered by tests
 
@@ -46,3 +46,4 @@ Why this path: one-line assignment fix at the construction site is the smallest 
 Alternative considered: parsing scope at PR-open time instead of at state construction — rejected; scope belongs on the state object so it is inspectable and durable across sessions
 Deferred: scope validation (format constraints enforcement beyond what the ticket template already documents)
 Contract note: `TicketDefinition.scope` is `string | undefined`; `TicketState` inherits via `TicketDefinition &`; the assignment must preserve optionality
+Patch addendum: `TicketDefinition.type` is now parsed from the ticket's `Type:` metadata and carried into `TicketState` alongside `scope`; `buildPullRequestTitle` no longer derives the Conventional Commit type from the ticket filename. Filename-derived type was intentionally removed because decomposition already generates canonical `Type:` and `Scope:` metadata for every ticket.
