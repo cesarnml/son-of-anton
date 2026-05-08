@@ -6,9 +6,9 @@ Scope: phase-exit
 
 ## Outcome
 
-- `docs/product/delivery/phase-05/implementation-plan.md` delivery status updated to reflect shipped state
+- `docs/product/delivery/phase-05/implementation-plan.md` delivery status updated to reflect completed ticket-stack state
 - `notes/public/phase-05-subagent-review-clarity-and-pr-scope-propagation-retrospective.md` scaffolded per `soa-write-retrospective` skill conventions
-- All three prior tickets (P5.01, P5.02, P5.03) have merged PRs; exit condition from implementation plan is verifiable
+- All three prior tickets (P5.01, P5.02, P5.03) have open stacked PRs and completed orchestrator review; final merge remains gated by developer closeout approval
 
 ## Red
 
@@ -39,3 +39,4 @@ Scope: phase-exit
 Red first: retrospective artifact does not exist; implementation plan still shows draft status
 Why this path: phase-exit ticket is a lightweight ceremony to close the loop and trigger the retrospective
 Deferred: hardening decisions — those belong in the retrospective and the planning session that follows it
+Correction: the original checklist said to confirm P5.01-P5.03 PRs were merged before this ticket starts, but stacked PRs are intentionally not merged until developer-approved closeout. Actual state at P5.04 start: PRs #14, #15, and #16 are open, reviewed, and ready for stack closeout after this ticket.

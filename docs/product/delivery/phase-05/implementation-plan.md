@@ -1,5 +1,7 @@
 # Phase 05 — Subagent Review Clarity and PR Scope Propagation
 
+Status: Delivered — ticket stack complete; stacked PR closeout pending developer approval.
+
 > Eliminate the three guidance gaps that caused live delivery mis-execution (wrong subagent default, checklist review framing, template drift) and fix the silent scope-drop in orchestrator PR titles.
 
 ## Product contract
@@ -10,14 +12,14 @@ After this phase ships, a developer or agent following son-of-anton guidance:
 - Knows subagent review prompts must be adversarial (find holes, flag everything, do not rationalize)
 - Knows `delivery-orchestrator.md` must be read in full before any orchestrated execution, and that the step order (subagent-review before open-pr) is visible near the top of that doc
 - Knows canonical templates are the only format source for planning/decomposition artifacts
-- Gets PR titles that include scope whenever ticket metadata carries a `Scope:` field
+- Gets PR titles whose Conventional Commit type and scope come from canonical ticket metadata
 
 ## Grill-Me decisions locked
 
 - Guidance-first, no enforcement → real-world execution signal drives the next phase decision
 - Retrospective required → provides the explicit go/no-go signal for a follow-up hardening phase
 - No cross-agent pairing expansion → validated pairings stay as-is
-- PR scope fix targets only the missing `scope: definition.scope` assignment in state construction; `buildPullRequestTitle` is already correct
+- PR metadata fix targets propagation of canonical ticket `Type:` and `Scope:` fields into PR title generation
 
 ## Ticket Order
 
@@ -35,7 +37,7 @@ After this phase ships, a developer or agent following son-of-anton guidance:
 
 ## Exit Condition
 
-No guidance surface in scope implies `codex:codex-rescue` is the subagent default. Subagent review descriptions frame the goal as adversarial hole-finding. `delivery-orchestrator.md` has a critical-sequence summary near the top and every invocation instruction says "in full". Planning/decomposition flows explicitly name canonical templates as the format source. PR titles produced by the orchestrator include scope when the ticket's `Scope:` field is populated. Tests cover both the scoped and unscoped PR title cases.
+No guidance surface in scope implies `codex:codex-rescue` is the subagent default. Subagent review descriptions frame the goal as adversarial hole-finding. `delivery-orchestrator.md` has a critical-sequence summary near the top and every invocation instruction says "in full". Planning/decomposition flows explicitly name canonical templates as the format source. PR titles produced by the orchestrator use the ticket's `Type:` field and include scope when the ticket's `Scope:` field is populated. Tests cover ticket-metadata type, scoped, and unscoped PR title cases.
 
 ## CI Baseline
 
