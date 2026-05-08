@@ -31,11 +31,13 @@
     "qodo",
     "realpath",
     "sabaai",
+    "decomp",
     "selfaudit",
     "sonarqube",
     "sonarqubecloud",
     "subagent",
     "toplevel",
+    "unstarted",
     "worktree",
     "worktrees"
   ]

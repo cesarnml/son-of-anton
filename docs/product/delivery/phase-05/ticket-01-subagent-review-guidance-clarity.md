@@ -58,3 +58,5 @@ Red first: current greps return incorrect or absent results for all four checkli
 Why this path: doc-only change with a grep-based verification checklist is the fastest, safest way to land the fix without risk of scope creep
 Alternative considered: adding a CI lint rule that greps for banned patterns — deferred per phase guidance-first decision
 Deferred: enforcement automation
+
+Implementation path: targeted doc-only edits to four files — delivery-orchestrator.md (Critical Step Order block near top), son-of-anton-ethos/SKILL.md (adversarial prompt requirement + same-type default clarification), AGENTS.md (new Subagent Review Rules section), soa/SKILL.md (\"read in full\" for execute and resume). No structural changes; all verification greps pass.

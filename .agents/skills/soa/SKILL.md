@@ -106,7 +106,7 @@ Begin orchestrated delivery of the named phase or epic.
 Read these files before doing anything else — they are gospel:
 
 - `.son-of-anton/docs/template/overview/start-here.md`
-- `.son-of-anton/docs/template/delivery/delivery-orchestrator.md`
+- `.son-of-anton/docs/template/delivery/delivery-orchestrator.md` (read in full)
 - `.son-of-anton/docs/template/delivery/son-of-anton.md`
 - `.son-of-anton/orchestrator.config.json`
 
@@ -126,7 +126,7 @@ Then:
 
 Resume delivery after a stopping point.
 
-1. Read `.son-of-anton/docs/template/delivery/delivery-orchestrator.md` and `orchestrator.config.json`.
+1. Read `.son-of-anton/docs/template/delivery/delivery-orchestrator.md` in full and `orchestrator.config.json`.
 2. Check `state.json` for the last recorded position, or run `git worktree list` to identify active worktrees.
 3. Read the handoff notes from the last stopping point.
 4. Continue from exactly where delivery left off — do not restart, do not re-plan.
