@@ -1,3 +1,16 @@
+import type { ReviewPolicyStageValue, TicketBoundaryMode } from './config';
+
+export type RunPolicyReviewSubagent =
+  | { kind: 'same-type' }
+  | { kind: 'override'; value: string };
+
+export type RunPolicy = {
+  ticketBoundaryMode: TicketBoundaryMode;
+  subagentReview: ReviewPolicyStageValue;
+  prReview: ReviewPolicyStageValue;
+  reviewSubagent: RunPolicyReviewSubagent;
+};
+
 export type TicketStatus =
   | 'pending'
   | 'in_progress'
@@ -122,6 +135,7 @@ export type DeliveryState = {
   handoffsDirPath: string;
   reviewPollIntervalMinutes: number;
   reviewPollMaxWaitMinutes: number;
+  runPolicy?: RunPolicy;
   tickets: TicketState[];
 };
 

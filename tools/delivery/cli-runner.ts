@@ -47,6 +47,7 @@ import {
 } from './planning';
 import {
   loadState as loadStateImpl,
+  normalizeRunPolicy,
   repairState as repairStateImpl,
   saveState as saveStateImpl,
   summarizeStateDifferences as summarizeStateDifferencesImpl,
@@ -648,7 +649,7 @@ export async function loadState(
   options: OrchestratorOptions,
   config: ResolvedOrchestratorConfig,
 ): Promise<DeliveryState> {
-  return loadStateImpl(cwd, options, {
+  const state = await loadStateImpl(cwd, options, {
     cwd,
     defaultBranch: config.defaultBranch,
     runtime: config.runtime,
@@ -656,6 +657,7 @@ export async function loadState(
     deriveWorktreePath,
     findExistingBranch,
   });
+  return normalizeRunPolicy(state, config);
 }
 
 async function repairState(

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
+import type { ResolvedOrchestratorConfig } from './config';
 import {
   listLocalBranches,
   listMergedPullRequests,
@@ -14,10 +15,38 @@ import { parsePlan } from './planning';
 import type {
   DeliveryState,
   OrchestratorOptions,
+  RunPolicy,
+  RunPolicyReviewSubagent,
   TicketDefinition,
   TicketState,
   TicketStatus,
 } from './types';
+
+export function deriveRunPolicyFromConfig(
+  config: ResolvedOrchestratorConfig,
+): RunPolicy {
+  const reviewSubagent: RunPolicyReviewSubagent = config.reviewSubagentOverride
+    ? { kind: 'override', value: config.reviewSubagentOverride }
+    : { kind: 'same-type' };
+
+  return {
+    ticketBoundaryMode: config.ticketBoundaryMode,
+    subagentReview: config.reviewPolicy.subagentReview,
+    prReview: config.reviewPolicy.prReview,
+    reviewSubagent,
+  };
+}
+
+export function normalizeRunPolicy(
+  state: DeliveryState,
+  config: ResolvedOrchestratorConfig,
+): DeliveryState {
+  if (state.runPolicy !== undefined) {
+    return state;
+  }
+
+  return { ...state, runPolicy: deriveRunPolicyFromConfig(config) };
+}
 
 /** Persisted tickets may use legacy status and timestamp keys until re-saved. */
 type PersistedTicketFields = Partial<TicketState> & {
@@ -266,6 +295,7 @@ function syncStateWithPlan(
     handoffsDirPath: options.handoffsDirPath,
     reviewPollIntervalMinutes: options.reviewPollIntervalMinutes,
     reviewPollMaxWaitMinutes: options.reviewPollMaxWaitMinutes,
+    runPolicy: existing?.runPolicy,
     tickets: ticketDefinitions.map((definition, index) => {
       const previous = existingById.get(definition.id);
       const inferredTicket = inferredById.get(definition.id);

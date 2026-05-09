@@ -39,8 +39,8 @@ Scope: delivery-state
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `deriveRunPolicyFromConfig` and `normalizeRunPolicy` missing from `state.ts` caused import failure at test load time.
+Why this path: `normalizeRunPolicy` as a separate pure helper keeps `normalizeDeliveryStateFromPersisted` free of config dependency; the config-aware migration step lives in the `loadState` wrapper in `cli-runner.ts` where `ResolvedOrchestratorConfig` is already available.
+Alternative considered: passing config as an optional param to `normalizeDeliveryStateFromPersisted` — rejected because it would blur the pure-transform boundary and force callers without config to pass `undefined`.
+Deferred: CLI flag parsing, `start`-time `runPolicy` write, and resume divergence checks — those belong to P7.02 and P7.03.
+Contract note: `runPolicy` field is optional on `DeliveryState`; `normalizeRunPolicy` (called from `loadState`) fills it from current config for old state files so consumers always see a defined `runPolicy` after load.

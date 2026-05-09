@@ -33,6 +33,7 @@ The ethos is non-negotiable. Any v2 that trades quality gates for throughput is 
 SoA runs one ticket at a time. Children-of-Aton manages a pool of concurrent worktrees, each running an independent agent session on an independent ticket.
 
 The coordinator:
+
 - Maintains a dependency graph across the ticket set for the phase
 - Assigns tickets to available worktree slots only when all declared blockers are merged
 - Enforces concurrency caps (global and per-phase) so the repo isn't overwhelmed
@@ -61,11 +62,11 @@ The coordinator polls the label state, same polling model as Symphony's Linear i
 
 The three gates map to roles, not one person:
 
-| Gate | Role |
-|---|---|
-| Plan the WHAT | Product owner / tech lead approves `docs/product/plans/phase-N.md` |
-| Decompose the HOW | Tech lead approves ticket list before implementation |
-| Review the STACK | Reviewer approves stacked PRs; tech lead runs closeout |
+| Gate              | Role                                                               |
+| ----------------- | ------------------------------------------------------------------ |
+| Plan the WHAT     | Product owner / tech lead approves `docs/product/plans/phase-N.md` |
+| Decompose the HOW | Tech lead approves ticket list before implementation               |
+| Review the STACK  | Reviewer approves stacked PRs; tech lead runs closeout             |
 
 The orchestrator enforces that no gate opens without the required label or approval on the GitHub Issue / PR. Role assignments are configurable in `orchestrator.config.json`.
 
@@ -76,17 +77,19 @@ For solo developers: all roles collapse to one person. SoA behavior is preserved
 The review gate must not become a bottleneck when 8 tickets are in flight simultaneously. The design constraint: review is mandatory but never blocks the coordinator from advancing other tickets.
 
 Options (to be decided at `/soa plan` time):
+
 - **Async queue:** adversarial review runs in parallel with the next ticket's implementation; findings surface to the developer's attention queue (GitHub Issue comment, notification)
 - **Parallel reviewer pool:** a separate pool of review agent sessions runs concurrently with implementation sessions, capped independently
 - **Batch review at gate 3:** reviews accumulate per-ticket but gate 3 (closeout) is where the human actually reads them — the review subagent runs immediately after each ticket completes, but the developer reads all findings at once during stack review
 
-The ethos constraint: findings are never suppressed. The human decides what to act on. The throughput optimization is in *when* the human reads the findings, not in *whether* they are produced.
+The ethos constraint: findings are never suppressed. The human decides what to act on. The throughput optimization is in _when_ the human reads the findings, not in _whether_ they are produced.
 
 ### 5. Handoff Files → Structured Async Communication
 
 Today's handoff is a markdown file the same developer reads 5 minutes later. For async teams it's a message someone reads tomorrow, possibly someone different.
 
 Handoff content moves into the GitHub Issue body (updated by the agent as a living workpad). Structured sections:
+
 - **What was done** — diff summary, key decisions
 - **What's next** — next ticket or blocker
 - **Open questions** — anything requiring human input before the next agent session
@@ -111,7 +114,7 @@ The natural team-scale deployment:
 ```yaml
 # .github/workflows/deliver.yml
 on:
-  schedule: [cron: "*/5 * * * *"]
+  schedule: [cron: '*/5 * * * *']
   workflow_dispatch:
 jobs:
   deliver:

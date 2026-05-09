@@ -109,7 +109,9 @@ describe('P7.01 run-policy state model and migration', () => {
       if (serialized.reviewSubagent.kind === 'override') {
         expect(serialized.reviewSubagent.value).toBe('codex:codex-rescue');
       } else {
-        throw new Error('Expected kind=override but got same-type after round-trip');
+        throw new Error(
+          'Expected kind=override but got same-type after round-trip',
+        );
       }
     });
 
