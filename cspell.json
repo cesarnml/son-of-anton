@@ -44,6 +44,8 @@
     "mktemp",
     "mtimes",
     "pasteable",
-    "relitigated"
+    "relitigated",
+    "idempotently",
+    "relinks"
   ]
 }
