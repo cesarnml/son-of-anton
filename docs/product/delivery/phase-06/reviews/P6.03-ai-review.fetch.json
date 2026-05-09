@@ -3,10 +3,7 @@
   "fetchedAt": "2026-05-09T09:50:50.687Z",
   "reviewedHeadSha": "12b41e680101b7a5d034d5fa3c4b58057b76d7b1",
   "detected": true,
-  "vendors": [
-    "coderabbit",
-    "qodo"
-  ],
+  "vendors": ["coderabbit", "qodo"],
   "agents": [
     {
       "agent": "coderabbit",
