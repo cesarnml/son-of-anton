@@ -61,6 +61,7 @@ Deferred: consumer-side migration logic at `SOA_TARGET_VERSION=1` is a no-op by 
 Contract note: none
 
 Implementation notes:
+
 - `son-of-anton-ethos` SKILL.md had no `.agents/delivery/*/reviews` references; Review Focus listed it but no change was needed — confirmed by grep
 - `orchestrator.test.ts` assertion for `createOptions()` output updated alongside `planning.ts` change to keep CI green (this was not called out explicitly in the ticket but was a necessary companion change)
 - `cspell.json` extended with `idempotently` and `relinks` — both introduced by this ticket

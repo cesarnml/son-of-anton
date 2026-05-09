@@ -38,7 +38,13 @@ fi
 read_soa_version() {
   local version_file="$REPO_ROOT/.soa-sync-version"
   if [ -f "$version_file" ]; then
-    cat "$version_file"
+    local raw
+    raw="$(cat "$version_file")"
+    if ! [[ "$raw" =~ ^[0-9]+$ ]]; then
+      echo "soa-sync: .soa-sync-version contains non-integer value '$raw'; aborting" >&2
+      exit 1
+    fi
+    echo "$raw"
   else
     echo "0"
   fi

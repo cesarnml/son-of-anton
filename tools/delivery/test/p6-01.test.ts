@@ -34,7 +34,9 @@ describe('P6.01 soa-sync migration runner', () => {
     try {
       initConsumerFixture(tmp);
 
-      // Create legacy reviews dir with a stub file and commit it
+      // Create legacy reviews dir with a stub file and commit it.
+      // Intentionally do NOT pre-create docs/product/delivery/phase-xx — the
+      // script's mkdir -p must create it.
       mkdirSync(join(tmp, '.agents', 'delivery', 'phase-xx', 'reviews'), {
         recursive: true,
       });
@@ -42,16 +44,10 @@ describe('P6.01 soa-sync migration runner', () => {
         join(tmp, '.agents', 'delivery', 'phase-xx', 'reviews', 'stub.md'),
         '# stub review',
       );
-      // Create the destination parent so git mv has somewhere to land
-      mkdirSync(join(tmp, 'docs', 'product', 'delivery', 'phase-xx'), {
-        recursive: true,
-      });
       spawnSync('git', ['add', '.'], { cwd: tmp });
-      spawnSync(
-        'git',
-        ['commit', '-m', 'initial: add legacy reviews and dest parent'],
-        { cwd: tmp },
-      );
+      spawnSync('git', ['commit', '-m', 'initial: add legacy reviews'], {
+        cwd: tmp,
+      });
 
       const result = runSync(tmp);
       expect(result.status).toBe(0);
@@ -78,9 +74,7 @@ describe('P6.01 soa-sync migration runner', () => {
 
       // Old reviews dir must be gone
       expect(
-        existsSync(
-          join(tmp, '.agents', 'delivery', 'phase-xx', 'reviews'),
-        ),
+        existsSync(join(tmp, '.agents', 'delivery', 'phase-xx', 'reviews')),
       ).toBe(false);
     } finally {
       rmSync(tmp, { force: true, recursive: true });
@@ -99,9 +93,6 @@ describe('P6.01 soa-sync migration runner', () => {
         join(tmp, '.agents', 'delivery', 'phase-yy', 'reviews', 'stub.md'),
         '# stub',
       );
-      mkdirSync(join(tmp, 'docs', 'product', 'delivery', 'phase-yy'), {
-        recursive: true,
-      });
       spawnSync('git', ['add', '.'], { cwd: tmp });
       spawnSync('git', ['commit', '-m', 'initial'], { cwd: tmp });
 
@@ -137,10 +128,7 @@ describe('P6.01 soa-sync migration runner', () => {
       // Override to source-repo mode: create .agents/skills at root, no .son-of-anton
       rmSync(join(tmp, '.son-of-anton'), { force: true, recursive: true });
       mkdirSync(join(tmp, '.agents', 'skills', 'soa'), { recursive: true });
-      writeFileSync(
-        join(tmp, '.agents', 'skills', 'soa', 'SKILL.md'),
-        '# soa',
-      );
+      writeFileSync(join(tmp, '.agents', 'skills', 'soa', 'SKILL.md'), '# soa');
 
       // Create legacy reviews — these must NOT be touched in source mode
       mkdirSync(join(tmp, '.agents', 'delivery', 'phase-zz', 'reviews'), {
