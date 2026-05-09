@@ -45,8 +45,10 @@
     "mtimes",
     "pasteable",
     "relitigated",
+    "footgun",
     "getline",
     "idempotently",
-    "relinks"
+    "relinks",
+    "Triaging"
   ]
 }

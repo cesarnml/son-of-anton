@@ -1,6 +1,6 @@
 # Phase 06 — soa-sync Refactor: Consumer Upgrade Story
 
-Status: Decomposed — ticket stack ready for orchestrated delivery.
+Status: Delivered — all tickets merged.
 
 > Make `soa update` a complete upgrade — consuming repos get current skills, current structural layout, and current agent guidance injected automatically, without manual follow-up steps.
 
