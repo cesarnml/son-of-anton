@@ -104,10 +104,19 @@ inject_soa_block() {
 
   [ -f "$source_path" ] || return 0
 
+  # Resolve symlink so we write through to the referent, not replace the link.
+  if [ -L "$target_path" ]; then
+    target_path="$(readlink -f "$target_path")"
+  fi
+
   local tmp
   tmp="$(mktemp)"
 
-  if [ -f "$target_path" ] && grep -qF '<!-- soa:start -->' "$target_path"; then
+  # Use replacement mode only when BOTH markers are present; a file with only
+  # the start marker (corrupted) falls through to append so content is not lost.
+  if [ -f "$target_path" ] \
+      && grep -qF '<!-- soa:start -->' "$target_path" \
+      && grep -qF '<!-- soa:end -->' "$target_path"; then
     # Replace existing block while preserving content outside the markers
     awk -v src="$source_path" '
       /<!-- soa:start -->/ {
