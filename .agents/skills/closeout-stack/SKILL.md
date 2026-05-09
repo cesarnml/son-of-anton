@@ -69,7 +69,7 @@ If closeout fails mid-flight (including after an automatic cherry-pick attempt),
    ```
 4. Confirm `origin/main` has expected squash commits in ticket order.
 5. Sync delivery artifacts to the primary `main` checkout: copy **`state.json`** from the worktree that last advanced the stack; **merge** all **`reviews/`** and **`handoffs/`** files from **every** ticket worktree used in the phase so nothing stays stranded off `main`.
-6. Write `notes/public/<plan>-retrospective.md` if not already done.
+6. Write `docs/product/retrospectives/<plan>-retrospective.md` if not already done.
 
 ## Key Rules
 

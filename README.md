@@ -133,7 +133,7 @@ bash .son-of-anton/scripts/sync-skills.sh
 | `soa-pr-review`           | Triage CodeRabbit, Qodo, Greptile, SonarQube review comments                                                                              |
 | `soa-enter-worktree`      | Bootstrap a fresh git worktree with deps and `.env`; runtime-agnostic, not Bun-only                                                       |
 | `soa-closeout-stack`      | Squash-merge completed stacked PRs onto main                                                                                              |
-| `soa-write-retrospective` | Write phase/epic retrospective to `notes/public/`                                                                                         |
+| `soa-write-retrospective` | Write phase/epic retrospective to `docs/product/retrospectives/`                                                                          |
 
 ## Requirements
 
