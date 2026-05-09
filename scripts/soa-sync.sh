@@ -90,6 +90,51 @@ apply_migrations() {
 }
 
 # ---------------------------------------------------------------------------
+# Agent-rule injection
+# ---------------------------------------------------------------------------
+
+# inject_soa_block <source-path-relative-to-REPO_ROOT> <target-path-relative-to-REPO_ROOT>
+# Replaces or inserts a <!-- soa:start --> ... <!-- soa:end --> block in target.
+# Creates target if absent. No-op when content is already current.
+inject_soa_block() {
+  local source_rel="$1"
+  local target_rel="$2"
+  local source_path="$REPO_ROOT/$source_rel"
+  local target_path="$REPO_ROOT/$target_rel"
+
+  [ -f "$source_path" ] || return 0
+
+  local tmp
+  tmp="$(mktemp)"
+
+  if [ -f "$target_path" ] && grep -qF '<!-- soa:start -->' "$target_path"; then
+    # Replace existing block while preserving content outside the markers
+    awk -v src="$source_path" '
+      /<!-- soa:start -->/ {
+        print "<!-- soa:start -->"
+        while ((getline line < src) > 0) print line
+        print "<!-- soa:end -->"
+        skip=1; next
+      }
+      skip && /<!-- soa:end -->/ { skip=0; next }
+      !skip { print }
+    ' "$target_path" > "$tmp"
+  elif [ -f "$target_path" ]; then
+    # Append block to existing file (no markers present)
+    { cat "$target_path"; printf '\n<!-- soa:start -->\n'; cat "$source_path"; printf '<!-- soa:end -->\n'; } > "$tmp"
+  else
+    # Create new file containing only the block
+    { printf '<!-- soa:start -->\n'; cat "$source_path"; printf '<!-- soa:end -->\n'; } > "$tmp"
+  fi
+
+  if [ -f "$target_path" ] && diff -q "$target_path" "$tmp" > /dev/null 2>&1; then
+    rm "$tmp"
+  else
+    mv "$tmp" "$target_path"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Run migrations (consumer mode only)
 # ---------------------------------------------------------------------------
 
@@ -140,6 +185,12 @@ if [ "$IS_SOURCE_REPO" = false ]; then
       echo "  kept: .agents already exists; Son-of-Anton skills remain under .son-of-anton/.agents"
     fi
   done
+
+  # Inject agent-rule blocks into AGENTS.md and CLAUDE.md
+  inject_soa_block ".son-of-anton/AGENTS.soa.md" "AGENTS.md"
+  inject_soa_block ".son-of-anton/CLAUDE.soa.md" "CLAUDE.md"
+
+  echo "soa-sync: add .son-of-anton/ to your lint/format ignore configuration (e.g. .prettierignore, .eslintignore)"
 fi
 
 echo "soa-sync: done"
