@@ -22,10 +22,7 @@ describe('P6.02 retrospective location migration', () => {
   it('phase-03 retro is in docs/product/retrospectives/', () => {
     expect(
       existsSync(
-        join(
-          retroDir,
-          'phase-03-orchestrator-ergonomics-retrospective.md',
-        ),
+        join(retroDir, 'phase-03-orchestrator-ergonomics-retrospective.md'),
       ),
     ).toBe(true);
   });
