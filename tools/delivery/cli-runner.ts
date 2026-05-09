@@ -665,7 +665,7 @@ async function repairState(
   options: OrchestratorOptions,
   config: ResolvedOrchestratorConfig,
 ): Promise<RepairStateResult> {
-  return repairStateImpl(cwd, options, {
+  const result = await repairStateImpl(cwd, options, {
     cwd,
     defaultBranch: config.defaultBranch,
     runtime: config.runtime,
@@ -673,6 +673,13 @@ async function repairState(
     deriveWorktreePath,
     findExistingBranch,
   });
+  const normalized = normalizeRunPolicy(result.state, config);
+
+  if (normalized !== result.state) {
+    await saveState(cwd, normalized);
+  }
+
+  return { ...result, state: normalized };
 }
 
 export async function inferPlanPathFromBranch(
