@@ -7,6 +7,12 @@ import {
 } from './config';
 import type { OrchestratorOptions } from './types';
 
+export type BaselineValue = 'orchestrator' | 'run-policy';
+export const VALID_BASELINE_VALUES: BaselineValue[] = [
+  'orchestrator',
+  'run-policy',
+];
+
 export type ParsedCliArgs = {
   command: string;
   positionals: string[];
@@ -18,6 +24,7 @@ export type ParsedCliArgs = {
   prReviewPolicy?: ReviewPolicyStageValue;
   reviewSubagent?: string;
   sameReviewSubagent?: boolean;
+  baseline?: BaselineValue;
 };
 
 /**
@@ -107,6 +114,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  --pr-review-policy <required|skip_doc_only|disabled>',
     '  --review-subagent <agent>',
     '  --same-review-subagent',
+    '  --baseline <orchestrator|run-policy>',
   ].join('\n');
 }
 
@@ -118,6 +126,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let prReviewPolicy: ParsedCliArgs['prReviewPolicy'];
   let reviewSubagent: ParsedCliArgs['reviewSubagent'];
   let sameReviewSubagent: ParsedCliArgs['sameReviewSubagent'];
+  let baseline: ParsedCliArgs['baseline'];
   const flags = new Set<string>();
   const positionals: string[] = [];
 
@@ -219,6 +228,23 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       continue;
     }
 
+    if (value === '--baseline') {
+      const raw = argv[index + 1];
+
+      if (
+        raw === undefined ||
+        !VALID_BASELINE_VALUES.includes(raw as BaselineValue)
+      ) {
+        throw new Error(
+          `Pass --baseline <${VALID_BASELINE_VALUES.join('|')}>.`,
+        );
+      }
+
+      baseline = raw as BaselineValue;
+      index += 1;
+      continue;
+    }
+
     if (value === '--phase') {
       throw new Error(
         '--phase has been removed. Pass --plan <plan-path> instead.',
@@ -256,6 +282,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     prReviewPolicy,
     reviewSubagent,
     sameReviewSubagent,
+    baseline,
   };
 }
 

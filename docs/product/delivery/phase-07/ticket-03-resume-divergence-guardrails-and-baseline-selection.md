@@ -41,8 +41,12 @@ Scope: delivery-resume
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `patchRunPolicyWithFlags`, `detectRunPolicyDivergence`, and `formatRunPolicyDivergenceError` missing from `state.ts` caused import failure at test load time; `baseline` field missing from `ParsedCliArgs` caused type errors.
+
+Why this path: Three pure helpers in `state.ts` (`detectRunPolicyDivergence`, `formatRunPolicyDivergenceError`, `patchRunPolicyWithFlags`) keep all divergence logic independently testable. The `loadState` wrapper in `cli-runner.ts` returns `{ state, hadPersistedRunPolicy }` so the divergence check can distinguish a fresh-start (normalization-derived) runPolicy from one that was already persisted — only the latter triggers the divergence refusal. The check is inserted immediately after `loadState` and before the command switch, allowing a narrow exemption list (`status`, `sync`, `repair-state`, `record-review`, `reconcile-late-review`) for idempotent/diagnostic commands that do not consume policy.
+
+Alternative considered: Storing a `runPolicySource: 'persisted' | 'derived'` discriminant in `state.json` — rejected because it adds persistent state for a transient concern; `hadPersistedRunPolicy` in the load result is sufficient and disappears after the check.
+
+Deferred: Run-policy observability (printing active runPolicy in `status` output) and docs updates stay in P7.04 and P7.05.
+
+Contract note: none; `Type: feat` and `Scope: delivery-resume` are accurate.

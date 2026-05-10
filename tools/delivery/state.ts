@@ -22,6 +22,140 @@ import type {
   TicketStatus,
 } from './types';
 
+// ─── Run-policy divergence helpers ──────────────────────────────────────────
+
+function runPolicyReviewSubagentEqual(
+  a: RunPolicyReviewSubagent,
+  b: RunPolicyReviewSubagent,
+): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'override' && b.kind === 'override')
+    return a.value === b.value;
+  return true;
+}
+
+/**
+ * Compare persisted runPolicy against the current config-derived policy on
+ * the four bounded Phase 07 fields.
+ * Returns an array of field names that differ (empty = no divergence).
+ */
+export function detectRunPolicyDivergence(
+  persisted: RunPolicy,
+  current: RunPolicy,
+): string[] {
+  const fields: string[] = [];
+  if (persisted.ticketBoundaryMode !== current.ticketBoundaryMode) {
+    fields.push('ticketBoundaryMode');
+  }
+  if (persisted.subagentReview !== current.subagentReview) {
+    fields.push('subagentReview');
+  }
+  if (persisted.prReview !== current.prReview) {
+    fields.push('prReview');
+  }
+  if (
+    !runPolicyReviewSubagentEqual(
+      persisted.reviewSubagent,
+      current.reviewSubagent,
+    )
+  ) {
+    fields.push('reviewSubagent');
+  }
+  return fields;
+}
+
+function formatReviewSubagent(rs: RunPolicyReviewSubagent): string {
+  return rs.kind === 'override' ? `override(${rs.value})` : 'same-type';
+}
+
+/**
+ * Format an operator-facing error message when resume detects divergence
+ * between the persisted runPolicy and the current repo config.
+ *
+ * Includes both policy values for each diverged field and exact recovery
+ * commands the operator can use to resolve the conflict.
+ */
+export function formatRunPolicyDivergenceError(
+  persisted: RunPolicy,
+  current: RunPolicy,
+  divergedFields: string[],
+  runDeliverInvocation: string,
+): string {
+  const lines: string[] = [
+    'Run-policy divergence detected. The persisted run policy in state.json',
+    'differs from the current orchestrator.config.json on these fields:',
+    '',
+  ];
+
+  for (const field of divergedFields) {
+    let persistedValue: string;
+    let currentValue: string;
+
+    if (field === 'ticketBoundaryMode') {
+      persistedValue = persisted.ticketBoundaryMode;
+      currentValue = current.ticketBoundaryMode;
+    } else if (field === 'subagentReview') {
+      persistedValue = persisted.subagentReview;
+      currentValue = current.subagentReview;
+    } else if (field === 'prReview') {
+      persistedValue = persisted.prReview;
+      currentValue = current.prReview;
+    } else {
+      persistedValue = formatReviewSubagent(persisted.reviewSubagent);
+      currentValue = formatReviewSubagent(current.reviewSubagent);
+    }
+
+    lines.push(
+      `  ${field}: persisted=${persistedValue}  current=${currentValue}`,
+    );
+  }
+
+  lines.push('');
+  lines.push('Resolve with one of:');
+  lines.push(
+    `  ${runDeliverInvocation} --baseline=orchestrator   # adopt current repo config`,
+  );
+  lines.push(
+    `  ${runDeliverInvocation} --baseline=run-policy     # keep persisted run policy`,
+  );
+
+  return lines.join('\n');
+}
+
+/**
+ * Apply explicit CLI flag overrides on top of a base RunPolicy.
+ * Used when `--baseline=run-policy` is selected: preserve the persisted
+ * policy but honour any additional flags the operator passed.
+ */
+export function patchRunPolicyWithFlags(
+  base: RunPolicy,
+  flags: {
+    boundaryMode?: string;
+    subagentReviewPolicy?: string;
+    prReviewPolicy?: string;
+    reviewSubagent?: string;
+    sameReviewSubagent?: boolean;
+  },
+): RunPolicy {
+  const reviewSubagent: RunPolicyReviewSubagent =
+    flags.reviewSubagent !== undefined
+      ? { kind: 'override', value: flags.reviewSubagent }
+      : flags.sameReviewSubagent === true
+        ? { kind: 'same-type' }
+        : base.reviewSubagent;
+
+  return {
+    ticketBoundaryMode:
+      (flags.boundaryMode as RunPolicy['ticketBoundaryMode']) ??
+      base.ticketBoundaryMode,
+    subagentReview:
+      (flags.subagentReviewPolicy as RunPolicy['subagentReview']) ??
+      base.subagentReview,
+    prReview: (flags.prReviewPolicy as RunPolicy['prReview']) ?? base.prReview,
+    reviewSubagent,
+  };
+}
+
 export function deriveRunPolicyFromConfig(
   config: ResolvedOrchestratorConfig,
 ): RunPolicy {

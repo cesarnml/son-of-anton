@@ -52,8 +52,11 @@ import {
 } from './planning';
 import {
   deriveRunPolicyFromConfig,
+  detectRunPolicyDivergence,
+  formatRunPolicyDivergenceError,
   loadState as loadStateImpl,
   normalizeRunPolicy,
+  patchRunPolicyWithFlags,
   repairState as repairStateImpl,
   saveState as saveStateImpl,
   summarizeStateDifferences as summarizeStateDifferencesImpl,
@@ -180,6 +183,7 @@ export async function runDeliveryOrchestrator(
         prReviewPolicy?: ReviewPolicyStageValue;
         reviewSubagent?: string;
         sameReviewSubagent?: boolean;
+        baseline?: 'orchestrator' | 'run-policy';
       }
     | undefined;
 
@@ -240,7 +244,66 @@ export async function runDeliveryOrchestrator(
       return 0;
     }
 
-    const state = await loadState(cwd, options, context.config);
+    const { state: loadedState, hadPersistedRunPolicy } = await loadState(
+      cwd,
+      options,
+      context.config,
+    );
+
+    // Divergence check: when a run is in-progress (runPolicy was already
+    // persisted) and the current config has drifted, refuse to continue
+    // silently. Skip diagnostic/idempotent commands that do not consume policy.
+    const DIVERGENCE_EXEMPT = new Set([
+      'status',
+      'sync',
+      'repair-state',
+      'record-review',
+      'reconcile-late-review',
+    ]);
+    let state = loadedState;
+    if (
+      hadPersistedRunPolicy &&
+      !DIVERGENCE_EXEMPT.has(parsed.command) &&
+      loadedState.runPolicy != null
+    ) {
+      const currentRunPolicy = deriveRunPolicyFromConfig(resolvedConfig);
+      const divergedFields = detectRunPolicyDivergence(
+        loadedState.runPolicy,
+        currentRunPolicy,
+      );
+      if (divergedFields.length > 0) {
+        const runDeliverInvocation = generateRunDeliverInvocation(
+          context.config.packageManager,
+        );
+        const commandArgs = [
+          '--plan',
+          state.planPath,
+          parsed.command,
+          ...parsed.positionals,
+        ].join(' ');
+        const recoveryInvocation = `${runDeliverInvocation} ${commandArgs}`;
+
+        if (parsed.baseline === undefined) {
+          throw new Error(
+            formatRunPolicyDivergenceError(
+              loadedState.runPolicy,
+              currentRunPolicy,
+              divergedFields,
+              recoveryInvocation,
+            ),
+          );
+        }
+
+        // Operator provided --baseline: resolve and persist the new runPolicy.
+        const resolvedRunPolicy =
+          parsed.baseline === 'orchestrator'
+            ? deriveRunPolicyFromConfig(resolvedConfig)
+            : patchRunPolicyWithFlags(loadedState.runPolicy, parsed);
+
+        state = { ...loadedState, runPolicy: resolvedRunPolicy };
+        await saveState(cwd, state);
+      }
+    }
 
     const resolvedCwd = await realpath(cwd).catch(() => cwd);
     assertWorktreeGuard(
@@ -668,8 +731,8 @@ export async function loadState(
   cwd: string,
   options: OrchestratorOptions,
   config: ResolvedOrchestratorConfig,
-): Promise<DeliveryState> {
-  const state = await loadStateImpl(cwd, options, {
+): Promise<{ state: DeliveryState; hadPersistedRunPolicy: boolean }> {
+  const raw = await loadStateImpl(cwd, options, {
     cwd,
     defaultBranch: config.defaultBranch,
     runtime: config.runtime,
@@ -677,7 +740,8 @@ export async function loadState(
     deriveWorktreePath,
     findExistingBranch,
   });
-  return normalizeRunPolicy(state, config);
+  const hadPersistedRunPolicy = raw.runPolicy != null;
+  return { state: normalizeRunPolicy(raw, config), hadPersistedRunPolicy };
 }
 
 async function repairState(
