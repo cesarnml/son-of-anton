@@ -138,5 +138,48 @@ describe('P7.04 run-policy observability', () => {
         .find((l) => l.startsWith('run_policy='));
       expect(runPolicyLine).toContain('same-type');
     });
+
+    it('labels the run_policy line as [persisted] to distinguish it from config lines', () => {
+      const state: DeliveryState = {
+        ...baseState,
+        runPolicy: samTypePolicy,
+      };
+      const out = formatStatus(state, baseConfig);
+      const runPolicyLine = out
+        .split('\n')
+        .find((l) => l.startsWith('run_policy='));
+      expect(runPolicyLine).toContain('[persisted]');
+    });
+
+    it('omits run_policy line when state.runPolicy is explicitly undefined', () => {
+      const state: DeliveryState = { ...baseState, runPolicy: undefined };
+      const out = formatStatus(state, baseConfig);
+      expect(out).not.toContain('run_policy=');
+    });
+  });
+
+  // ─── formatRunPolicy — additional edge cases ──────────────────────────────────
+
+  describe('formatRunPolicy — additional edge cases', () => {
+    it('renders glide boundary mode', () => {
+      const glidePolicy: RunPolicy = {
+        ...samTypePolicy,
+        ticketBoundaryMode: 'glide',
+      };
+      expect(formatRunPolicy(glidePolicy)).toContain('boundary_mode=glide');
+    });
+
+    it('renders required subagentReview', () => {
+      const policy: RunPolicy = {
+        ...samTypePolicy,
+        subagentReview: 'required',
+      };
+      expect(formatRunPolicy(policy)).toContain('subagentReview:required');
+    });
+
+    it('renders disabled prReview', () => {
+      const policy: RunPolicy = { ...samTypePolicy, prReview: 'disabled' };
+      expect(formatRunPolicy(policy)).toContain('prReview:disabled');
+    });
   });
 });

@@ -18,6 +18,11 @@ import type {
  * Format the active run policy into a compact, operator-readable string
  * suitable for display in status output.
  *
+ * Separator convention (intentional, mirrors existing status line format):
+ * - Top-level key uses `=` (e.g. `boundary_mode=cook`)
+ * - Sub-fields within the same line use `:` (e.g. `subagentReview:skip_doc_only`),
+ *   matching the existing `review_policy=subagentReview:... prReview:...` pattern.
+ *
  * Example output:
  *   boundary_mode=cook subagentReview:skip_doc_only prReview:skip_doc_only reviewSubagent:same-type
  */
@@ -163,7 +168,7 @@ export function formatStatus(
     `boundary_mode=${config.ticketBoundaryMode}`,
     `review_policy=subagentReview:${config.reviewPolicy.subagentReview} prReview:${config.reviewPolicy.prReview}`,
     state.runPolicy != null
-      ? `run_policy=${formatRunPolicy(state.runPolicy)}`
+      ? `run_policy=${formatRunPolicy(state.runPolicy)} [persisted]`
       : undefined,
     '',
     ...state.tickets.map((ticket) =>
