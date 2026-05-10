@@ -118,6 +118,32 @@ describe('P7.02 runtime policy override parsing and resolution', () => {
   });
 
   describe('resolveRuntimePolicyOverrides', () => {
+    it('throws when --pr-review-policy is non-disabled and prReviewAgents absent', () => {
+      const configNoAgents: OrchestratorConfig = {
+        ...baseRawConfig,
+        prReviewAgents: undefined,
+      };
+      expect(() =>
+        resolveRuntimePolicyOverrides(
+          { prReviewPolicy: 'required' },
+          configNoAgents,
+        ),
+      ).toThrow('prReviewAgents');
+    });
+
+    it('allows --pr-review-policy disabled even when prReviewAgents absent', () => {
+      const configNoAgents: OrchestratorConfig = {
+        ...baseRawConfig,
+        prReviewAgents: undefined,
+      };
+      expect(() =>
+        resolveRuntimePolicyOverrides(
+          { prReviewPolicy: 'disabled' },
+          configNoAgents,
+        ),
+      ).not.toThrow();
+    });
+
     it('patches subagentReview when --subagent-review-policy provided', () => {
       const patched = resolveRuntimePolicyOverrides(
         { subagentReviewPolicy: 'required' },

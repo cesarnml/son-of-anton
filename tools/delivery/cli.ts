@@ -43,18 +43,37 @@ export function resolveRuntimePolicyOverrides(
         ? undefined
         : rawConfig.reviewSubagentOverride;
 
+  const mergedReviewPolicy = {
+    ...rawConfig.reviewPolicy,
+    ...(parsed.subagentReviewPolicy !== undefined
+      ? { subagentReview: parsed.subagentReviewPolicy }
+      : {}),
+    ...(parsed.prReviewPolicy !== undefined
+      ? { prReview: parsed.prReviewPolicy }
+      : {}),
+  };
+
+  // Guard: if --pr-review-policy upgrades prReview to a non-disabled value but
+  // the config has no prReviewAgents, fail fast so the operator knows they need
+  // to configure prReviewAgents before enabling external PR review.
+  const effectivePrReview =
+    mergedReviewPolicy.prReview ?? mergedReviewPolicy.externalReview;
+
+  if (
+    parsed.prReviewPolicy !== undefined &&
+    effectivePrReview !== 'disabled' &&
+    (rawConfig.prReviewAgents === undefined ||
+      rawConfig.prReviewAgents.length === 0)
+  ) {
+    throw new Error(
+      `--pr-review-policy ${parsed.prReviewPolicy} requires prReviewAgents in orchestrator.config.json. Add a prReviewAgents array or use --pr-review-policy disabled.`,
+    );
+  }
+
   return {
     ...rawConfig,
     ticketBoundaryMode: parsed.boundaryMode ?? rawConfig.ticketBoundaryMode,
-    reviewPolicy: {
-      ...rawConfig.reviewPolicy,
-      ...(parsed.subagentReviewPolicy !== undefined
-        ? { subagentReview: parsed.subagentReviewPolicy }
-        : {}),
-      ...(parsed.prReviewPolicy !== undefined
-        ? { prReview: parsed.prReviewPolicy }
-        : {}),
-    },
+    reviewPolicy: mergedReviewPolicy,
     reviewSubagentOverride,
   };
 }
