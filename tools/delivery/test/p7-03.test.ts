@@ -239,5 +239,39 @@ describe('P7.03 resume divergence guardrails', () => {
         value: 'preserved-agent',
       });
     });
+
+    it('throws when both reviewSubagent and sameReviewSubagent are provided', () => {
+      expect(() =>
+        patchRunPolicyWithFlags(basePolicy, {
+          reviewSubagent: 'some-agent',
+          sameReviewSubagent: true,
+        }),
+      ).toThrow('mutually exclusive');
+    });
+  });
+
+  // ─── formatRunPolicyDivergenceError — edge cases ─────────────────────────────
+
+  describe('formatRunPolicyDivergenceError — edge cases', () => {
+    it('produces header and recovery lines even when divergedFields is empty', () => {
+      const msg = formatRunPolicyDivergenceError(
+        basePolicy,
+        basePolicy,
+        [],
+        'bun run deliver --plan x.md post-verify',
+      );
+      expect(msg).toContain('--baseline=orchestrator');
+      expect(msg).toContain('--baseline=run-policy');
+    });
+
+    it('recovery guidance includes the run-deliver invocation', () => {
+      const msg = formatRunPolicyDivergenceError(
+        basePolicy,
+        { ...basePolicy, prReview: 'required' },
+        ['prReview'],
+        'bun run deliver --plan docs/x.md post-verify',
+      );
+      expect(msg).toContain('bun run deliver --plan docs/x.md post-verify');
+    });
   });
 });

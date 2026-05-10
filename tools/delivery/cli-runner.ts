@@ -254,11 +254,16 @@ export async function runDeliveryOrchestrator(
     // persisted) and the current config has drifted, refuse to continue
     // silently. Skip diagnostic/idempotent commands that do not consume policy.
     const DIVERGENCE_EXEMPT = new Set([
+      // Diagnostic / idempotent commands that do not consume runPolicy.
       'status',
       'sync',
       'repair-state',
       'record-review',
       'reconcile-late-review',
+      // start: re-stamps runPolicy from current config when explicit flags are
+      // present, so blocking it on divergence is counter-productive — let
+      // start-time stamping resolve the conflict.
+      'start',
     ]);
     let state = loadedState;
     if (

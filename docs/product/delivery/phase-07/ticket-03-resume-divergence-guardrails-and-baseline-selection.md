@@ -47,6 +47,6 @@ Why this path: Three pure helpers in `state.ts` (`detectRunPolicyDivergence`, `f
 
 Alternative considered: Storing a `runPolicySource: 'persisted' | 'derived'` discriminant in `state.json` — rejected because it adds persistent state for a transient concern; `hadPersistedRunPolicy` in the load result is sufficient and disappears after the check.
 
-Deferred: Run-policy observability (printing active runPolicy in `status` output) and docs updates stay in P7.04 and P7.05.
+Deferred: Run-policy observability (printing active runPolicy in `status` output) and docs updates stay in P7.04 and P7.05. Subagent also flagged that `startTicket`, `recordPostVerify`, and `applyAdvanceBoundaryMode` still read from `context.config` rather than `state.runPolicy` — plumbing the persisted policy through to actual consumers is intentionally deferred to P7.04 which owns policy observability.
 
 Contract note: none; `Type: feat` and `Scope: delivery-resume` are accurate.

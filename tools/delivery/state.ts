@@ -2,7 +2,11 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import type { ResolvedOrchestratorConfig } from './config';
+import type {
+  ResolvedOrchestratorConfig,
+  ReviewPolicyStageValue,
+  TicketBoundaryMode,
+} from './config';
 import {
   listLocalBranches,
   listMergedPullRequests,
@@ -111,7 +115,7 @@ export function formatRunPolicyDivergenceError(
   }
 
   lines.push('');
-  lines.push('Resolve with one of:');
+  lines.push('Add --baseline to your command to resolve, e.g.:');
   lines.push(
     `  ${runDeliverInvocation} --baseline=orchestrator   # adopt current repo config`,
   );
@@ -126,17 +130,27 @@ export function formatRunPolicyDivergenceError(
  * Apply explicit CLI flag overrides on top of a base RunPolicy.
  * Used when `--baseline=run-policy` is selected: preserve the persisted
  * policy but honour any additional flags the operator passed.
+ *
+ * Callers must not pass both `reviewSubagent` and `sameReviewSubagent`
+ * simultaneously — this function throws defensively even though `parseCliArgs`
+ * already rejects that combination at the CLI layer.
  */
 export function patchRunPolicyWithFlags(
   base: RunPolicy,
   flags: {
-    boundaryMode?: string;
-    subagentReviewPolicy?: string;
-    prReviewPolicy?: string;
+    boundaryMode?: TicketBoundaryMode;
+    subagentReviewPolicy?: ReviewPolicyStageValue;
+    prReviewPolicy?: ReviewPolicyStageValue;
     reviewSubagent?: string;
     sameReviewSubagent?: boolean;
   },
 ): RunPolicy {
+  if (flags.reviewSubagent !== undefined && flags.sameReviewSubagent === true) {
+    throw new Error(
+      'patchRunPolicyWithFlags: reviewSubagent and sameReviewSubagent are mutually exclusive.',
+    );
+  }
+
   const reviewSubagent: RunPolicyReviewSubagent =
     flags.reviewSubagent !== undefined
       ? { kind: 'override', value: flags.reviewSubagent }
@@ -145,13 +159,9 @@ export function patchRunPolicyWithFlags(
         : base.reviewSubagent;
 
   return {
-    ticketBoundaryMode:
-      (flags.boundaryMode as RunPolicy['ticketBoundaryMode']) ??
-      base.ticketBoundaryMode,
-    subagentReview:
-      (flags.subagentReviewPolicy as RunPolicy['subagentReview']) ??
-      base.subagentReview,
-    prReview: (flags.prReviewPolicy as RunPolicy['prReview']) ?? base.prReview,
+    ticketBoundaryMode: flags.boundaryMode ?? base.ticketBoundaryMode,
+    subagentReview: flags.subagentReviewPolicy ?? base.subagentReview,
+    prReview: flags.prReviewPolicy ?? base.prReview,
     reviewSubagent,
   };
 }
