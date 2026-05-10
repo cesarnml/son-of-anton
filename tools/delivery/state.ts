@@ -41,7 +41,7 @@ export function normalizeRunPolicy(
   state: DeliveryState,
   config: ResolvedOrchestratorConfig,
 ): DeliveryState {
-  if (state.runPolicy !== undefined) {
+  if (state.runPolicy != null) {
     return state;
   }
 

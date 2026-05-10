@@ -80,6 +80,16 @@ describe('P7.01 run-policy state model and migration', () => {
       });
     });
 
+    it('derives runPolicy from config when runPolicy is null in persisted state', () => {
+      const state = {
+        ...legacyRawState,
+        runPolicy: null,
+      } as unknown as DeliveryState;
+      const normalized = normalizeRunPolicy(state, baseConfig);
+      expect(normalized.runPolicy).toBeDefined();
+      expect(normalized.runPolicy!.ticketBoundaryMode).toBe('cook');
+    });
+
     it('leaves existing runPolicy unchanged when already present', () => {
       const existingPolicy: RunPolicy = {
         ticketBoundaryMode: 'gated',
