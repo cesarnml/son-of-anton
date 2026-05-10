@@ -270,6 +270,35 @@ For ticket `01`, `start` is the command that initializes the first ticket contex
 
 **No read-ahead during the review window.** The agent does nothing while waiting on external AI review. The wait is free (LLM idle during subprocess sleep). Read-ahead during the window burns context that is dead weight at the next ticket boundary. Be sabaai sabaai.
 
+## Runtime Policy Overrides
+
+Pass explicit flags to override delivery policy for a single run without editing `orchestrator.config.json`. The resolved policy persists in `state.json` as `runPolicy` and governs the entire run.
+
+**Available flags:**
+
+| Flag                       | Values                              | Effect                                                                     |
+| -------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
+| `--boundary-mode`          | `cook\|gated\|glide`                | Override ticket-boundary mode                                              |
+| `--subagent-review-policy` | `required\|skip_doc_only\|disabled` | Override subagent review gate                                              |
+| `--pr-review-policy`       | `required\|skip_doc_only\|disabled` | Override PR review gate                                                    |
+| `--review-subagent`        | `<agent-name>`                      | Use a specific review subagent                                             |
+| `--same-review-subagent`   | (boolean)                           | Clear `reviewSubagentOverride` so the same agent type reviews its own work |
+| `--baseline`               | `orchestrator\|run-policy`          | Resolve divergence on resume (see below)                                   |
+
+**Divergence recovery:** If `orchestrator.config.json` changes between runs, resume detects drift on the four bounded policy fields and refuses to continue until the operator resolves it:
+
+```bash
+# Adopt current repo config as the new active policy:
+bun run deliver --plan <plan> --baseline=orchestrator <command>
+
+# Keep the persisted run policy (ignoring config changes):
+bun run deliver --plan <plan> --baseline=run-policy <command>
+```
+
+Both baselines accept additional override flags to fine-tune the resolved policy before persisting it.
+
+**Status output:** The active persisted `runPolicy` appears as `run_policy=... [persisted]` in `status` output, below the config-baseline `boundary_mode` and `review_policy` lines. Divergence between those lines is resolved with `--baseline`.
+
 ## Ticket Boundary Modes
 
 EE7 makes the ticket-boundary policy explicit.

@@ -43,6 +43,30 @@ bun run deliver --plan <plan-path> start         # resume from current ticket
 
 Always read the handoff doc at `.agents/delivery/<plan-key>/handoffs/<ticket-id>.md` first.
 
+## Runtime policy overrides
+
+Override delivery policy for a single run without editing `orchestrator.config.json`:
+
+```bash
+bun run deliver --plan <plan-path> \
+  --boundary-mode <cook|gated|glide> \
+  --subagent-review-policy <required|skip_doc_only|disabled> \
+  --pr-review-policy <required|skip_doc_only|disabled> \
+  --review-subagent <agent-name> \
+  start
+```
+
+`--same-review-subagent` clears any `reviewSubagentOverride` in config so the same agent type reviews its own work.
+
+The resolved policy is persisted in `state.json` as `runPolicy`. If `orchestrator.config.json` changes between runs, the orchestrator detects divergence and refuses to continue silently — pass `--baseline=orchestrator` to adopt the current config or `--baseline=run-policy` to keep the persisted policy:
+
+```bash
+bun run deliver --plan <plan-path> --baseline=orchestrator <command>
+bun run deliver --plan <plan-path> --baseline=run-policy   <command>
+```
+
+`status` shows the active persisted `run_policy [persisted]` line alongside the config-baseline lines.
+
 ## Standalone (non-ticketed) PRs
 
 Small bounded changes that don't warrant a full phase (bug fixes, doc updates, cleanup):
