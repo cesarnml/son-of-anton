@@ -2,7 +2,12 @@
   "version": "0.2",
   "language": "en",
   "useGitignore": true,
-  "ignorePaths": ["bun.lock", "node_modules", ".agents/delivery/**"],
+  "ignorePaths": [
+    "bun.lock",
+    "node_modules",
+    ".agents/delivery/**",
+    "docs/product/delivery/**/reviews/**"
+  ],
   "words": [
     "ai-review",
     "cesarnml",
