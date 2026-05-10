@@ -117,10 +117,10 @@ export function formatRunPolicyDivergenceError(
   lines.push('');
   lines.push('Add --baseline to your command to resolve, e.g.:');
   lines.push(
-    `  ${runDeliverInvocation} --baseline=orchestrator   # adopt current repo config`,
+    `  ${runDeliverInvocation} --baseline orchestrator   # adopt current repo config`,
   );
   lines.push(
-    `  ${runDeliverInvocation} --baseline=run-policy     # keep persisted run policy`,
+    `  ${runDeliverInvocation} --baseline run-policy     # keep persisted run policy`,
   );
 
   return lines.join('\n');

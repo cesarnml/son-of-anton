@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import { getUsage } from '../cli';
+import { formatRunPolicyDivergenceError } from '../state';
+import type { RunPolicy } from '../types';
 
 /**
  * P7.05 — Documentation and closeout verification.
@@ -76,5 +78,44 @@ describe('P7.05 doc-surface — delivery-orchestrator.md documents Phase 07 flag
 
   it('delivery-orchestrator.md mentions --baseline', () => {
     expect(ORCHESTRATOR_DOC).toContain('--baseline');
+  });
+
+  it('docs use space-separated --baseline syntax (not --baseline=), matching the parser', () => {
+    // The CLI parser only accepts "--baseline orchestrator", not "--baseline=orchestrator".
+    // Docs must not teach operators a syntax that will silently fail.
+    expect(START_HERE).not.toContain('--baseline=');
+    expect(ORCHESTRATOR_DOC).not.toContain('--baseline=');
+  });
+});
+
+describe('P7.05 divergence error message — runnable syntax', () => {
+  const policy: RunPolicy = {
+    ticketBoundaryMode: 'cook',
+    subagentReview: 'skip_doc_only',
+    prReview: 'skip_doc_only',
+    reviewSubagent: { kind: 'same-type' },
+  };
+
+  it('formatRunPolicyDivergenceError emits --baseline orchestrator (space-separated)', () => {
+    const msg = formatRunPolicyDivergenceError(
+      policy,
+      { ...policy, ticketBoundaryMode: 'gated' },
+      ['ticketBoundaryMode'],
+      'bun run deliver --plan x.md post-verify',
+    );
+    // Must contain the parseable form, not the unsupported = form
+    expect(msg).toContain('--baseline orchestrator');
+    expect(msg).not.toContain('--baseline=orchestrator');
+  });
+
+  it('formatRunPolicyDivergenceError emits --baseline run-policy (space-separated)', () => {
+    const msg = formatRunPolicyDivergenceError(
+      policy,
+      { ...policy, subagentReview: 'required' },
+      ['subagentReview'],
+      'bun run deliver --plan x.md post-verify',
+    );
+    expect(msg).toContain('--baseline run-policy');
+    expect(msg).not.toContain('--baseline=run-policy');
   });
 });

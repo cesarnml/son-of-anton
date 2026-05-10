@@ -111,24 +111,24 @@ describe('P7.03 resume divergence guardrails', () => {
       expect(msg).toContain('ticketBoundaryMode');
     });
 
-    it('includes recovery command with --baseline=orchestrator', () => {
+    it('includes recovery command with --baseline orchestrator (space-separated, parseable)', () => {
       const msg = formatRunPolicyDivergenceError(
         basePolicy,
         { ...basePolicy, subagentReview: 'required' },
         ['subagentReview'],
         'bun run deliver --plan x.md',
       );
-      expect(msg).toContain('--baseline=orchestrator');
+      expect(msg).toContain('--baseline orchestrator');
     });
 
-    it('includes recovery command with --baseline=run-policy', () => {
+    it('includes recovery command with --baseline run-policy (space-separated, parseable)', () => {
       const msg = formatRunPolicyDivergenceError(
         basePolicy,
         { ...basePolicy, prReview: 'disabled' },
         ['prReview'],
         'bun run deliver --plan x.md',
       );
-      expect(msg).toContain('--baseline=run-policy');
+      expect(msg).toContain('--baseline run-policy');
     });
 
     it('includes persisted and current policy values for each diverged field', () => {
@@ -260,8 +260,8 @@ describe('P7.03 resume divergence guardrails', () => {
         [],
         'bun run deliver --plan x.md post-verify',
       );
-      expect(msg).toContain('--baseline=orchestrator');
-      expect(msg).toContain('--baseline=run-policy');
+      expect(msg).toContain('--baseline orchestrator');
+      expect(msg).toContain('--baseline run-policy');
     });
 
     it('recovery guidance includes the run-deliver invocation', () => {

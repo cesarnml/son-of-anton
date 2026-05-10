@@ -289,10 +289,10 @@ Pass explicit flags to override delivery policy for a single run without editing
 
 ```bash
 # Adopt current repo config as the new active policy:
-bun run deliver --plan <plan> --baseline=orchestrator <command>
+bun run deliver --plan <plan> --baseline orchestrator <command>
 
 # Keep the persisted run policy (ignoring config changes):
-bun run deliver --plan <plan> --baseline=run-policy <command>
+bun run deliver --plan <plan> --baseline run-policy <command>
 ```
 
 Both baselines accept additional override flags to fine-tune the resolved policy before persisting it.
