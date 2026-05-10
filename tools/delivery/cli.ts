@@ -203,13 +203,13 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     if (value === '--review-subagent') {
       const raw = argv[index + 1];
 
-      if (!raw || raw.startsWith('--')) {
+      if (!raw || raw.trim() === '' || raw.startsWith('--')) {
         throw new Error(
           'Pass --review-subagent <agent> with a non-blank agent identifier.',
         );
       }
 
-      reviewSubagent = raw;
+      reviewSubagent = raw.trim();
       index += 1;
       continue;
     }

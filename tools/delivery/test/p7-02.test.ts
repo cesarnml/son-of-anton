@@ -108,6 +108,29 @@ describe('P7.02 runtime policy override parsing and resolution', () => {
       ).toThrow('--review-subagent');
     });
 
+    it('throws when --review-subagent value is whitespace-only', () => {
+      expect(() =>
+        parseCliArgs(
+          ['--plan', 'x.md', 'start', '--review-subagent', '   '],
+          DUMMY_USAGE,
+        ),
+      ).toThrow('--review-subagent');
+    });
+
+    it('trims whitespace from a valid --review-subagent value', () => {
+      const result = parseCliArgs(
+        [
+          '--plan',
+          'x.md',
+          'start',
+          '--review-subagent',
+          ' codex:codex-rescue ',
+        ],
+        DUMMY_USAGE,
+      );
+      expect(result.reviewSubagent).toBe('codex:codex-rescue');
+    });
+
     it('leaves policy fields undefined when flags are absent', () => {
       const result = parseCliArgs(['--plan', 'x.md', 'status'], DUMMY_USAGE);
       expect(result.subagentReviewPolicy).toBeUndefined();
