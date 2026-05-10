@@ -39,8 +39,12 @@ Scope: delivery-output
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `formatRunPolicy` missing from `format.ts` caused import failure at test load time.
+
+Why this path: `formatRunPolicy` is a pure formatter with a single responsibility — convert `RunPolicy` to a compact key=value string. Adding `run_policy=...` as a conditional line in `formatStatus` (present only when `state.runPolicy != null`) follows the pattern of the existing `boundary_mode` and `review_policy` lines, keeps the change minimal, and gives operators visibility into the governing policy in every status output.
+
+Alternative considered: Replacing the existing `boundary_mode` and `review_policy` lines with `run_policy` when a persisted policy is set — rejected because it would break existing output expectations (operators and existing test fixtures depend on those lines) and would hide the config baseline even when it matches the persisted policy.
+
+Deferred: Plumbing `state.runPolicy` through to actual policy consumers (`startTicket`, `recordPostVerify`, `applyAdvanceBoundaryMode`) deferred — that crosses into behavior changes beyond output observability and belongs to a separate boundary-plumbing pass.
+
+Contract note: none; `Type: feat` and `Scope: delivery-output` are accurate.

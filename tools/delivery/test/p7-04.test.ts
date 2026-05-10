@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  formatRunPolicy,
-  formatStatus,
-} from '../format';
+import { formatRunPolicy, formatStatus } from '../format';
 import type { ResolvedOrchestratorConfig } from '../runtime-config';
 import type { DeliveryState, RunPolicy } from '../types';
 
@@ -65,7 +62,9 @@ describe('P7.04 run-policy observability', () => {
     });
 
     it('renders reviewSubagent same-type as "same-type"', () => {
-      expect(formatRunPolicy(samTypePolicy)).toContain('reviewSubagent:same-type');
+      expect(formatRunPolicy(samTypePolicy)).toContain(
+        'reviewSubagent:same-type',
+      );
     });
 
     it('renders reviewSubagent override with the agent value', () => {
@@ -104,7 +103,7 @@ describe('P7.04 run-policy observability', () => {
     it('shows the persisted boundary_mode from runPolicy, not just from config', () => {
       const state: DeliveryState = {
         ...baseState,
-        runPolicy: overridePolicy,  // boundary_mode=gated
+        runPolicy: overridePolicy, // boundary_mode=gated
       };
       // Config still says cook — the run_policy line should reflect the persisted value
       const out = formatStatus(state, baseConfig);
