@@ -1,7 +1,12 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { getUsage, parseCliArgs, resolveOptionsForCommand } from './cli';
+import {
+  getUsage,
+  parseCliArgs,
+  resolveOptionsForCommand,
+  resolveRuntimePolicyOverrides,
+} from './cli';
 import { ensureEnvReady as ensureEnvReadyImpl } from './env';
 import {
   generateRunDeliverInvocation,
@@ -46,6 +51,7 @@ import {
   resolvePlanPathForBranch as resolvePlanPathForBranchImpl,
 } from './planning';
 import {
+  deriveRunPolicyFromConfig,
   loadState as loadStateImpl,
   normalizeRunPolicy,
   repairState as repairStateImpl,
@@ -170,6 +176,10 @@ export async function runDeliveryOrchestrator(
         planPath?: string;
         prNumber?: number;
         boundaryMode?: TicketBoundaryMode;
+        subagentReviewPolicy?: ReviewPolicyStageValue;
+        prReviewPolicy?: ReviewPolicyStageValue;
+        reviewSubagent?: string;
+        sameReviewSubagent?: boolean;
       }
     | undefined;
 
@@ -184,10 +194,7 @@ export async function runDeliveryOrchestrator(
     );
     parsed = parseCliArgs(argv, usage);
     const resolvedConfig = resolveOrchestratorConfig(
-      {
-        ...rawConfig,
-        ticketBoundaryMode: parsed.boundaryMode ?? rawConfig.ticketBoundaryMode,
-      },
+      resolveRuntimePolicyOverrides(parsed, rawConfig),
       cwd,
     );
     const context = createDeliveryOrchestratorContext(resolvedConfig);
@@ -255,8 +262,21 @@ export async function runDeliveryOrchestrator(
         return 0;
       }
       case 'start': {
+        // When explicit policy flags are provided, re-stamp runPolicy from the
+        // current resolved config so the persisted state reflects the operator's
+        // explicit overrides. Without explicit flags, the existing runPolicy (or
+        // normalizeRunPolicy-derived baseline) is preserved.
+        const hasExplicitPolicyFlags =
+          parsed.boundaryMode !== undefined ||
+          parsed.subagentReviewPolicy !== undefined ||
+          parsed.prReviewPolicy !== undefined ||
+          parsed.reviewSubagent !== undefined ||
+          parsed.sameReviewSubagent === true;
+        const stateForStart = hasExplicitPolicyFlags
+          ? { ...state, runPolicy: deriveRunPolicyFromConfig(resolvedConfig) }
+          : state;
         const nextState = await startTicket(
-          state,
+          stateForStart,
           cwd,
           context,
           parsed.positionals[0],

@@ -44,8 +44,8 @@ Scope: delivery-cli
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `resolveRuntimePolicyOverrides` missing from `cli.ts` caused import failure at test load time.
+Why this path: `resolveRuntimePolicyOverrides` in `cli.ts` keeps flag-to-config patching testable in isolation; `cli-runner.ts` delegates to it and replaces the previous inline `ticketBoundaryMode` patch. `start` case stamps `runPolicy` from `resolvedConfig` only when explicit flags are present, preserving the carry-forward behavior for cook-mode auto-advance.
+Alternative considered: storing explicit flag presence in `DeliveryState` directly — rejected because it conflates input provenance with policy semantics; `runPolicy` captures the resolved outcome, not the raw flag set.
+Deferred: resume divergence detection (comparing persisted `runPolicy` against current config when flags absent) — belongs to P7.03.
+Contract note: none; `Type: feat` and `Scope: delivery-cli` are accurate.

@@ -19,7 +19,13 @@ describe('P7.02 runtime policy override parsing and resolution', () => {
   describe('parseCliArgs — new policy flags', () => {
     it('parses --subagent-review-policy required', () => {
       const result = parseCliArgs(
-        ['--plan', 'docs/product/delivery/phase-07/implementation-plan.md', 'start', '--subagent-review-policy', 'required'],
+        [
+          '--plan',
+          'docs/product/delivery/phase-07/implementation-plan.md',
+          'start',
+          '--subagent-review-policy',
+          'required',
+        ],
         DUMMY_USAGE,
       );
       expect(result.subagentReviewPolicy).toBe('required');
@@ -60,10 +66,19 @@ describe('P7.02 runtime policy override parsing and resolution', () => {
     it('throws when --review-subagent and --same-review-subagent are both provided', () => {
       expect(() =>
         parseCliArgs(
-          ['--plan', 'x.md', 'start', '--review-subagent', 'codex:codex-rescue', '--same-review-subagent'],
+          [
+            '--plan',
+            'x.md',
+            'start',
+            '--review-subagent',
+            'codex:codex-rescue',
+            '--same-review-subagent',
+          ],
           DUMMY_USAGE,
         ),
-      ).toThrow('--review-subagent and --same-review-subagent are mutually exclusive');
+      ).toThrow(
+        '--review-subagent and --same-review-subagent are mutually exclusive',
+      );
     });
 
     it('throws on invalid --subagent-review-policy value', () => {
