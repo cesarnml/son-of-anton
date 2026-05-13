@@ -59,3 +59,4 @@ Why this path: [why this implementation was the smallest acceptable]
 Alternative considered: blocking the warning (throwing on uncommitted changes) — rejected; too disruptive for common workflows where the agent intentionally has staged-but-uncommitted work.
 Deferred: surfacing specific uncommitted file details in the warning body is best-effort — implementation may omit the file list if the DI pattern makes it complex; the warning text alone is the minimum requirement.
 Contract note: [record any deviation from the ticket metadata contract here]
+Contract note: the Outcome and Green sections require a non-blocking uncommitted-changes warning, while the Red section says to assert that no warning is printed. Red follows the intended behavior contract from Outcome/Green, so the failing regression expects the warning and treats the Red bullet as contradictory metadata.
