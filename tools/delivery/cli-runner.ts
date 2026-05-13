@@ -350,6 +350,14 @@ export async function runDeliveryOrchestrator(
         const stateForStart = hasExplicitPolicyFlags
           ? { ...state, runPolicy: deriveRunPolicyFromConfig(resolvedConfig) }
           : state;
+        // When explicit flags are provided, stateForStart.runPolicy reflects the
+        // new policy derived from CLI flags. Re-anchor context.config to the
+        // flag-resolved config so startTicket and status output use the
+        // operator's intended values, not the persisted policy stamped by the
+        // merge block above.
+        if (hasExplicitPolicyFlags) {
+          context = { ...context, config: resolvedConfig };
+        }
         const nextState = await startTicket(
           stateForStart,
           cwd,
