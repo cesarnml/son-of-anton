@@ -6,7 +6,8 @@
     "bun.lock",
     "node_modules",
     ".agents/delivery/**",
-    "docs/product/delivery/**/reviews/**"
+    "docs/product/delivery/**/reviews/**",
+    "docs/product/delivery/*/reviews/**"
   ],
   "words": [
     "ai-review",

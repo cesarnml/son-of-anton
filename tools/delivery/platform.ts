@@ -751,6 +751,14 @@ export function hasLocalBranchCommits(
   }
 }
 
+export function getWorkingTreeStatus(cwd: string, runtime: Runtime): string {
+  return runProcess(cwd, ['git', 'status', '--short'], runtime).trimEnd();
+}
+
+export function hasUncommittedChanges(cwd: string, runtime: Runtime): boolean {
+  return getWorkingTreeStatus(cwd, runtime).trim().length > 0;
+}
+
 export function readMergeBase(
   cwd: string,
   branch: string,

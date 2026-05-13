@@ -49,7 +49,10 @@ describe('P9.03 exit hygiene', () => {
       'clean',
       baseConfig,
       {
+        getWorkingTreeStatus: () => 'M src/foo.ts\n?? notes.txt',
+        hasUncommittedChanges: () => true,
         isLocalBranchDocOnly: () => false,
+        warn: (message) => warnings.push(message),
       },
     );
 

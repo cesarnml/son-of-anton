@@ -404,7 +404,12 @@ export async function runDeliveryOrchestrator(
           auditTicketId,
           auditOutcome,
           context.config,
-          { hasLocalBranchCommits: context.platform.hasLocalBranchCommits },
+          {
+            getWorkingTreeStatus: context.platform.getWorkingTreeStatus,
+            hasLocalBranchCommits: context.platform.hasLocalBranchCommits,
+            hasUncommittedChanges: context.platform.hasUncommittedChanges,
+            warn: (message: string) => console.log(message),
+          },
           auditPatchCommits,
         );
         await saveState(cwd, nextState);
@@ -912,7 +917,10 @@ export async function recordPostVerify(
       runtime: Runtime,
     ) => boolean;
     hasLocalBranchCommits?: (cwd: string, baseBranch: string) => boolean;
+    hasUncommittedChanges?: (cwd: string) => boolean;
+    getWorkingTreeStatus?: (cwd: string) => string;
     postVerifyPolicy?: ReviewPolicyStageValue;
+    warn?: (message: string) => void;
   } = {},
   patchCommits?: InternalReviewPatchCommit[],
 ): Promise<DeliveryState> {
@@ -936,6 +944,27 @@ export async function recordPostVerify(
       target.baseBranch,
       config.runtime,
     );
+
+  if (
+    target &&
+    dependencies.hasUncommittedChanges?.(target.worktreePath) === true
+  ) {
+    const statusOutput =
+      dependencies.getWorkingTreeStatus?.(target.worktreePath) ?? '';
+    const warningLines = [
+      'Warning: working tree has uncommitted changes.',
+      'Confirm these are intentional before recording post-verify clean.',
+    ];
+
+    if (statusOutput.trim().length > 0) {
+      warningLines.push(
+        'Uncommitted files:',
+        ...statusOutput.split('\n').map((line) => `  ${line}`),
+      );
+    }
+
+    dependencies.warn?.(warningLines.join('\n'));
+  }
 
   if (isDocOnly && target && dependencies.hasLocalBranchCommits !== undefined) {
     const hasCommits = dependencies.hasLocalBranchCommits(

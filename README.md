@@ -155,6 +155,9 @@ Add `.son-of-anton/` to `.prettierignore`, `.eslintignore`, or your linter's
 equivalent. The subtree must stay tracked and unignored by git, but your
 formatter should not touch it.
 
+Add `docs/product/delivery/*/reviews/**` to your `cspell.json` `ignorePaths` to
+prevent spellcheck failures on review artifacts.
+
 Copy `orchestrator.config.json` from `.son-of-anton/` to your repo root and
 edit it to set your plan path, boundary mode, and review policy.
 
