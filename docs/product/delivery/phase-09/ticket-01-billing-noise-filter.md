@@ -43,8 +43,8 @@ Scope: pr-review
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
+Red first: `tools/delivery/test/p9-01.test.ts` proved that a lone `qodo-code-review` billing-limit comment currently triages to `needs_patch` instead of `clean`.
+Why this path: Filtering these comments before the unknown-comment escalation preserves the existing triage contract and keeps the change isolated to the review triager.
+Alternative considered: body-text matching without vendor scoping was rejected because it would be more brittle and risks suppressing unrelated human or bot comments.
 Deferred: `vendor_status` details (individual comment bodies) not surfaced in output — only the count. Full detail belongs to the fetch artifact, not the triage summary.
-Contract note: [record any deviation from the ticket metadata contract here]
+Contract note: The ticket's Red text said to assert `needs_patch: true`, which would have passed on the buggy behavior. The implemented red regression instead asserts the intended `clean` outcome so the test fails before the filter exists.

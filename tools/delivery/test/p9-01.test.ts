@@ -44,4 +44,35 @@ describe('P9.01 billing noise filter', () => {
       rmSync(tempDir, { force: true, recursive: true });
     }
   });
+
+  it('keeps coderabbit comments with fenced code blocks actionable', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'p9-01-codeblock-'));
+    const artifactPath = join(tempDir, 'coderabbit-finding.fetch.json');
+
+    try {
+      writeFileSync(
+        artifactPath,
+        JSON.stringify({
+          vendors: ['coderabbit'],
+          comments: [
+            {
+              kind: 'unknown',
+              authorLogin: 'coderabbitai',
+              body: "You're out of credits.\n```diff\n- old\n+ new\n```",
+            },
+          ],
+        }),
+      );
+
+      const result = runTriager(artifactPath);
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        outcome: 'needs_patch',
+        vendor_status_count: 0,
+      });
+    } finally {
+      rmSync(tempDir, { force: true, recursive: true });
+    }
+  });
 });
