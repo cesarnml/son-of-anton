@@ -291,7 +291,7 @@ Pass explicit flags to override delivery policy for a single run without editing
 # Adopt current repo config as the new active policy:
 bun run deliver --plan <plan> --baseline orchestrator <command>
 
-# Keep the persisted run policy (ignoring config changes):
+# Re-apply the persisted runPolicy — it governs execution for this invocation (not just state):
 bun run deliver --plan <plan> --baseline run-policy <command>
 ```
 

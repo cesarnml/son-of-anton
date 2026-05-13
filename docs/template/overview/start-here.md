@@ -58,7 +58,7 @@ bun run deliver --plan <plan-path> \
 
 `--same-review-subagent` clears any `reviewSubagentOverride` in config so the same agent type reviews its own work.
 
-The resolved policy is persisted in `state.json` as `runPolicy`. If `orchestrator.config.json` changes between runs, the orchestrator detects divergence and refuses to continue silently — pass `--baseline orchestrator` to adopt the current config or `--baseline run-policy` to keep the persisted policy:
+The resolved policy is persisted in `state.json` as `runPolicy` and governs execution for every invocation that loads it. If `orchestrator.config.json` changes between runs, the orchestrator detects divergence and refuses to continue silently — pass `--baseline orchestrator` to adopt the current config or `--baseline run-policy` to re-apply the persisted runPolicy (it governs execution for the current invocation, not just state):
 
 ```bash
 bun run deliver --plan <plan-path> --baseline orchestrator <command>
