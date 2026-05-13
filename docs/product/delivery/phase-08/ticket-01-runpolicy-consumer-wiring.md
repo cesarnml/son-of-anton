@@ -89,3 +89,5 @@ Red first: import failure on `applyRunPolicyToConfig` from `../state`
 Why this path: post-hoc bounded merge keeps the resolution logic in one place and avoids re-running `resolveOrchestratorConfig` with synthetic flags
 Alternative considered: inline mutation block in `runDeliveryOrchestrator` — rejected because it requires testing through the full orchestrator with filesystem mocking, inconsistent with P7 test pattern
 Deferred: per-ticket policy snapshots, named presets, field set expansion
+
+Implementation outcome: matched spec exactly. Prettier auto-formatted the new block after manual edit (one extra format pass required). `LoadStateResult` exported adjacent to `loadState`; type annotation confirmed at destructuring site. All 6 p8-01 tests pass; full CI green at 334/334. Refactor items already clean from green commit — no separate refactor commit needed.
