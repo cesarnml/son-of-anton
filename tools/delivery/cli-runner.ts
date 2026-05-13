@@ -51,6 +51,7 @@ import {
   resolvePlanPathForBranch as resolvePlanPathForBranchImpl,
 } from './planning';
 import {
+  applyRunPolicyToConfig,
   deriveRunPolicyFromConfig,
   detectRunPolicyDivergence,
   formatRunPolicyDivergenceError,
@@ -201,7 +202,7 @@ export async function runDeliveryOrchestrator(
       resolveRuntimePolicyOverrides(parsed, rawConfig),
       cwd,
     );
-    const context = createDeliveryOrchestratorContext(resolvedConfig);
+    let context = createDeliveryOrchestratorContext(resolvedConfig);
     const platform = context.platform;
     const notifier = resolveNotifier();
     if (parsed.command === 'ai-review') {
@@ -244,11 +245,8 @@ export async function runDeliveryOrchestrator(
       return 0;
     }
 
-    const { state: loadedState, hadPersistedRunPolicy } = await loadState(
-      cwd,
-      options,
-      context.config,
-    );
+    const { state: loadedState, hadPersistedRunPolicy }: LoadStateResult =
+      await loadState(cwd, options, context.config);
 
     // Divergence check: when a run is in-progress (runPolicy was already
     // persisted) and the current config has drifted, refuse to continue
@@ -308,6 +306,15 @@ export async function runDeliveryOrchestrator(
         state = { ...loadedState, runPolicy: resolvedRunPolicy };
         await saveState(cwd, state);
       }
+    }
+
+    // Apply persisted runPolicy so all downstream call sites use the governing
+    // policy values from state, not the current config.
+    if (hadPersistedRunPolicy && state.runPolicy != null) {
+      context = {
+        ...context,
+        config: applyRunPolicyToConfig(context.config, state.runPolicy),
+      };
     }
 
     const resolvedCwd = await realpath(cwd).catch(() => cwd);
@@ -732,11 +739,16 @@ export function createOptions(input: {
   return createOptionsImpl(input);
 }
 
+export type LoadStateResult = {
+  state: DeliveryState;
+  hadPersistedRunPolicy: boolean;
+};
+
 export async function loadState(
   cwd: string,
   options: OrchestratorOptions,
   config: ResolvedOrchestratorConfig,
-): Promise<{ state: DeliveryState; hadPersistedRunPolicy: boolean }> {
+): Promise<LoadStateResult> {
   const raw = await loadStateImpl(cwd, options, {
     cwd,
     defaultBranch: config.defaultBranch,

@@ -181,6 +181,30 @@ export function deriveRunPolicyFromConfig(
   };
 }
 
+/**
+ * Apply a persisted runPolicy on top of the current resolved config.
+ * The logical inverse of deriveRunPolicyFromConfig: all four bounded Phase 07
+ * fields are taken from the runPolicy, overriding whatever the config says.
+ */
+export function applyRunPolicyToConfig(
+  config: ResolvedOrchestratorConfig,
+  runPolicy: RunPolicy,
+): ResolvedOrchestratorConfig {
+  return {
+    ...config,
+    ticketBoundaryMode: runPolicy.ticketBoundaryMode,
+    reviewPolicy: {
+      ...config.reviewPolicy,
+      subagentReview: runPolicy.subagentReview,
+      prReview: runPolicy.prReview,
+    },
+    reviewSubagentOverride:
+      runPolicy.reviewSubagent.kind === 'override'
+        ? runPolicy.reviewSubagent.value
+        : undefined,
+  };
+}
+
 export function normalizeRunPolicy(
   state: DeliveryState,
   config: ResolvedOrchestratorConfig,
