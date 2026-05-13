@@ -75,4 +75,35 @@ describe('P9.01 billing noise filter', () => {
       rmSync(tempDir, { force: true, recursive: true });
     }
   });
+
+  it('treats Greptile free-trial notices as clean vendor noise', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'p9-01-greptile-'));
+    const artifactPath = join(tempDir, 'greptile-noise.fetch.json');
+
+    try {
+      writeFileSync(
+        artifactPath,
+        JSON.stringify({
+          vendors: ['greptile'],
+          comments: [
+            {
+              kind: 'unknown',
+              authorLogin: 'greptile-apps',
+              body: 'Your free trial has ended. Add a payment method to continue reviews.',
+            },
+          ],
+        }),
+      );
+
+      const result = runTriager(artifactPath);
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        outcome: 'clean',
+        vendor_status_count: 1,
+      });
+    } finally {
+      rmSync(tempDir, { force: true, recursive: true });
+    }
+  });
 });

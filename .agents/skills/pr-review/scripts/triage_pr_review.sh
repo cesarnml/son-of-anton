@@ -27,27 +27,20 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 jq '
+  def is_vendor_status:
+    (.kind == "unknown")
+    and (
+      .authorLogin == "qodo-code-review"
+      or .authorLogin == "qodo-merge"
+      or .authorLogin == "coderabbitai"
+      or .authorLogin == "greptile-apps"
+    )
+    and ((.body // "") | contains("```") | not);
+
   .vendors as $vendors
   | (.comments // []) as $comments
-  | ($comments
-      | map(
-          select(
-            (.kind == "unknown")
-            and (.authorLogin == "qodo-code-review" or .authorLogin == "qodo-merge" or .authorLogin == "coderabbitai")
-            and ((.body // "") | contains("```") | not)
-          )
-        )) as $vendor_statuses
-  | ($comments
-      | map(
-          select(
-            (
-              (.kind == "unknown")
-              and (.authorLogin == "qodo-code-review" or .authorLogin == "qodo-merge" or .authorLogin == "coderabbitai")
-              and ((.body // "") | contains("```") | not)
-            )
-            | not
-          )
-        )) as $relevant_comments
+  | ($comments | map(select(is_vendor_status))) as $vendor_statuses
+  | ($comments | map(select(is_vendor_status | not))) as $relevant_comments
   | ($relevant_comments | map(select((.kind == "finding") and (.is_outdated != true) and (.is_resolved != true)))) as $findings
   | ($relevant_comments | map(select((.kind == "finding") and ((.is_outdated == true) or (.is_resolved == true))))) as $stale_findings
   | ($relevant_comments | map(select(.kind == "summary"))) as $summaries

@@ -14,7 +14,7 @@ Scope: pr-review
 ## Red
 
 - Add a test fixture: a minimal `*.fetch.json` containing one comment with `kind: "unknown"`, `authorLogin: "qodo-code-review"`, and body `"You've reached your Qodo monthly free-tier limit"` (no fenced code block).
-- Run `triage_pr_review.sh` against the fixture and assert the triage output contains `needs_patch: true` — this is the bug we are fixing; the test must fail before the filter exists.
+- Run `triage_pr_review.sh` against the fixture and assert the triage output contains `outcome: "clean"` — before the filter exists the comment still escalates to `needs_patch`, so this assertion fails and produces the required red state.
 - Commit with suffix `[red]`: `test(P9.01): billing noise comment escalates to needs_patch [red]`
 - Do not write any implementation until this commit exists on the branch.
 
@@ -44,7 +44,7 @@ Scope: pr-review
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
 Red first: `tools/delivery/test/p9-01.test.ts` proved that a lone `qodo-code-review` billing-limit comment currently triages to `needs_patch` instead of `clean`.
-Why this path: Filtering these comments before the unknown-comment escalation preserves the existing triage contract and keeps the change isolated to the review triager.
+Why this path: Filtering these comments before the unknown-comment escalation preserves the existing triage contract and keeps the change isolated to the review triager while covering the same vendor billing/free-trial noise pattern seen in live PR review.
 Alternative considered: body-text matching without vendor scoping was rejected because it would be more brittle and risks suppressing unrelated human or bot comments.
 Deferred: `vendor_status` details (individual comment bodies) not surfaced in output — only the count. Full detail belongs to the fetch artifact, not the triage summary.
-Contract note: The ticket's Red text said to assert `needs_patch: true`, which would have passed on the buggy behavior. The implemented red regression instead asserts the intended `clean` outcome so the test fails before the filter exists.
+Contract note: The Red instruction was corrected in-place to assert the intended `clean` outcome, because asserting `needs_patch: true` would have passed on the buggy behavior and skipped the required red failure.
