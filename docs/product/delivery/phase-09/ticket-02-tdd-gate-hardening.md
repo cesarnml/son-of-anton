@@ -52,8 +52,8 @@ DI: `runVerify` is an injectable override on the context or passed as a named op
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
+Red first: `tools/delivery/test/p9-02.test.ts` proved that `recordPostVerify` still accepted an `in_progress` code ticket instead of forcing a `post-red` checkpoint first.
+Why this path: Adding a single `red_complete` state between `in_progress` and `verified` let the orchestrator preserve its existing review flow while introducing the new gate with minimal branching logic.
 Alternative considered: warn-only gate rejected — does not close the loophole; an agent can bypass a warning.
 Deferred: `post-red` failure attribution (which tests failed, count) — only non-zero exit is asserted. Detailed output belongs to the agent reading stdout, not to state.
-Contract note: [record any deviation from the ticket metadata contract here]
+Contract note: The ticket introduces the `post-red` command itself, so the live delivery bootstrap used the new `recordPostRed` helper against the existing `[red]` commit before the green implementation commit existed. That preserves the red-to-green state transition without requiring the command to be available on the pre-implementation red tree.

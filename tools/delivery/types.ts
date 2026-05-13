@@ -14,6 +14,7 @@ export type RunPolicy = {
 export type TicketStatus =
   | 'pending'
   | 'in_progress'
+  | 'red_complete'
   | 'verified'
   | 'subagent_review_complete'
   | 'in_review'
@@ -99,6 +100,7 @@ export type TicketState = TicketDefinition & {
   worktreePath: string;
   handoffPath?: string;
   handoffGeneratedAt?: string;
+  redCommitSha?: string;
   verifiedAt?: string;
   verifyOutcome?: ReviewOutcome;
   verifyPatchCommits?: InternalReviewPatchCommit[];

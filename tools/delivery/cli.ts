@@ -99,6 +99,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  status',
     '  repair-state',
     '  start [ticket-id]',
+    '  post-red [ticket-id]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
     '  subagent-review [ticket-id] [clean|patched|skipped] [patch-commit-sha ...]',
     '  open-pr [ticket-id]',

@@ -108,6 +108,7 @@ import {
   materializeTicketContext,
   openPullRequest as openPullRequestImpl,
   recordSubagentReview as recordSubagentReviewImpl,
+  recordPostRed as recordPostRedImpl,
   recordPostVerify as recordPostVerifyImpl,
   restackTicket as restackTicketImpl,
   startTicket as startTicketImpl,
@@ -126,6 +127,7 @@ export function assertWorktreeGuard(
 
   const activeTicket =
     state.tickets.find((t) => t.status === 'in_progress') ??
+    state.tickets.find((t) => t.status === 'red_complete') ??
     state.tickets.find((t) => t.status === 'verified') ??
     state.tickets.find((t) => t.status === 'subagent_review_complete') ??
     state.tickets.find((t) => t.status === 'in_review') ??
@@ -404,6 +406,16 @@ export async function runDeliveryOrchestrator(
           context.config,
           { hasLocalBranchCommits: context.platform.hasLocalBranchCommits },
           auditPatchCommits,
+        );
+        await saveState(cwd, nextState);
+        console.log(formatStatus(nextState, context.config));
+        return 0;
+      }
+      case 'post-red': {
+        const nextState = await recordPostRed(
+          state,
+          parsed.positionals[0],
+          context,
         );
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
@@ -911,7 +923,8 @@ export async function recordPostVerify(
   const target =
     (ticketId
       ? state.tickets.find((ticket) => ticket.id === ticketId)
-      : state.tickets.find((ticket) => ticket.status === 'in_progress')) ??
+      : (state.tickets.find((ticket) => ticket.status === 'red_complete') ??
+        state.tickets.find((ticket) => ticket.status === 'in_progress'))) ??
     undefined;
   const subagentReviewPolicy =
     dependencies.postVerifyPolicy ?? config.reviewPolicy.subagentReview;
@@ -950,7 +963,81 @@ export async function recordPostVerify(
     );
   }
 
+  if (target?.status === 'in_progress' && !isDocOnly) {
+    throw createWorkflowContractError(
+      'workflow.post_verify.requires_post_red',
+      `Ticket ${target.id} is at status in_progress. Run \`bun run deliver --plan ${state.planPath} post-red ${target.id}\` before post-verify on a code ticket.`,
+    );
+  }
+
   return recordPostVerifyImpl(state, ticketId, outcome, patchCommits);
+}
+
+export async function recordPostRed(
+  state: DeliveryState,
+  ticketId: string | undefined,
+  context: DeliveryOrchestratorContext,
+  dependencies: {
+    isLocalBranchDocOnly?: (
+      cwd: string,
+      baseBranch: string,
+      runtime: Runtime,
+    ) => boolean;
+    readHeadSha?: (cwd: string) => string;
+    readLatestCommitSubject?: (cwd: string) => string;
+    runVerify?: (cwd: string) => {
+      exitCode: number;
+      stderr: string;
+      stdout: string;
+    };
+  } = {},
+): Promise<DeliveryState> {
+  const target =
+    (ticketId
+      ? state.tickets.find((ticket) => ticket.id === ticketId)
+      : state.tickets.find((ticket) => ticket.status === 'in_progress')) ??
+    undefined;
+
+  if (!target) {
+    throw new Error('No in-progress ticket found to mark red_complete.');
+  }
+
+  const isDocOnly = (
+    dependencies.isLocalBranchDocOnly ?? isPlatformLocalBranchDocOnly
+  )(target.worktreePath, target.baseBranch, context.config.runtime);
+
+  if (isDocOnly) {
+    console.log('Doc-only branch — post-red skipped.');
+    return state;
+  }
+
+  const latestCommitSubject =
+    dependencies.readLatestCommitSubject ??
+    context.platform.readLatestCommitSubject;
+  const readHeadSha = dependencies.readHeadSha ?? context.platform.readHeadSha;
+  const runVerify =
+    dependencies.runVerify ??
+    ((cwd: string) =>
+      context.platform.runProcessResult(cwd, [
+        context.config.packageManager,
+        'run',
+        'ci',
+      ]));
+
+  const verifyResult = runVerify(target.worktreePath);
+
+  if (verifyResult.exitCode === 0) {
+    throw new Error(
+      `Ticket ${target.id} post-red requires a failing verification run before delivery can advance.`,
+    );
+  }
+
+  return recordPostRedImpl(state, {
+    headSha: readHeadSha(target.worktreePath),
+    latestCommitSubject: latestCommitSubject(target.worktreePath),
+    ticketId,
+    verifyExitCode: verifyResult.exitCode,
+  });
 }
 
 export function recordSubagentReview(

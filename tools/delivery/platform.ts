@@ -721,7 +721,10 @@ export function isLocalBranchDocOnly(
       .split('\n')
       .map((f) => f.trim())
       .filter(Boolean);
-    return files.length > 0 && files.every((f) => f.endsWith('.md'));
+    return (
+      files.length > 0 &&
+      files.every((f) => f.endsWith('.md') || f.endsWith('.json'))
+    );
   } catch {
     return false;
   }
