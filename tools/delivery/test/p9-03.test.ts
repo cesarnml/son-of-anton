@@ -67,4 +67,21 @@ describe('P9.03 exit hygiene', () => {
       ].join('\n'),
     ]);
   });
+
+  it('keeps post-verify non-blocking when dirty-worktree inspection throws', async () => {
+    const nextState = await recordPostVerify(
+      baseState,
+      'P9.03',
+      'clean',
+      baseConfig,
+      {
+        hasUncommittedChanges: () => {
+          throw new Error('git status failed');
+        },
+        isLocalBranchDocOnly: () => false,
+      },
+    );
+
+    expect(nextState.tickets[0]?.status).toBe('verified');
+  });
 });

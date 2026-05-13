@@ -945,25 +945,35 @@ export async function recordPostVerify(
       config.runtime,
     );
 
-  if (
-    target &&
-    dependencies.hasUncommittedChanges?.(target.worktreePath) === true
-  ) {
-    const statusOutput =
-      dependencies.getWorkingTreeStatus?.(target.worktreePath) ?? '';
-    const warningLines = [
-      'Warning: working tree has uncommitted changes.',
-      'Confirm these are intentional before recording post-verify clean.',
-    ];
+  if (target) {
+    try {
+      if (dependencies.hasUncommittedChanges?.(target.worktreePath) === true) {
+        let statusOutput = '';
 
-    if (statusOutput.trim().length > 0) {
-      warningLines.push(
-        'Uncommitted files:',
-        ...statusOutput.split('\n').map((line) => `  ${line}`),
-      );
+        try {
+          statusOutput =
+            dependencies.getWorkingTreeStatus?.(target.worktreePath) ?? '';
+        } catch {
+          // Keep post-verify non-blocking if status lookup fails.
+        }
+
+        const warningLines = [
+          'Warning: working tree has uncommitted changes.',
+          'Confirm these are intentional before recording post-verify clean.',
+        ];
+
+        if (statusOutput.trim().length > 0) {
+          warningLines.push(
+            'Uncommitted files:',
+            ...statusOutput.split('\n').map((line) => `  ${line}`),
+          );
+        }
+
+        dependencies.warn?.(warningLines.join('\n'));
+      }
+    } catch {
+      // Keep post-verify non-blocking if dirty-worktree inspection fails.
     }
-
-    dependencies.warn?.(warningLines.join('\n'));
   }
 
   if (isDocOnly && target && dependencies.hasLocalBranchCommits !== undefined) {
