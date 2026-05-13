@@ -427,6 +427,42 @@ describe('EE8.01 — post-verify observability and reviewPolicy config', () => {
     );
   });
 
+  it('preserves redCommitSha when syncStateFromExisting rebuilds state', () => {
+    const options = createOptions({
+      planPath: 'docs/product/delivery/phase-03/implementation-plan.md',
+    });
+    const existing: DeliveryState = {
+      ...options,
+      planKey: options.planKey,
+      tickets: [
+        {
+          id: 'P3.01',
+          title: 'Persist Transmission Identity For Queued Torrents',
+          slug: 'persist-transmission-identity-for-queued-torrents',
+          ticketFile:
+            'docs/product/delivery/phase-03/ticket-01-persist-transmission-identity-for-queued-torrents.md',
+          status: 'red_complete',
+          branch:
+            'agents/p3-01-persist-transmission-identity-for-queued-torrents',
+          baseBranch: 'main',
+          worktreePath: '/tmp/p3_01',
+          redCommitSha: 'red123',
+        },
+      ],
+    };
+
+    const rebuilt = syncStateFromExisting(
+      existing,
+      existing.tickets,
+      '/tmp',
+      options,
+      baseConfig,
+      existing,
+    );
+
+    expect(rebuilt.tickets[0]?.redCommitSha).toBe('red123');
+  });
+
   it('parses reviewPolicy config with all valid stage values', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'ee8-cfg-'));
     try {

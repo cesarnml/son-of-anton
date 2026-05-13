@@ -963,6 +963,17 @@ export async function recordPostVerify(
     );
   }
 
+  if (
+    outcome === 'skipped' &&
+    (!isDocOnly || subagentReviewPolicy === 'required')
+  ) {
+    throw new Error(
+      isDocOnly
+        ? `Ticket ${target.id} requires an explicit post-verify outcome. Pass \`clean\` or \`patched\`.`
+        : `Ticket ${target.id} cannot record \`skipped\` for post-verify on a code ticket. Pass \`clean\` or \`patched\`.`,
+    );
+  }
+
   if (target?.status === 'in_progress' && !isDocOnly) {
     throw createWorkflowContractError(
       'workflow.post_verify.requires_post_red',
@@ -1000,6 +1011,11 @@ export async function recordPostRed(
 
   if (!target) {
     throw new Error('No in-progress ticket found to mark red_complete.');
+  }
+
+  if (target.status === 'red_complete') {
+    console.log(`Ticket ${target.id} is already red_complete.`);
+    return state;
   }
 
   const isDocOnly = (

@@ -506,6 +506,7 @@ function syncStateWithPlan(
         handoffPath: previous?.handoffPath ?? inferredTicket?.handoffPath,
         handoffGeneratedAt:
           previous?.handoffGeneratedAt ?? inferredTicket?.handoffGeneratedAt,
+        redCommitSha: previous?.redCommitSha ?? inferredTicket?.redCommitSha,
         verifiedAt:
           pickVerifiedAt(previous) ??
           pickVerifiedAt(inferredTicket as PersistedTicketFields | undefined),

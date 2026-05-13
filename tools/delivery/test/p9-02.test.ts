@@ -114,6 +114,52 @@ describe('P9.02 tdd gate hardening', () => {
     });
   });
 
+  it('rejects explicit skipped for post-verify on a code ticket', async () => {
+    await expect(
+      recordPostVerify(
+        {
+          ...baseState,
+          tickets: baseState.tickets.map((ticket) => ({
+            ...ticket,
+            status: 'red_complete',
+            redCommitSha: 'abc123def456',
+          })),
+        },
+        'P9.02',
+        'skipped',
+        baseConfig,
+        {
+          isLocalBranchDocOnly: () => false,
+        },
+      ),
+    ).rejects.toThrow(/cannot record `skipped`/);
+  });
+
+  it('returns early when post-red is rerun for an already red_complete ticket', async () => {
+    const state = {
+      ...baseState,
+      tickets: baseState.tickets.map((ticket) => ({
+        ...ticket,
+        status: 'red_complete' as const,
+        redCommitSha: 'abc123def456',
+      })),
+    };
+
+    const nextState = await recordPostRed(
+      state,
+      'P9.02',
+      createDeliveryOrchestratorContext(baseConfig),
+      {
+        isLocalBranchDocOnly: () => false,
+        runVerify: () => {
+          throw new Error('should not run');
+        },
+      },
+    );
+
+    expect(nextState).toBe(state);
+  });
+
   it('treats .json-only branches as doc-only but not mixed code branches', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'p9-02-doc-only-'));
     const remoteDir = mkdtempSync(join(tmpdir(), 'p9-02-doc-only-remote-'));
