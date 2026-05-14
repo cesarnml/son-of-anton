@@ -43,6 +43,10 @@ When this phase is complete:
 
 All five tickets merged to `main`. `bun run ci` is green. A code ticket at `verified` can no longer advance to `open-pr` on a merely asserted internal review outcome when a supported runner is configured. A repo with Claude CLI or Codex Exec installed and authenticated can execute the internal subagent-review step programmatically through the orchestrator. The README and directly beta-facing delivery docs describe that guarantee accurately without collapsing into weak hedging. Retrospective written.
 
+## Delivery Status
+
+> Delivered: 2026-05-14 — PRs #33 (P10.01), #34 (P10.02), #35 (P10.03), #36 (P10.04), #37 (P10.05) open. Awaiting developer closeout approval.
+
 ## CI Baseline
 
 > Baseline recorded: 2026-05-14 — **pass** (`bun run ci:quiet` exit 0)
