@@ -43,3 +43,14 @@ Why this path: the beta-surface correction is a real deliverable, not cleanup at
 Alternative considered: folding docs into `P10.03`; rejected because the honesty pass deserves its own product review
 Deferred: broader doc cleanup outside the directly beta-facing surfaces
 Contract note: record any wording compromise where precision and product force were in tension
+
+Implementation decisions:
+
+- Doc-only ticket: Red step skipped per ticket contract; claim list was identified before rewriting
+- README "Findings go to you; you decide what to act on" was the most direct overclaim — changed to describe both runner-based (autonomous patching + artifact) and agent-to-agent (primary agent triages) paths explicitly
+- `delivery-orchestrator.md` subagent review section was restructured into two named paths (agent-to-agent and executor-owned runner) so operators know which mechanism applies to their config
+- `workflow.open_pr.requires_runner_review` added to stable contract list — it was shipped in P10.02 but absent from docs
+- `subagentReviewRunner` config field and `--runner-subagent-review` CLI flag added to both README and delivery-orchestrator tables
+- `subagent-runner.ts` module added to the module table in delivery-orchestrator.md
+- Hardcoded `codex:codex-rescue` references replaced with "same-type review subagent" in start-here.md and delivery-orchestrator.md standalone path
+- Scope stayed targeted: no other doc files touched; existing "strong product stance" in README Gate 3 and "What You Get" framing preserved
