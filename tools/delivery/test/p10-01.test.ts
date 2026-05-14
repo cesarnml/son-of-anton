@@ -184,6 +184,21 @@ describe('P10.01 — RunPolicy runner round-trip', () => {
     expect(applied.reviewSubagentOverride).toBe('codex:codex-rescue');
   });
 
+  it('applyRunPolicyToConfig clears subagentReviewRunner for same-type kind', () => {
+    const runPolicy: RunPolicy = {
+      ticketBoundaryMode: 'cook',
+      subagentReview: 'skip_doc_only',
+      prReview: 'skip_doc_only',
+      reviewSubagent: { kind: 'same-type' },
+    };
+    const applied = applyRunPolicyToConfig(
+      { ...baseResolvedConfig, subagentReviewRunner: { kind: 'claude-cli' } },
+      runPolicy,
+    );
+    expect(applied.subagentReviewRunner).toBeUndefined();
+    expect(applied.reviewSubagentOverride).toBeUndefined();
+  });
+
   it('detectRunPolicyDivergence detects runner kind change', () => {
     const persisted: RunPolicy = {
       ticketBoundaryMode: 'cook',
@@ -358,6 +373,36 @@ describe('P10.01 — CLI --runner-subagent-review flag', () => {
       rawConfig,
     );
     expect(result.subagentReviewRunner).toEqual({ kind: 'claude-cli' });
+  });
+
+  it('resolveRuntimePolicyOverrides clears legacy reviewSubagentOverride when --runner-subagent-review is used', () => {
+    const rawConfig = { reviewSubagentOverride: 'codex:codex-rescue' };
+    const result = resolveRuntimePolicyOverrides(
+      { runnerSubagentReview: 'claude-cli' },
+      rawConfig,
+    );
+    expect(result.subagentReviewRunner).toEqual({ kind: 'claude-cli' });
+    expect(result.reviewSubagentOverride).toBeUndefined();
+  });
+
+  it('resolveRuntimePolicyOverrides clears subagentReviewRunner when --review-subagent is used', () => {
+    const rawConfig = { subagentReviewRunner: { kind: 'claude-cli' as const } };
+    const result = resolveRuntimePolicyOverrides(
+      { reviewSubagent: 'codex:codex-rescue' },
+      rawConfig,
+    );
+    expect(result.subagentReviewRunner).toBeUndefined();
+    expect(result.reviewSubagentOverride).toBe('codex:codex-rescue');
+  });
+
+  it('resolveRuntimePolicyOverrides clears subagentReviewRunner when --same-review-subagent is used', () => {
+    const rawConfig = { subagentReviewRunner: { kind: 'codex-exec' as const } };
+    const result = resolveRuntimePolicyOverrides(
+      { sameReviewSubagent: true },
+      rawConfig,
+    );
+    expect(result.subagentReviewRunner).toBeUndefined();
+    expect(result.reviewSubagentOverride).toBeUndefined();
   });
 });
 

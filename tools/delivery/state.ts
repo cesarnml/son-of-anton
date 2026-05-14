@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import type {
   ResolvedOrchestratorConfig,
   ReviewPolicyStageValue,
+  SubagentReviewRunnerKind,
   TicketBoundaryMode,
 } from './config';
 import {
@@ -166,8 +167,7 @@ export function patchRunPolicyWithFlags(
   if (flags.runnerSubagentReview !== undefined) {
     reviewSubagent = {
       kind: 'runner',
-      runner:
-        flags.runnerSubagentReview as import('./config').SubagentReviewRunnerKind,
+      runner: flags.runnerSubagentReview as SubagentReviewRunnerKind,
     };
   } else if (flags.reviewSubagent !== undefined) {
     reviewSubagent = { kind: 'override', value: flags.reviewSubagent };

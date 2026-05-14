@@ -46,4 +46,6 @@ Red first: config/state/CLI tests should fail before the contract changes land
 Why this path: the executor tickets need a stable bounded contract for runner selection before process execution semantics build on top of it
 Alternative considered: bundling config/run-policy into the first executor ticket; rejected because it would couple state-model mistakes to runner-launch bugs
 Deferred: actual process execution and fail-closed review gating belong to later tickets
-Contract note: if any backward-compat shim is needed for `reviewSubagentOverride`, record it here explicitly
+Contract note: `reviewSubagentOverride` is preserved with `@deprecated` annotation; `subagentReviewRunner` takes precedence in `deriveRunPolicyFromConfig` when both are set — no breaking shim needed.
+Naming asymmetry: CLI field `runnerSubagentReview` vs config field `subagentReviewRunner` — word order is inverted between CLI and config. Not a correctness issue (the mapping is explicit), deferred to a future naming-consistency pass.
+Guard gap in `resolveRuntimePolicyOverrides`: does not throw if both `reviewSubagent` and `runnerSubagentReview` are passed simultaneously (bypassing `parseCliArgs`). `deriveRunPolicyFromConfig` handles inconsistent config gracefully (prefers `subagentReviewRunner`), so no active execution path hits this. Deferred; `parseCliArgs` is the authoritative exclusion gate.

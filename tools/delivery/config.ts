@@ -321,14 +321,19 @@ function parseSubagentReviewRunner(raw: unknown): SubagentReviewRunnerConfig {
 
   const obj = raw as Record<string, unknown>;
 
+  if (typeof obj['kind'] !== 'string') {
+    throw new Error(
+      `orchestrator.config.json: subagentReviewRunner.kind is missing or not a string. Expected: ${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join(', ')}`,
+    );
+  }
+
   if (
-    typeof obj['kind'] !== 'string' ||
     !VALID_SUBAGENT_REVIEW_RUNNER_KINDS.includes(
       obj['kind'] as SubagentReviewRunnerKind,
     )
   ) {
     throw new Error(
-      `orchestrator.config.json: subagentReviewRunner.kind "${String(obj['kind'])}" is invalid. Expected: ${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join(', ')}`,
+      `orchestrator.config.json: subagentReviewRunner.kind "${obj['kind']}" is invalid. Expected: ${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join(', ')}`,
     );
   }
 
