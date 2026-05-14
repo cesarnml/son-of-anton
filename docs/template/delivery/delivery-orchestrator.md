@@ -37,24 +37,25 @@ After EE11, `tools/delivery/` is decomposed into focused single-concern modules.
 `orchestrator.ts` is a pure re-export barrel with no logic — it exists only so
 external callers can import from one stable path.
 
-| Module                 | Concern                                                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| `types.ts`             | All shared TypeScript types and interfaces                                                             |
-| `env.ts`               | `.env` parsing (`parseDotEnv`) and environment readiness helpers                                       |
-| `runtime-config.ts`    | `OrchestratorConfig` loading, resolution, package-manager inference, and invocation formatting         |
-| `context.ts`           | Plain `DeliveryOrchestratorContext` construction from resolved config and platform adapters            |
-| `format.ts`            | Human-readable status formatting (`formatStatus`, `formatCurrentTicketStatus`, etc.) with config input |
-| `platform.ts`          | Raw platform primitives: `spawnSync`, git worktree parsing, shell helpers                              |
-| `platform-adapters.ts` | `createPlatformAdapters(config)` factory that binds runtime/config to platform primitives              |
-| `planning.ts`          | Branch and worktree naming (`deriveBranchName`, `deriveWorktreePath`, `findExistingBranch`)            |
-| `state.ts`             | State persistence (`loadState`, `saveState`, `normalizeDeliveryStateFromPersisted`)                    |
-| `ticket-flow.ts`       | Ticket lifecycle transitions, handoff artifact writing, `materializeTicketContext`                     |
-| `notifications.ts`     | Telegram notification events and formatting                                                            |
-| `pr-metadata.ts`       | PR title/body construction and AI-review section builders                                              |
-| `review.ts`            | Review polling lifecycle, fetcher/triager adapters, artifact parsing                                   |
-| `cli-runner.ts`        | `runDeliveryOrchestrator` dispatch switch and explicit command-helper wiring                           |
-| `cli.ts`               | Argument parsing (`parseCliArgs`, `getUsage`)                                                          |
-| `orchestrator.ts`      | Pure re-export barrel — no logic                                                                       |
+| Module                 | Concern                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `types.ts`             | All shared TypeScript types and interfaces                                                                               |
+| `env.ts`               | `.env` parsing (`parseDotEnv`) and environment readiness helpers                                                         |
+| `runtime-config.ts`    | `OrchestratorConfig` loading, resolution, package-manager inference, and invocation formatting                           |
+| `context.ts`           | Plain `DeliveryOrchestratorContext` construction from resolved config and platform adapters                              |
+| `format.ts`            | Human-readable status formatting (`formatStatus`, `formatCurrentTicketStatus`, etc.) with config input                   |
+| `platform.ts`          | Raw platform primitives: `spawnSync`, git worktree parsing, shell helpers                                                |
+| `platform-adapters.ts` | `createPlatformAdapters(config)` factory that binds runtime/config to platform primitives                                |
+| `planning.ts`          | Branch and worktree naming (`deriveBranchName`, `deriveWorktreePath`, `findExistingBranch`)                              |
+| `state.ts`             | State persistence (`loadState`, `saveState`, `normalizeDeliveryStateFromPersisted`)                                      |
+| `ticket-flow.ts`       | Ticket lifecycle transitions, handoff artifact writing, `materializeTicketContext`                                       |
+| `notifications.ts`     | Telegram notification events and formatting                                                                              |
+| `pr-metadata.ts`       | PR title/body construction and AI-review section builders                                                                |
+| `review.ts`            | Review polling lifecycle, fetcher/triager adapters, artifact parsing                                                     |
+| `cli-runner.ts`        | `runDeliveryOrchestrator` dispatch switch and explicit command-helper wiring                                             |
+| `cli.ts`               | Argument parsing (`parseCliArgs`, `getUsage`)                                                                            |
+| `subagent-runner.ts`   | Executor-owned runner types and functions (`executeClaudeCliReview`, `executeCodexExecReview`, `validateRunnerArtifact`) |
+| `orchestrator.ts`      | Pure re-export barrel — no logic                                                                                         |
 
 Each source module has a corresponding test file under `tools/delivery/test/`.
 Import from source modules in tests, not from the barrel.
@@ -104,6 +105,7 @@ behavior, and review policy are not hardcoded:
     "prReview": "skip_doc_only"
   },
   "reviewSubagentOverride": "codex:codex-rescue",
+  "subagentReviewRunner": { "kind": "claude-cli" },
   "prReviewAgents": [
     { "login": "coderabbitai", "name": "coderabbit" },
     { "login": "qodo-merge", "name": "qodo" }
@@ -129,7 +131,7 @@ Valid `reviewPolicy` stage values are:
 
 Invalid values and unknown keys are rejected at config load with a clear error.
 
-`reviewPolicy.subagentReview` governs the pre-PR internal agent review step (`subagent-review` command). `reviewPolicy.prReview` governs the external AI PR review polling window. `reviewSubagentOverride` sets the subagent invocation string for the `subagent-review` step (e.g. `"codex:codex-rescue"`). `prReviewAgents` is a list of `{ login, name }` entries used by the fetcher script to identify external review bots by GitHub login — replaces the old hardcoded vendor list.
+`reviewPolicy.subagentReview` governs the pre-PR internal agent review step (`subagent-review` command). `reviewPolicy.prReview` governs the external AI PR review polling window. `reviewSubagentOverride` sets the subagent invocation string for the agent-to-agent review path (e.g. `"codex:codex-rescue"`). `subagentReviewRunner` configures an executor-owned CLI runner for the internal review step — when set, the orchestrator launches the runner directly rather than relying on the embedding agent; `open-pr` fails closed if a valid runner artifact is missing. `reviewSubagentOverride` and `subagentReviewRunner` are mutually exclusive: when `subagentReviewRunner` is present, it takes precedence. `prReviewAgents` is a list of `{ login, name }` entries used by the fetcher script to identify external review bots by GitHub login — replaces the old hardcoded vendor list.
 
 Supported `ticketBoundaryMode` values are:
 
@@ -281,8 +283,9 @@ Pass explicit flags to override delivery policy for a single run without editing
 | `--boundary-mode`          | `cook\|gated\|glide`                | Override ticket-boundary mode                                              |
 | `--subagent-review-policy` | `required\|skip_doc_only\|disabled` | Override subagent review gate                                              |
 | `--pr-review-policy`       | `required\|skip_doc_only\|disabled` | Override PR review gate                                                    |
-| `--review-subagent`        | `<agent-name>`                      | Use a specific review subagent                                             |
+| `--review-subagent`        | `<agent-name>`                      | Use a specific agent-to-agent review subagent                              |
 | `--same-review-subagent`   | (boolean)                           | Clear `reviewSubagentOverride` so the same agent type reviews its own work |
+| `--runner-subagent-review` | `claude-cli\|codex-exec`            | Use an executor-owned CLI runner for internal review                       |
 | `--baseline`               | `orchestrator\|run-policy`          | Resolve divergence on resume (see below)                                   |
 
 **Divergence recovery:** If `orchestrator.config.json` changes between runs, resume detects drift on the four bounded policy fields and refuses to continue until the operator resolves it:
@@ -381,21 +384,35 @@ When `reviewPolicy.subagentReview` is `"required"`, the agent must record a suba
 **Role split:**
 
 - **Primary agent** executes and patches during build and post-verify mode.
-- **Review subagent** (configured via `reviewSubagentOverride`, e.g. `"codex:codex-rescue"`) reviews and patches its own findings autonomously — a second AI pass before the PR is published. The primary agent does not triage subagent output; the subagent acts on what it finds.
+- **Review subagent** reviews and patches its own findings autonomously — a second AI pass before the PR is published. The primary agent does not triage subagent output; the subagent acts on what it finds.
 - **External AI vendors** (e.g. CodeRabbit, Qodo) review post-publication during `poll-review`.
+
+There are two concrete review paths:
+
+**Agent-to-agent path** (`reviewSubagentOverride` set, e.g. `"codex:codex-rescue"`): The primary agent invokes the named subagent via the Agent tool. The subagent patches what it finds autonomously.
+
+**Executor-owned runner path** (`subagentReviewRunner` set, e.g. `{ "kind": "claude-cli" }`): The orchestrator launches the configured runner process directly — no embedding agent required. The runner writes a structured `SubagentRunnerArtifact` to the reviews directory. `open-pr` fails closed if the artifact is missing, malformed, or the runner was unavailable or timed out. This path is suitable for headless or CI contexts where the embedding agent cannot be relied on to drive a subagent tool call.
 
 **Running subagent review:**
 
-1. Invoke the review subagent via the Agent tool using the `reviewSubagentOverride` value (e.g. `subagent_type: "codex:codex-rescue"`). The subagent will patch what it finds autonomously.
+_Agent-to-agent path:_
+
+1. Invoke the review subagent via the Agent tool using the `reviewSubagentOverride` value. The subagent will patch what it finds autonomously.
 2. **Stay idle. No read-ahead.** Wait for the subagent to complete before doing anything else.
-3. Record the outcome. When the outcome is `patched`, include one or more patch-commit SHAs:
+3. Record the outcome.
+
+_Executor-owned runner path:_
+
+1. The orchestrator (or the embedding agent on its behalf) launches the configured runner binary with the bounded review prompt.
+2. The runner writes a `SubagentRunnerArtifact` JSON file to `reviews/<ticket>-runner-review.json`.
+3. Record the outcome.
 
 ```bash
 bun run deliver --plan <plan> subagent-review clean    # subagent found nothing worth patching
 bun run deliver --plan <plan> subagent-review patched <sha...>  # subagent findings were applied
 ```
 
-The CLI is a state recorder only — it does not invoke the subagent. The primary agent runs the subagent skill, then calls this command. A recorded subagent patch commit must use a subject suffix of `[subagent-review]`.
+The CLI is a state recorder only — it does not invoke the subagent or runner. A recorded subagent patch commit must use a subject suffix of `[subagent-review]`.
 
 **Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 
@@ -449,6 +466,7 @@ Current examples:
 
 - `workflow.open_pr.requires_post_verify`
 - `workflow.open_pr.requires_subagent_review`
+- `workflow.open_pr.requires_runner_review`
 - `workflow.open_pr.invalid_state`
 - `workflow.advance.requires_reviewed_ticket`
 - `workflow.worktree_guard.wrong_worktree`
@@ -608,7 +626,7 @@ For standalone PRs, the internal review contract is behavior-first, not state-re
 - use `verify:quiet` for the fast inner loop
 - run `ci:quiet` before publication for non-doc code changes so the final local gate matches the pre-push hook
 - run the post-verify diff review and re-check risky areas
-- for non-trivial code changes, run `codex:codex-rescue` informally before `ai-review`
+- for non-trivial code changes, run a same-type review subagent informally before `ai-review`
 - run standalone `ai-review` as the orchestrator-visible external review gate
 
 In standalone mode, `post-verify` and `subagent-review` are expected preflight discipline, not orchestrator gates. The orchestrator can tell the agent to do them, but without standalone state it cannot verify, audit, or block on them. Only standalone `ai-review` is an orchestrator-visible gate today.

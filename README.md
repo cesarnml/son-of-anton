@@ -93,9 +93,12 @@ exactly what to type to resume.
 - **Skill layer** — behavioral instructions in `.agents/skills/` that any
   agent can read, plus per-agent adapters for platforms with specific file
   conventions (see [Agent compatibility](#agent-compatibility) below).
-- **Adversarial subagent review** — after each ticket, a second agent checks
-  the implementation assuming the first one cut corners. Findings go to you;
-  you decide what to act on.
+- **Adversarial subagent review** — after each ticket, a second AI pass checks
+  the implementation assuming the first one cut corners. When the review runs
+  through an executor-owned CLI runner (`claude-cli` or `codex-exec`), it
+  patches findings autonomously and writes a durable proof artifact. When the
+  review runs agent-to-agent, the primary agent triages findings before
+  publishing.
 - **Stacked PR model** — each ticket gets its own branch and PR, stacked in
   dependency order. Closeout squash-merges the whole phase onto main cleanly.
 - **Migration runner** — when Son of Anton ships structural changes, `bun run sync`
@@ -236,13 +239,14 @@ or committing config changes.
 
 ### Supported flags
 
-| Flag                        | Values                                  | What it overrides                                       |
-| --------------------------- | --------------------------------------- | ------------------------------------------------------- |
-| `--boundary-mode`           | `cook`, `gated`, `glide`                | `ticketBoundaryMode`                                    |
-| `--subagent-review-policy`  | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.subagentReview`                           |
-| `--pr-review-policy`        | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.prReview`                                 |
-| `--review-subagent <agent>` | agent name string                       | review subagent selection                               |
-| `--same-review-subagent`    | _(flag)_                                | force same-type review subagent (ignores repo override) |
+| Flag                                                | Values                                  | What it overrides                                       |
+| --------------------------------------------------- | --------------------------------------- | ------------------------------------------------------- |
+| `--boundary-mode`                                   | `cook`, `gated`, `glide`                | `ticketBoundaryMode`                                    |
+| `--subagent-review-policy`                          | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.subagentReview`                           |
+| `--pr-review-policy`                                | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.prReview`                                 |
+| `--review-subagent <agent>`                         | agent name string                       | review subagent selection                               |
+| `--same-review-subagent`                            | _(flag)_                                | force same-type review subagent (ignores repo override) |
+| `--runner-subagent-review <claude-cli\|codex-exec>` | `claude-cli`, `codex-exec`              | use an executor-owned CLI runner for internal review    |
 
 The resolved policy is written to `state.json` at the start of every run.
 `orchestrator.config.json` is never modified.

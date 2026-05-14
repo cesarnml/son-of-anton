@@ -75,7 +75,7 @@ Small bounded changes that don't warrant a full phase (bug fixes, doc updates, c
 bun run deliver ai-review [--pr <number>]
 ```
 
-Self-audit is required. A `codex:codex-rescue` subagent review is optional but recommended for non-trivial changes.
+Self-audit is required. A same-type review subagent is optional but recommended for non-trivial changes.
 
 ## Key files
 
