@@ -47,3 +47,12 @@ Why this path: Claude CLI is the lower-risk first runner for proving the new orc
 Alternative considered: landing both Claude and Codex in one ticket; rejected because the first executor seam should be hardened before a second runner adds platform nuance
 Deferred: Codex Exec support and beta-surface wording updates land in later tickets
 Contract note: record any place where a manual escape hatch remains in the Claude-supported path, and why
+
+Implementation decisions:
+
+- `subagent-runner.ts` is a separate module (not inlined in ticket-flow or cli-runner) so Codex Exec can reuse the same artifact contract in P10.03
+- `SubagentRunnerArtifact` uses a discriminated `runnerKind` field to let future runners extend the union without breaking the validator
+- `validateRunnerArtifact` performs structural validation only — it does not read from disk; callers decide when and where to parse the JSON
+- The runner gate in `openPullRequest` (cli-runner.ts) checks BEFORE delegating to ticket-flow's `openPullRequestImpl`, so the runner-review error surfaces even when the ticket is `verified` (which would otherwise hit a different gate first)
+- `does not gate` test uses try/catch rather than `.rejects.not.toThrow()` because the flow may resolve or reject for non-runner reasons depending on worktree state; `.rejects` requires a rejection which is not guaranteed in the mock context
+- No manual escape hatch remains in the Claude-supported path: when `subagentReviewRunner` is set, `open-pr` fails closed unconditionally unless a valid artifact path is recorded on the ticket
