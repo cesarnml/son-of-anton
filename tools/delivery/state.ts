@@ -35,6 +35,7 @@ function runPolicyReviewSubagentEqual(
   if (a.kind !== b.kind) return false;
   if (a.kind === 'override' && b.kind === 'override')
     return a.value === b.value;
+  if (a.kind === 'runner' && b.kind === 'runner') return a.runner === b.runner;
   return true;
 }
 
@@ -69,7 +70,9 @@ export function detectRunPolicyDivergence(
 }
 
 function formatReviewSubagent(rs: RunPolicyReviewSubagent): string {
-  return rs.kind === 'override' ? `override(${rs.value})` : 'same-type';
+  if (rs.kind === 'override') return `override(${rs.value})`;
+  if (rs.kind === 'runner') return `runner(${rs.runner})`;
+  return 'same-type';
 }
 
 /**
@@ -143,20 +146,36 @@ export function patchRunPolicyWithFlags(
     prReviewPolicy?: ReviewPolicyStageValue;
     reviewSubagent?: string;
     sameReviewSubagent?: boolean;
+    runnerSubagentReview?: string;
   },
 ): RunPolicy {
-  if (flags.reviewSubagent !== undefined && flags.sameReviewSubagent === true) {
+  const reviewSubagentFlags = [
+    flags.reviewSubagent !== undefined,
+    flags.sameReviewSubagent === true,
+    flags.runnerSubagentReview !== undefined,
+  ].filter(Boolean).length;
+
+  if (reviewSubagentFlags > 1) {
     throw new Error(
-      'patchRunPolicyWithFlags: reviewSubagent and sameReviewSubagent are mutually exclusive.',
+      'patchRunPolicyWithFlags: reviewSubagent, sameReviewSubagent, and runnerSubagentReview are mutually exclusive.',
     );
   }
 
-  const reviewSubagent: RunPolicyReviewSubagent =
-    flags.reviewSubagent !== undefined
-      ? { kind: 'override', value: flags.reviewSubagent }
-      : flags.sameReviewSubagent === true
-        ? { kind: 'same-type' }
-        : base.reviewSubagent;
+  let reviewSubagent: RunPolicyReviewSubagent;
+
+  if (flags.runnerSubagentReview !== undefined) {
+    reviewSubagent = {
+      kind: 'runner',
+      runner:
+        flags.runnerSubagentReview as import('./config').SubagentReviewRunnerKind,
+    };
+  } else if (flags.reviewSubagent !== undefined) {
+    reviewSubagent = { kind: 'override', value: flags.reviewSubagent };
+  } else if (flags.sameReviewSubagent === true) {
+    reviewSubagent = { kind: 'same-type' };
+  } else {
+    reviewSubagent = base.reviewSubagent;
+  }
 
   return {
     ticketBoundaryMode: flags.boundaryMode ?? base.ticketBoundaryMode,
@@ -169,9 +188,18 @@ export function patchRunPolicyWithFlags(
 export function deriveRunPolicyFromConfig(
   config: ResolvedOrchestratorConfig,
 ): RunPolicy {
-  const reviewSubagent: RunPolicyReviewSubagent = config.reviewSubagentOverride
-    ? { kind: 'override', value: config.reviewSubagentOverride }
-    : { kind: 'same-type' };
+  let reviewSubagent: RunPolicyReviewSubagent;
+
+  if (config.subagentReviewRunner) {
+    reviewSubagent = {
+      kind: 'runner',
+      runner: config.subagentReviewRunner.kind,
+    };
+  } else if (config.reviewSubagentOverride) {
+    reviewSubagent = { kind: 'override', value: config.reviewSubagentOverride };
+  } else {
+    reviewSubagent = { kind: 'same-type' };
+  }
 
   return {
     ticketBoundaryMode: config.ticketBoundaryMode,
@@ -201,6 +229,10 @@ export function applyRunPolicyToConfig(
     reviewSubagentOverride:
       runPolicy.reviewSubagent.kind === 'override'
         ? runPolicy.reviewSubagent.value
+        : undefined,
+    subagentReviewRunner:
+      runPolicy.reviewSubagent.kind === 'runner'
+        ? { kind: runPolicy.reviewSubagent.runner }
         : undefined,
   };
 }

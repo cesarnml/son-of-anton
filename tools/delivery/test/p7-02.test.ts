@@ -76,9 +76,7 @@ describe('P7.02 runtime policy override parsing and resolution', () => {
           ],
           DUMMY_USAGE,
         ),
-      ).toThrow(
-        '--review-subagent and --same-review-subagent are mutually exclusive',
-      );
+      ).toThrow(/mutually exclusive/);
     });
 
     it('throws on invalid --subagent-review-policy value', () => {

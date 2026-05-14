@@ -4,6 +4,18 @@ import { resolve } from 'node:path';
 
 export const VALID_TICKET_BOUNDARY_MODES = ['cook', 'gated', 'glide'] as const;
 
+export const VALID_SUBAGENT_REVIEW_RUNNER_KINDS = [
+  'claude-cli',
+  'codex-exec',
+] as const;
+
+export type SubagentReviewRunnerKind =
+  (typeof VALID_SUBAGENT_REVIEW_RUNNER_KINDS)[number];
+
+export type SubagentReviewRunnerConfig = {
+  kind: SubagentReviewRunnerKind;
+};
+
 export type TicketBoundaryMode = (typeof VALID_TICKET_BOUNDARY_MODES)[number];
 
 export const VALID_REVIEW_POLICY_STAGE_VALUES = [
@@ -40,7 +52,9 @@ export type OrchestratorConfig = {
   packageManager?: 'bun' | 'npm' | 'pnpm' | 'yarn';
   ticketBoundaryMode?: TicketBoundaryMode;
   reviewPolicy?: ReviewPolicy;
+  /** @deprecated Use subagentReviewRunner instead. Accepted for migration. */
   reviewSubagentOverride?: string;
+  subagentReviewRunner?: SubagentReviewRunnerConfig;
   prReviewAgents?: PrReviewAgent[];
 };
 
@@ -51,7 +65,9 @@ export type ResolvedOrchestratorConfig = {
   packageManager: 'bun' | 'npm' | 'pnpm' | 'yarn';
   ticketBoundaryMode: TicketBoundaryMode;
   reviewPolicy: ResolvedReviewPolicy;
+  /** @deprecated Use subagentReviewRunner instead. */
   reviewSubagentOverride?: string;
+  subagentReviewRunner?: SubagentReviewRunnerConfig;
   prReviewAgents?: PrReviewAgent[];
 };
 
@@ -125,6 +141,11 @@ export async function loadOrchestratorConfig(
     'orchestrator.config.json',
   );
 
+  const subagentReviewRunner =
+    raw.subagentReviewRunner !== undefined
+      ? parseSubagentReviewRunner(raw.subagentReviewRunner)
+      : undefined;
+
   const resolvedPrReview =
     reviewPolicy?.prReview ?? reviewPolicy?.externalReview ?? undefined;
   const prReviewAgents =
@@ -151,6 +172,7 @@ export async function loadOrchestratorConfig(
       raw.ticketBoundaryMode as OrchestratorConfig['ticketBoundaryMode'],
     reviewPolicy,
     reviewSubagentOverride,
+    subagentReviewRunner,
     prReviewAgents,
   };
 }
@@ -183,6 +205,7 @@ export function resolveOrchestratorConfig(
         'skip_doc_only',
     },
     reviewSubagentOverride: raw.reviewSubagentOverride,
+    subagentReviewRunner: raw.subagentReviewRunner,
     prReviewAgents: raw.prReviewAgents,
   };
 }
@@ -287,6 +310,29 @@ function parsePrReviewAgents(raw: unknown): PrReviewAgent[] {
       resolveThreads: obj['resolveThreads'] === true,
     };
   });
+}
+
+function parseSubagentReviewRunner(raw: unknown): SubagentReviewRunnerConfig {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      'orchestrator.config.json: subagentReviewRunner must be an object with a "kind" field.',
+    );
+  }
+
+  const obj = raw as Record<string, unknown>;
+
+  if (
+    typeof obj['kind'] !== 'string' ||
+    !VALID_SUBAGENT_REVIEW_RUNNER_KINDS.includes(
+      obj['kind'] as SubagentReviewRunnerKind,
+    )
+  ) {
+    throw new Error(
+      `orchestrator.config.json: subagentReviewRunner.kind "${String(obj['kind'])}" is invalid. Expected: ${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join(', ')}`,
+    );
+  }
+
+  return { kind: obj['kind'] as SubagentReviewRunnerKind };
 }
 
 function optionalNonBlankString(

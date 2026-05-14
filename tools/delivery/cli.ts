@@ -1,8 +1,10 @@
 import {
   VALID_REVIEW_POLICY_STAGE_VALUES,
+  VALID_SUBAGENT_REVIEW_RUNNER_KINDS,
   VALID_TICKET_BOUNDARY_MODES,
   type OrchestratorConfig,
   type ReviewPolicyStageValue,
+  type SubagentReviewRunnerKind,
   type TicketBoundaryMode,
 } from './config';
 import type { OrchestratorOptions } from './types';
@@ -24,6 +26,7 @@ export type ParsedCliArgs = {
   prReviewPolicy?: ReviewPolicyStageValue;
   reviewSubagent?: string;
   sameReviewSubagent?: boolean;
+  runnerSubagentReview?: SubagentReviewRunnerKind;
   baseline?: BaselineValue;
 };
 
@@ -40,15 +43,25 @@ export function resolveRuntimePolicyOverrides(
     | 'prReviewPolicy'
     | 'reviewSubagent'
     | 'sameReviewSubagent'
+    | 'runnerSubagentReview'
   >,
   rawConfig: OrchestratorConfig,
 ): OrchestratorConfig {
   const reviewSubagentOverride =
     parsed.reviewSubagent !== undefined
       ? parsed.reviewSubagent
-      : parsed.sameReviewSubagent === true
+      : parsed.sameReviewSubagent === true ||
+          parsed.runnerSubagentReview !== undefined
         ? undefined
         : rawConfig.reviewSubagentOverride;
+
+  const subagentReviewRunner =
+    parsed.runnerSubagentReview !== undefined
+      ? { kind: parsed.runnerSubagentReview }
+      : parsed.sameReviewSubagent === true ||
+          parsed.reviewSubagent !== undefined
+        ? undefined
+        : rawConfig.subagentReviewRunner;
 
   const mergedReviewPolicy = {
     ...rawConfig.reviewPolicy,
@@ -82,6 +95,7 @@ export function resolveRuntimePolicyOverrides(
     ticketBoundaryMode: parsed.boundaryMode ?? rawConfig.ticketBoundaryMode,
     reviewPolicy: mergedReviewPolicy,
     reviewSubagentOverride,
+    subagentReviewRunner,
   };
 }
 
@@ -115,6 +129,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  --pr-review-policy <required|skip_doc_only|disabled>',
     '  --review-subagent <agent>',
     '  --same-review-subagent',
+    `  --runner-subagent-review <${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join('|')}>`,
     '  --baseline <orchestrator|run-policy>',
   ].join('\n');
 }
@@ -127,6 +142,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let prReviewPolicy: ParsedCliArgs['prReviewPolicy'];
   let reviewSubagent: ParsedCliArgs['reviewSubagent'];
   let sameReviewSubagent: ParsedCliArgs['sameReviewSubagent'];
+  let runnerSubagentReview: ParsedCliArgs['runnerSubagentReview'];
   let baseline: ParsedCliArgs['baseline'];
   const flags = new Set<string>();
   const positionals: string[] = [];
@@ -229,6 +245,26 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       continue;
     }
 
+    if (value === '--runner-subagent-review') {
+      const raw = argv[index + 1];
+
+      if (
+        raw === undefined ||
+        raw.startsWith('--') ||
+        !VALID_SUBAGENT_REVIEW_RUNNER_KINDS.includes(
+          raw as SubagentReviewRunnerKind,
+        )
+      ) {
+        throw new Error(
+          `Pass --runner-subagent-review <${VALID_SUBAGENT_REVIEW_RUNNER_KINDS.join('|')}>.`,
+        );
+      }
+
+      runnerSubagentReview = raw as SubagentReviewRunnerKind;
+      index += 1;
+      continue;
+    }
+
     if (value === '--baseline') {
       const raw = argv[index + 1];
 
@@ -260,9 +296,15 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     positionals.push(value ?? '');
   }
 
-  if (reviewSubagent !== undefined && sameReviewSubagent === true) {
+  const reviewSubagentFlagCount = [
+    reviewSubagent !== undefined,
+    sameReviewSubagent === true,
+    runnerSubagentReview !== undefined,
+  ].filter(Boolean).length;
+
+  if (reviewSubagentFlagCount > 1) {
     throw new Error(
-      '--review-subagent and --same-review-subagent are mutually exclusive. Pass one or the other.',
+      '--review-subagent, --same-review-subagent, and --runner-subagent-review are mutually exclusive. Pass one or the other.',
     );
   }
 
@@ -283,6 +325,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     prReviewPolicy,
     reviewSubagent,
     sameReviewSubagent,
+    runnerSubagentReview,
     baseline,
   };
 }

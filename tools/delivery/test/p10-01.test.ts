@@ -92,7 +92,7 @@ describe('P10.01 — runner-native config parsing', () => {
   });
 
   it('throws when subagentReviewRunner is missing kind', async () => {
-    const tempDir = await mkdtemp(join(tmpdir(), 'p10-01-cfg-nokind-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'p10-01-cfg-no-kind-'));
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),

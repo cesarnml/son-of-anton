@@ -16,6 +16,7 @@ import {
 import type {
   ResolvedOrchestratorConfig,
   ReviewPolicyStageValue,
+  SubagentReviewRunnerKind,
   TicketBoundaryMode,
 } from './config';
 import type {
@@ -186,6 +187,7 @@ export async function runDeliveryOrchestrator(
         prReviewPolicy?: ReviewPolicyStageValue;
         reviewSubagent?: string;
         sameReviewSubagent?: boolean;
+        runnerSubagentReview?: SubagentReviewRunnerKind;
         baseline?: 'orchestrator' | 'run-policy';
       }
     | undefined;
@@ -348,7 +350,8 @@ export async function runDeliveryOrchestrator(
           parsed.subagentReviewPolicy !== undefined ||
           parsed.prReviewPolicy !== undefined ||
           parsed.reviewSubagent !== undefined ||
-          parsed.sameReviewSubagent === true;
+          parsed.sameReviewSubagent === true ||
+          parsed.runnerSubagentReview !== undefined;
         const stateForStart = hasExplicitPolicyFlags
           ? { ...state, runPolicy: deriveRunPolicyFromConfig(resolvedConfig) }
           : state;

@@ -27,10 +27,15 @@ import type {
  *   boundary_mode=cook subagentReview:skip_doc_only prReview:skip_doc_only reviewSubagent:same-type
  */
 export function formatRunPolicy(policy: RunPolicy): string {
-  const reviewSubagentStr =
-    policy.reviewSubagent.kind === 'override'
-      ? policy.reviewSubagent.value
-      : 'same-type';
+  let reviewSubagentStr: string;
+
+  if (policy.reviewSubagent.kind === 'override') {
+    reviewSubagentStr = policy.reviewSubagent.value;
+  } else if (policy.reviewSubagent.kind === 'runner') {
+    reviewSubagentStr = `runner(${policy.reviewSubagent.runner})`;
+  } else {
+    reviewSubagentStr = 'same-type';
+  }
 
   return [
     `boundary_mode=${policy.ticketBoundaryMode}`,
