@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
@@ -114,6 +114,7 @@ import {
   restackTicket as restackTicketImpl,
   startTicket as startTicketImpl,
 } from './ticket-flow';
+import { validateRunnerArtifact } from './subagent-runner';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 
@@ -1193,13 +1194,30 @@ export async function openPullRequest(
         state.tickets.find((t) => t.status === 'in_review'));
 
     if (targetTicket !== undefined) {
-      const artifactPath = targetTicket.subagentRunnerArtifactPath;
-      if (!artifactPath || !existsSync(artifactPath)) {
+      const rawArtifactPath = targetTicket.subagentRunnerArtifactPath;
+      const artifactPath = rawArtifactPath
+        ? resolve(cwd, rawArtifactPath)
+        : undefined;
+      const artifactExists =
+        artifactPath !== undefined && existsSync(artifactPath);
+      const artifact = artifactExists
+        ? (() => {
+            try {
+              return validateRunnerArtifact(
+                JSON.parse(readFileSync(artifactPath, 'utf-8')),
+              );
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+      const configuredKind = context.config.subagentReviewRunner.kind;
+      if (!artifact || artifact.runnerKind !== configuredKind) {
         throw createWorkflowContractError(
           'workflow.open_pr.requires_runner_review',
           `Ticket ${targetTicket.id} requires an executor-owned runner review before opening a PR. ` +
-            `Runner kind: ${context.config.subagentReviewRunner.kind}. ` +
-            `No valid runner review artifact found at ${artifactPath ?? '(path not set)'}.`,
+            `Runner kind: ${configuredKind}. ` +
+            `No valid runner review artifact found at ${rawArtifactPath ?? '(path not set)'}.`,
         );
       }
     }

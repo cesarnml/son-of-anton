@@ -1,3 +1,5 @@
+import type { SubagentReviewRunnerKind } from './config';
+
 export type SubagentRunnerOutcome =
   | 'clean'
   | 'patched'
@@ -6,7 +8,7 @@ export type SubagentRunnerOutcome =
   | 'malformed';
 
 export type SubagentRunnerArtifact = {
-  runnerKind: 'claude-cli' | 'codex-exec';
+  runnerKind: SubagentReviewRunnerKind;
   reviewedHeadSha: string;
   outcome: SubagentRunnerOutcome;
   completedAt: string;

@@ -54,5 +54,5 @@ Implementation decisions:
 - `SubagentRunnerArtifact` uses a discriminated `runnerKind` field to let future runners extend the union without breaking the validator
 - `validateRunnerArtifact` performs structural validation only — it does not read from disk; callers decide when and where to parse the JSON
 - The runner gate in `openPullRequest` (cli-runner.ts) checks BEFORE delegating to ticket-flow's `openPullRequestImpl`, so the runner-review error surfaces even when the ticket is `verified` (which would otherwise hit a different gate first)
-- `does not gate` test uses try/catch rather than `.rejects.not.toThrow()` because the flow may resolve or reject for non-runner reasons depending on worktree state; `.rejects` requires a rejection which is not guaranteed in the mock context
+- `does not gate` test uses try/catch asserting the error code is not `workflow.open_pr.requires_runner_review` — this correctly captures the intent (runner gate must not fire) without asserting whether the call resolves or rejects for unrelated reasons
 - No manual escape hatch remains in the Claude-supported path: when `subagentReviewRunner` is set, `open-pr` fails closed unconditionally unless a valid artifact path is recorded on the ticket
