@@ -105,10 +105,12 @@ export type {
 export { parseDotEnv } from './env';
 export {
   executeClaudeCliReview,
+  executeCodexExecReview,
   validateRunnerArtifact,
 } from './subagent-runner';
 export type {
   ClaudeCliReviewResult,
+  CodexExecReviewResult,
   SubagentRunnerArtifact,
   SubagentRunnerOutcome,
 } from './subagent-runner';

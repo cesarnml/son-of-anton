@@ -21,6 +21,14 @@ export type ClaudeCliReviewResult = {
   findings?: string[];
 };
 
+export type CodexExecReviewResult = {
+  runnerKind: 'codex-exec';
+  reviewedHeadSha: string;
+  outcome: SubagentRunnerOutcome;
+  completedAt: string;
+  findings?: string[];
+};
+
 export type SpawnResult = {
   exitCode: number | null;
   stdout: string;
@@ -34,61 +42,53 @@ export type ExecuteClaudeCliReviewOptions = {
   spawnProcess: () => SpawnResult;
 };
 
-export function executeClaudeCliReview(
-  options: ExecuteClaudeCliReviewOptions,
-): ClaudeCliReviewResult {
-  const { headSha, spawnProcess } = options;
+export type ExecuteCodexExecReviewOptions = {
+  headSha: string;
+  prompt: string;
+  timeoutMs: number;
+  spawnProcess: () => SpawnResult;
+};
+
+const VALID_SPAWN_OUTCOMES: SubagentRunnerOutcome[] = [
+  'clean',
+  'patched',
+  'timeout',
+  'unavailable',
+  'malformed',
+];
+
+function executeRunnerReview<K extends SubagentRunnerArtifact['runnerKind']>(
+  runnerKind: K,
+  headSha: string,
+  spawnProcess: () => SpawnResult,
+): SubagentRunnerArtifact & { runnerKind: K } {
   const completedAt = new Date().toISOString();
+  const fail = (outcome: SubagentRunnerOutcome) =>
+    ({
+      runnerKind,
+      reviewedHeadSha: headSha,
+      outcome,
+      completedAt,
+    }) as SubagentRunnerArtifact & {
+      runnerKind: K;
+    };
 
   let result: SpawnResult;
   try {
     result = spawnProcess();
   } catch (err) {
     const code = (err as { code?: string }).code;
-    if (code === 'ENOENT') {
-      return {
-        runnerKind: 'claude-cli',
-        reviewedHeadSha: headSha,
-        outcome: 'unavailable',
-        completedAt,
-      };
-    }
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'malformed',
-      completedAt,
-    };
+    return fail(code === 'ENOENT' ? 'unavailable' : 'malformed');
   }
 
-  if (result.timedOut) {
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'timeout',
-      completedAt,
-    };
-  }
-
-  if (result.exitCode !== 0) {
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'malformed',
-      completedAt,
-    };
-  }
+  if (result.timedOut) return fail('timeout');
+  if (result.exitCode !== 0) return fail('malformed');
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout);
   } catch {
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'malformed',
-      completedAt,
-    };
+    return fail('malformed');
   }
 
   if (
@@ -97,31 +97,13 @@ export function executeClaudeCliReview(
     !('outcome' in parsed) ||
     typeof (parsed as Record<string, unknown>)['outcome'] !== 'string'
   ) {
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'malformed',
-      completedAt,
-    };
+    return fail('malformed');
   }
 
   const raw = parsed as Record<string, unknown>;
   const outcome = raw['outcome'] as string;
-  const validOutcomes: SubagentRunnerOutcome[] = [
-    'clean',
-    'patched',
-    'timeout',
-    'unavailable',
-    'malformed',
-  ];
-  if (!(validOutcomes as string[]).includes(outcome)) {
-    return {
-      runnerKind: 'claude-cli',
-      reviewedHeadSha: headSha,
-      outcome: 'malformed',
-      completedAt,
-    };
-  }
+  if (!(VALID_SPAWN_OUTCOMES as string[]).includes(outcome))
+    return fail('malformed');
 
   const findings = Array.isArray(raw['findings'])
     ? (raw['findings'] as unknown[]).filter(
@@ -130,12 +112,32 @@ export function executeClaudeCliReview(
     : undefined;
 
   return {
-    runnerKind: 'claude-cli',
+    runnerKind,
     reviewedHeadSha: headSha,
     outcome: outcome as SubagentRunnerOutcome,
     completedAt,
     ...(findings !== undefined && findings.length > 0 ? { findings } : {}),
-  };
+  } as SubagentRunnerArtifact & { runnerKind: K };
+}
+
+export function executeClaudeCliReview(
+  options: ExecuteClaudeCliReviewOptions,
+): ClaudeCliReviewResult {
+  return executeRunnerReview(
+    'claude-cli',
+    options.headSha,
+    options.spawnProcess,
+  );
+}
+
+export function executeCodexExecReview(
+  options: ExecuteCodexExecReviewOptions,
+): CodexExecReviewResult {
+  return executeRunnerReview(
+    'codex-exec',
+    options.headSha,
+    options.spawnProcess,
+  );
 }
 
 const VALID_RUNNER_KINDS: SubagentRunnerArtifact['runnerKind'][] = [

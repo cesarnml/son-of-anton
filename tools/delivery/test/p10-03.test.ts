@@ -26,7 +26,8 @@ const baseStateVerified: DeliveryState = {
       ticketFile:
         'docs/product/delivery/phase-10/ticket-03-codex-exec-runner-support-for-programmatic-subagent-review.md',
       status: 'subagent_review_complete',
-      branch: 'agents/p10-03-codex-exec-runner-support-for-programmatic-subagent-review',
+      branch:
+        'agents/p10-03-codex-exec-runner-support-for-programmatic-subagent-review',
       baseBranch: 'agents/p10-02-executor-owned-subagent-review-via-claude-cli',
       worktreePath: '/tmp/p10_03',
       subagentReviewOutcome: 'clean',
@@ -247,7 +248,12 @@ describe('P10.03 — open-pr fails closed when codex-exec runner artifact is mis
     const context = makeContext('codex-exec');
 
     try {
-      await openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.03');
+      await openPullRequest(
+        stateWithoutArtifact,
+        '/tmp/project',
+        context,
+        'P10.03',
+      );
       throw new Error('Expected error was not thrown');
     } catch (error) {
       expect((error as { code?: string }).code).toBe(
@@ -266,7 +272,12 @@ describe('P10.03 — open-pr fails closed when codex-exec runner artifact is mis
       })),
     };
     try {
-      await openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.03');
+      await openPullRequest(
+        stateWithoutArtifact,
+        '/tmp/project',
+        context,
+        'P10.03',
+      );
     } catch (err) {
       expect((err as Error).message).not.toMatch(/requires.*runner.*review/i);
     }
