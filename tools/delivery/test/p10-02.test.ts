@@ -40,7 +40,10 @@ const baseState: DeliveryState = {
 
 const baseStateVerified: DeliveryState = {
   ...baseState,
-  tickets: baseState.tickets.map((t) => ({ ...t, status: 'verified' as const })),
+  tickets: baseState.tickets.map((t) => ({
+    ...t,
+    status: 'verified' as const,
+  })),
 };
 
 function makeContext(
@@ -66,7 +69,10 @@ function makeContext(
           : undefined,
     },
     platform: {
-      createPullRequest: () => ({ number: 42, url: 'https://github.com/test/pr/42' }),
+      createPullRequest: () => ({
+        number: 42,
+        url: 'https://github.com/test/pr/42',
+      }),
       editPullRequest: () => undefined,
       ensureBranchPushed: () => undefined,
       findOpenPullRequest: () => undefined,
@@ -112,7 +118,10 @@ describe('P10.02 — Claude CLI runner execution', () => {
       timeoutMs: 30_000,
       spawnProcess: () => ({
         exitCode: 0,
-        stdout: JSON.stringify({ outcome: 'patched', findings: ['fixed null check'] }),
+        stdout: JSON.stringify({
+          outcome: 'patched',
+          findings: ['fixed null check'],
+        }),
         timedOut: false,
       }),
     });
@@ -126,7 +135,9 @@ describe('P10.02 — Claude CLI runner execution', () => {
       prompt: 'Review.',
       timeoutMs: 30_000,
       spawnProcess: () => {
-        throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+        throw Object.assign(new Error('spawn claude ENOENT'), {
+          code: 'ENOENT',
+        });
       },
     });
     expect(result.outcome).toBe('unavailable');
@@ -205,7 +216,11 @@ describe('P10.02 — validateRunnerArtifact', () => {
   });
 
   it('accepts valid patched artifact with findings', () => {
-    const artifact = { ...validArtifact, outcome: 'patched', findings: ['fixed x'] };
+    const artifact = {
+      ...validArtifact,
+      outcome: 'patched',
+      findings: ['fixed x'],
+    };
     expect(validateRunnerArtifact(artifact)).not.toBeNull();
   });
 
@@ -220,7 +235,9 @@ describe('P10.02 — validateRunnerArtifact', () => {
   });
 
   it('returns null for unknown outcome value', () => {
-    expect(validateRunnerArtifact({ ...validArtifact, outcome: 'unknown' })).toBeNull();
+    expect(
+      validateRunnerArtifact({ ...validArtifact, outcome: 'unknown' }),
+    ).toBeNull();
   });
 
   it('returns null for null input', () => {
@@ -253,7 +270,10 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
         subagentRunnerArtifactPath: undefined,
       })),
     };
-    const context = makeContext({ runnerKind: 'claude-cli', subagentReview: 'skip_doc_only' });
+    const context = makeContext({
+      runnerKind: 'claude-cli',
+      subagentReview: 'skip_doc_only',
+    });
 
     await expect(
       openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.02'),
@@ -261,11 +281,23 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
   });
 
   it('fails closed when claude-cli runner is configured and artifact file is missing', async () => {
-    const context = makeContext({ runnerKind: 'claude-cli', subagentReview: 'skip_doc_only' });
+    const context = makeContext({
+      runnerKind: 'claude-cli',
+      subagentReview: 'skip_doc_only',
+    });
 
     await expect(
       openPullRequest(
-        { ...baseState, tickets: [{ ...baseState.tickets[0]!, status: 'subagent_review_complete' as const, subagentRunnerArtifactPath: '/nonexistent/path.json' }] },
+        {
+          ...baseState,
+          tickets: [
+            {
+              ...baseState.tickets[0]!,
+              status: 'subagent_review_complete' as const,
+              subagentRunnerArtifactPath: '/nonexistent/path.json',
+            },
+          ],
+        },
         '/tmp/project',
         context,
         'P10.02',
@@ -281,10 +313,18 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
         subagentRunnerArtifactPath: undefined,
       })),
     };
-    const context = makeContext({ runnerKind: 'claude-cli', subagentReview: 'skip_doc_only' });
+    const context = makeContext({
+      runnerKind: 'claude-cli',
+      subagentReview: 'skip_doc_only',
+    });
 
     try {
-      await openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.02');
+      await openPullRequest(
+        stateWithoutArtifact,
+        '/tmp/project',
+        context,
+        'P10.02',
+      );
       throw new Error('Expected error was not thrown');
     } catch (error) {
       expect((error as { code?: string }).code).toBe(
@@ -294,7 +334,10 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
   });
 
   it('does not gate when no runner is configured', async () => {
-    const context = makeContext({ runnerKind: undefined, subagentReview: 'disabled' });
+    const context = makeContext({
+      runnerKind: undefined,
+      subagentReview: 'disabled',
+    });
     const stateWithoutArtifact: DeliveryState = {
       ...baseState,
       tickets: baseState.tickets.map((t) => ({
@@ -304,8 +347,15 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
     };
     // Should not throw due to runner artifact — the normal open-pr flow handles the rest
     // Use subagent_review_complete status and disabled policy to let it proceed
-    await expect(
-      openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.02'),
-    ).rejects.not.toThrow(/requires.*runner.*review/i);
+    try {
+      await openPullRequest(
+        stateWithoutArtifact,
+        '/tmp/project',
+        context,
+        'P10.02',
+      );
+    } catch (err) {
+      expect((err as Error).message).not.toMatch(/requires.*runner.*review/i);
+    }
   });
 });

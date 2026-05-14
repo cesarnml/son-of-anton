@@ -104,6 +104,15 @@ export type {
 } from './platform-adapters';
 export { parseDotEnv } from './env';
 export {
+  executeClaudeCliReview,
+  validateRunnerArtifact,
+} from './subagent-runner';
+export type {
+  ClaudeCliReviewResult,
+  SubagentRunnerArtifact,
+  SubagentRunnerOutcome,
+} from './subagent-runner';
+export {
   applyAdvanceBoundaryMode,
   copyLocalBootstrapFilesIfPresent,
   copyLocalEnvIfPresent,

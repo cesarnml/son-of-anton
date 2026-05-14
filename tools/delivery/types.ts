@@ -113,6 +113,7 @@ export type TicketState = TicketDefinition & {
   subagentReviewCompletedAt?: string;
   subagentReviewPatchCommits?: InternalReviewPatchCommit[];
   subagentReviewAgent?: string;
+  subagentRunnerArtifactPath?: string;
   docOnly?: boolean;
   prNumber?: number;
   prUrl?: string;

@@ -1184,6 +1184,26 @@ export async function openPullRequest(
   ticketId?: string,
 ): Promise<DeliveryState> {
   const resolvedTicketId = ticketId;
+
+  if (context.config.subagentReviewRunner !== undefined) {
+    const targetTicket = resolvedTicketId
+      ? state.tickets.find((t) => t.id === resolvedTicketId)
+      : (state.tickets.find((t) => t.status === 'subagent_review_complete') ??
+        state.tickets.find((t) => t.status === 'verified'));
+
+    if (targetTicket !== undefined) {
+      const artifactPath = targetTicket.subagentRunnerArtifactPath;
+      if (!artifactPath || !existsSync(artifactPath)) {
+        throw createWorkflowContractError(
+          'workflow.open_pr.requires_runner_review',
+          `Ticket ${targetTicket.id} requires an executor-owned runner review before opening a PR. ` +
+            `Runner kind: ${context.config.subagentReviewRunner.kind}. ` +
+            `No valid runner review artifact found at ${artifactPath ?? '(path not set)'}.`,
+        );
+      }
+    }
+  }
+
   const platform = context.platform;
   const nextState = openPullRequestImpl(state, cwd, resolvedTicketId, {
     assertReviewerFacingMarkdown,
