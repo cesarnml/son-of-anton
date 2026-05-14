@@ -147,7 +147,7 @@ export function patchRunPolicyWithFlags(
     prReviewPolicy?: ReviewPolicyStageValue;
     reviewSubagent?: string;
     sameReviewSubagent?: boolean;
-    runnerSubagentReview?: string;
+    runnerSubagentReview?: SubagentReviewRunnerKind;
   },
 ): RunPolicy {
   const reviewSubagentFlags = [
@@ -167,7 +167,7 @@ export function patchRunPolicyWithFlags(
   if (flags.runnerSubagentReview !== undefined) {
     reviewSubagent = {
       kind: 'runner',
-      runner: flags.runnerSubagentReview as SubagentReviewRunnerKind,
+      runner: flags.runnerSubagentReview,
     };
   } else if (flags.reviewSubagent !== undefined) {
     reviewSubagent = { kind: 'override', value: flags.reviewSubagent };
