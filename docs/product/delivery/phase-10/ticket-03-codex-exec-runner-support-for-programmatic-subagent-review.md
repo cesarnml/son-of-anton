@@ -46,3 +46,10 @@ Why this path: Codex Exec is committed beta scope, but it should extend a proven
 Alternative considered: making Codex the first runner; rejected because Claude is the cleaner first proving ground for the headless review contract
 Deferred: App Server and Gemini remain out of scope for this phase
 Contract note: record any runner-specific caveat that materially affects the beta promise
+
+Implementation decisions:
+
+- Extracted `executeRunnerReview<K>` as a generic internal function that both `executeClaudeCliReview` and `executeCodexExecReview` delegate to; the `runnerKind` is the only runner-specific input and is stamped into the artifact
+- `ExecuteCodexExecReviewOptions` is structurally identical to `ExecuteClaudeCliReviewOptions` — keeping them as separate types preserves future flexibility for runner-specific fields without coupling the two
+- The `open-pr` gate in `cli-runner.ts` already covers `codex-exec` without changes since it checks `context.config.subagentReviewRunner !== undefined` generically, not by kind
+- No runner-specific caveat affects the beta promise: both runners write the same artifact schema and honor the same fail-closed contract via `validateRunnerArtifact`
