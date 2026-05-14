@@ -3,8 +3,10 @@ import { describe, expect, it } from 'bun:test';
 import {
   executeCodexExecReview,
   executeClaudeCliReview,
+  validateRunnerArtifact,
 } from '../subagent-runner';
 import { openPullRequest } from '../orchestrator';
+import type { SubagentRunnerArtifact } from '../subagent-runner';
 import type { DeliveryOrchestratorContext } from '../context';
 import type { DeliveryState } from '../types';
 
@@ -281,5 +283,59 @@ describe('P10.03 — open-pr fails closed when codex-exec runner artifact is mis
     } catch (err) {
       expect((err as Error).message).not.toMatch(/requires.*runner.*review/i);
     }
+  });
+
+  it('fails closed when codex-exec runner is configured and ticket is at in_review with no artifact (no ticketId)', async () => {
+    const stateInReview: DeliveryState = {
+      ...baseStateVerified,
+      tickets: baseStateVerified.tickets.map((t) => ({
+        ...t,
+        status: 'in_review' as const,
+        subagentRunnerArtifactPath: undefined,
+      })),
+    };
+    const context = makeContext('codex-exec');
+
+    // When ticketId is omitted, the gate must still find the in_review ticket and block.
+    await expect(
+      openPullRequest(stateInReview, '/tmp/project', context),
+    ).rejects.toThrow(/runner.*review.*required|requires.*runner.*review/i);
+  });
+});
+
+// ─── validateRunnerArtifact with codex-exec ───────────────────────────────────
+
+describe('P10.03 — validateRunnerArtifact accepts codex-exec runnerKind', () => {
+  const validCodexArtifact: SubagentRunnerArtifact = {
+    runnerKind: 'codex-exec',
+    reviewedHeadSha: 'abc1234',
+    outcome: 'clean',
+    completedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('accepts a valid codex-exec clean artifact', () => {
+    expect(validateRunnerArtifact(validCodexArtifact)).toEqual(
+      validCodexArtifact,
+    );
+  });
+
+  it('accepts a valid codex-exec patched artifact with findings', () => {
+    const artifact = {
+      ...validCodexArtifact,
+      outcome: 'patched',
+      findings: ['removed dead branch'],
+    };
+    expect(validateRunnerArtifact(artifact)).not.toBeNull();
+  });
+
+  it('returns null for codex-exec artifact missing reviewedHeadSha', () => {
+    const { reviewedHeadSha: _, ...rest } = validCodexArtifact;
+    expect(validateRunnerArtifact(rest)).toBeNull();
+  });
+
+  it('returns null for codex-exec artifact with unknown outcome', () => {
+    expect(
+      validateRunnerArtifact({ ...validCodexArtifact, outcome: 'unknown' }),
+    ).toBeNull();
   });
 });
