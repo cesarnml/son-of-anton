@@ -345,17 +345,31 @@ describe('P10.02 — open-pr fails closed when runner artifact is missing', () =
         subagentRunnerArtifactPath: undefined,
       })),
     };
-    // Should not throw due to runner artifact — the normal open-pr flow handles the rest
-    // Use subagent_review_complete status and disabled policy to let it proceed
-    try {
-      await openPullRequest(
-        stateWithoutArtifact,
-        '/tmp/project',
-        context,
-        'P10.02',
-      );
-    } catch (err) {
-      expect((err as Error).message).not.toMatch(/requires.*runner.*review/i);
-    }
+    // Should not throw due to runner artifact — the normal open-pr flow handles the rest.
+    // Use subagent_review_complete status and disabled policy to let it proceed.
+    // Assert resolves (not just "no runner error") so the test fails if the gate fires for any reason.
+    await expect(
+      openPullRequest(stateWithoutArtifact, '/tmp/project', context, 'P10.02'),
+    ).resolves.toBeDefined();
+  });
+
+  it('fails closed when claude-cli runner is configured and ticket is at in_review with no artifact (no ticketId)', async () => {
+    const stateInReview: DeliveryState = {
+      ...baseState,
+      tickets: baseState.tickets.map((t) => ({
+        ...t,
+        status: 'in_review' as const,
+        subagentRunnerArtifactPath: undefined,
+      })),
+    };
+    const context = makeContext({
+      runnerKind: 'claude-cli',
+      subagentReview: 'disabled',
+    });
+
+    // When ticketId is omitted, the gate must still find the in_review ticket and block.
+    await expect(
+      openPullRequest(stateInReview, '/tmp/project', context),
+    ).rejects.toThrow(/runner.*review.*required|requires.*runner.*review/i);
   });
 });

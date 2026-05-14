@@ -1189,7 +1189,8 @@ export async function openPullRequest(
     const targetTicket = resolvedTicketId
       ? state.tickets.find((t) => t.id === resolvedTicketId)
       : (state.tickets.find((t) => t.status === 'subagent_review_complete') ??
-        state.tickets.find((t) => t.status === 'verified'));
+        state.tickets.find((t) => t.status === 'verified') ??
+        state.tickets.find((t) => t.status === 'in_review'));
 
     if (targetTicket !== undefined) {
       const artifactPath = targetTicket.subagentRunnerArtifactPath;
