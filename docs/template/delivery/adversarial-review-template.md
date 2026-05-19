@@ -67,6 +67,51 @@ Surfaces for this review:
 3. <function/path — class of attack>
 ...
 
+#### Diff-derived attack surfaces
+
+In addition to the ticket-spec-derived surfaces above, probe each of the seven
+diff-derived classes below. These are the finding classes external code review
+(e.g. CodeRabbit) catches consistently and the prior template did not name. The
+primary agent must enumerate concrete surfaces drawn from this diff against each
+class. The subagent must report coverage for every class using the form
+`[probed]` / `[N/A — reason]` / `[blocked — missing-input]`.
+
+1. **Output stability across schema-version drift** — does any persisted
+   artifact, CLI stdout shape, or on-disk JSON format change in a way that
+   breaks consumers reading prior-version output? Probe legacy-shape fixtures,
+   adapter coverage, and version markers. Output form: `[probed]` / `[N/A —
+   reason]` / `[blocked — missing-input]`.
+2. **CLI flag/arg symmetry** — for every added or changed CLI flag, is the
+   parser, help text, validator, and downstream consumer updated together?
+   Probe each flag's read site and each producer site. Output form: `[probed]`
+   / `[N/A — reason]` / `[blocked — missing-input]`.
+3. **Error-class breadth in `catch` blocks** — does each new or modified
+   `catch` distinguish recoverable from non-recoverable errors, or does it
+   silently swallow all `Error` instances? Probe error-class matching, rethrow
+   paths, and logging fidelity. Output form: `[probed]` / `[N/A — reason]` /
+   `[blocked — missing-input]`.
+4. **Defensive layering at module boundaries** — at every new cross-module
+   call, does the callee revalidate inputs it cannot trust the caller to have
+   normalized (paths, identifiers, schema shape)? Probe each new boundary
+   crossing in the diff. Output form: `[probed]` / `[N/A — reason]` /
+   `[blocked — missing-input]`.
+5. **Cross-file atomicity windows** — does any multi-step write (state +
+   artifact, commit + push, file-A + file-B) leave an observable
+   partially-committed window if interrupted? Probe ordering, error-recovery,
+   and re-entrant safety. Output form: `[probed]` / `[N/A — reason]` /
+   `[blocked — missing-input]`.
+6. **Test-contract strength** — do new tests assert the stable
+   machine-readable contract (error codes, structural shape) before asserting
+   prose, and do they cover both the omitted-hook and supplied-hook paths for
+   optional DI? Probe assertion targets and branch coverage. Output form:
+   `[probed]` / `[N/A — reason]` / `[blocked — missing-input]`.
+7. **Doc-vs-code drift in the ticket Rationale** — does the ticket's
+   `## Rationale`, scope contract, or referenced docs describe behavior that
+   does not match what the diff actually does? Read the Rationale and contract
+   docs and surface drift in **Findings for human review** — do not patch
+   ticket docs. Output form: `[probed]` / `[N/A — reason]` / `[blocked —
+   missing-input]`.
+
 ### Diff context
 
 <Paste the relevant diff hunks here, or describe the key logic changes in 3–5 sentences.
@@ -80,11 +125,17 @@ changed files and directly related code before deciding the review is complete.>
 **Scope:** You review and patch implementation code only. Do not expand scope beyond what
 the ticket outcome describes.
 
-**Hard write boundary:** Never modify files under `docs/product/delivery/**`. If you find
-an issue there, report it under **Findings for human review** only. This includes ticket
-docs, implementation plans, handoffs, review artifacts, and `## Rationale` sections. Those
-files are primary-agent delivery artifacts and historical workflow evidence, not subagent
-patch surface.
+**Hard write boundary:** Do not patch files under `docs/product/delivery/**`. This
+includes ticket docs, implementation plans, handoffs, review artifacts, and
+`## Rationale` sections. Those files are primary-agent delivery artifacts and historical
+workflow evidence, not subagent patch surface.
+
+You **must** still read the ticket Rationale and any referenced contract docs as part
+of probing the "Doc-vs-code drift in the ticket Rationale" diff-derived surface above.
+If you find drift — the Rationale claims a behavior the diff does not implement, or the
+diff implements behavior the Rationale does not describe — surface it under **Findings
+for human review** with the specific file, the conflicting claim, and what the diff
+actually does. The primary agent decides whether to patch docs or code.
 
 **Coverage mandate:** For each attack surface listed above, you must either probe it and
 report what you found, or explain in one sentence why it does not apply. "I didn't check"
@@ -93,10 +144,19 @@ You may add extra attack surfaces when your independent repo read finds a plausi
 ticket-relevant failure path. Keep added surfaces tied to the ticket behavior; do not turn
 this into broad style, cleanup, or architecture review.
 
-**Patch discipline:** Patch only code that breaks a stated invariant or introduces a
-correctness gap you can demonstrate. Do not patch for style, preference, or hypothetical
-future requirements. If you notice something worth flagging but it is outside the invariant
-scope, put it in Findings for human review — do not patch it.
+**Patch discipline:** Patch only when one of the following holds:
+
+1. The code breaks a stated invariant.
+2. The code introduces a correctness gap you can demonstrate.
+3. **Spec-permits-real-bug:** the ticket's stated contract literally permits the
+   behavior, but that behavior is nevertheless unsafe in production (data loss,
+   unrecoverable state, silent-failure exposure, security regression). Patch
+   and explain in Findings which spec clause permitted the unsafe behavior so
+   the primary agent can decide whether to update the spec.
+
+Do not patch for style, preference, or hypothetical future requirements. If you notice
+something worth flagging but it is outside these three clauses, put it in Findings for
+human review — do not patch it.
 
 **Verification discipline:** Prefer scoped verification for the implementation/test files
 under review. If a full-repo check fails on pre-existing files or generated
@@ -116,15 +176,27 @@ After completing your review and any patches, report in this exact structure:
 For each invariant: `[held | broken | untested]` — one line explaining what you tried.
 
 **Surface results**
-For each attack surface: `[probed | skipped — <reason> | N/A — <reason>]`
+For each attack surface (both ticket-spec-derived and the seven diff-derived classes):
+`[probed | N/A — <reason> | blocked — missing-input]`
 If probed: what you tried and what you found (one to three sentences).
 
 **Patches applied**
 If none: "None."
-If any: for each patch — file, change summary, which invariant it fixes.
+If any: for each patch — file, change summary, which invariant or patch-discipline clause
+it fixes (invariant break, demonstrable correctness gap, or spec-permits-real-bug).
 
 **Findings for human review**
-Things you noticed that are outside invariant scope and were not patched. If none: "None."
+Things you noticed that are outside the three patch-discipline clauses and were not
+patched, including any doc-vs-code drift surfaced under the diff-derived "Doc-vs-code
+drift in the ticket Rationale" class. If none: "None."
+
+**Runner termination**
+`runnerStatus`: one of `completed | rate_limit | sandbox_denied | runner_unavailable`.
+`terminatedReason`: one short sentence explaining why this status was reported.
+
+`completed` means you finished the review per this template. The other three values are
+honest failure modes — the CLI refuses to record `outcome: clean` for any non-`completed`
+`terminatedReason`, so do not claim `completed` if you stopped early.
 ```
 
 ---

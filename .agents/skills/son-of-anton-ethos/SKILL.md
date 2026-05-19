@@ -90,20 +90,20 @@ Reset context (/clear), then resume with:
 
 **Role split:**
 
-- **Primary agent** executes and patches (build mode and post-verify).
-- **Review subagent** reviews and patches its own findings autonomously — a second AI pass before the PR is published. The primary agent does not triage subagent output; the subagent acts on what it finds.
+- **Primary agent** executes and patches (build mode and post-verify), and also applies patches for findings the review subagent returns. Patches applied in response to subagent findings are committed by the primary agent with a `[subagent-review]` subject suffix.
+- **Review subagent** is an advisory runner — a second AI pass before the PR is published. It reports findings (broken invariants, probed surfaces, demonstrable correctness gaps, spec-permits-real-bug cases, and doc-vs-code drift surfaced under Findings for human review). It does not own patch application; the primary agent decides what to patch and commits it. Exactly one `subagent-review` invocation per ticket via programmatic subprocess; repeat invocations against the same HEAD are no-op recorders.
 - **External AI vendors** (e.g. CodeRabbit, Qodo) review post-publication via `poll-review`.
 
 **When `subagentReview` is `"required"`:**
 
-1. **Read `docs/template/delivery/adversarial-review-template.md`.** Fill in the template from the current diff and ticket spec — invariants, attack surfaces, diff context. This takes real work; do not skip it or pass a vague prompt. The filled template becomes the subagent's complete prompt.
-2. Invoke the review subagent via the Agent tool. Pass the completed template as the prompt. Use a different model family from the primary agent when available (cross-model review breaks shared blind spots). Same-type is acceptable when cross-model is unavailable.
-3. **Stay idle. No read-ahead.** Wait for the subagent to complete before doing anything else — same discipline as the external review window.
-4. Record: `bun run deliver --plan <plan> subagent-review [clean|patched]`
+1. **Read `docs/template/delivery/adversarial-review-template.md`.** Fill in the template from the current diff and ticket spec — invariants, attack surfaces (including the seven diff-derived classes), diff context. This takes real work; do not skip it or pass a vague prompt. The filled template becomes the subagent's complete prompt.
+2. Invoke the review subagent **exactly once per ticket** via programmatic subprocess by passing `--preferred-runner <claude-cli|codex-exec>` to `subagent-review`. The CLI tries the preferred runner first, falls back to the other, and records an honest `skipped` artifact if neither is available. Use a different model family from the primary agent when available (cross-model review breaks shared blind spots).
+3. **Stay idle. No read-ahead.** Wait for the runner subprocess to exit before doing anything else — same discipline as the external review window.
+4. The runner returns findings. The **primary agent applies any resulting patches** and commits them with a `[subagent-review]` subject suffix. Then record: `bun run deliver --plan <plan> subagent-review [clean|patched] <sha...>`.
 
-The CLI is a state recorder only — never invoke the subagent from within the CLI.
+Without `--preferred-runner`, the CLI is a state recorder only and does not invoke a runner. With `--preferred-runner`, the CLI invokes the runner programmatically and writes the structured `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-runner.json`. The artifact carries the runner's `terminatedReason`; the CLI refuses to record `outcome: clean` for any non-`completed` terminatedReason.
 
-**Subagent scope contract:** The review subagent reviews and patches implementation code only. Ticket doc files under `docs/product/delivery/` — including `## Rationale` sections written during implementation — are part of the ticket deliverable and must not be reverted by the subagent. The template already encodes this constraint; do not remove it.
+**Subagent scope contract:** The review subagent reviews implementation code and reports findings; the primary agent applies any resulting patches. Ticket doc files under `docs/product/delivery/` — including `## Rationale` sections written during implementation — are part of the ticket deliverable and must not be patched by the subagent. The subagent must still read the Rationale and contract docs and surface doc-vs-code drift in **Findings for human review**; the primary agent decides whether to patch docs or code. The template already encodes these constraints; do not remove them.
 
 **When `subagentReview` is `"skip_doc_only"`** (repo default): code tickets still require the subagent step before `open-pr`; doc-only tickets auto-record `skipped`.
 

@@ -42,8 +42,8 @@ Scope: delivery
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: docs-only ticket — no Red step per the canonical template.
+Why this path: kept the seven diff-derived classes named one-per-numbered-block with the coverage-mandate output form repeated per class. Future subagents reading the template cold need each class to be its own probe target, not a comma-separated list embedded in prose. The scope-contract relax was rewritten in two paragraphs so the "do not patch / must still read" split is unambiguous, and the patch-discipline clause was rewritten as a numbered list so the new spec-permits-real-bug case is visually parallel with the existing two.
+Alternative considered: a single bullet list per class with one shared output-form footer at the bottom. Rejected — easy for a subagent to skip the footer when copying its report structure from the class definitions.
+Deferred: the recorder-mode CLI behavior (artifact-existence-at-HEAD idempotency, operator-supplied outcomes skipping subprocess invocation) and runner-termination honesty (CLI refuses `clean` for non-`completed` `terminatedReason`) ship in P11.03 and P11.04 respectively. The ethos doc references those contracts as the target state; the runner artifact already carries `terminatedReason` after P11.01.
+Contract note: ethos skill update touched `.agents/skills/son-of-anton-ethos/SKILL.md` (the actual source tracked in git). The ticket Outcome's "or the source under `docs/template/`" alternative path does not exist in this repo; `soa-sync.sh` reads from `.agents/skills/` directly.
