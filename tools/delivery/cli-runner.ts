@@ -634,7 +634,10 @@ export async function runDeliveryOrchestrator(
         }
 
         // Write runner artifact (append-only invocations[] per ticket).
-        const invocation = buildRunnerInvocation(usedRunner, headSha, outcome);
+        const invocation = buildRunnerInvocation(usedRunner, headSha, outcome, {
+          terminatedReason:
+            outcome === 'skipped' ? 'runner_unavailable' : 'completed',
+        });
         const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-runner.json`;
         const artifactAbsPath = resolve(cwd, artifactRelPath);
         appendInvocationToArtifact(

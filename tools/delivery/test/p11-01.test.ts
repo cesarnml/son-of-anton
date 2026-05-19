@@ -197,6 +197,20 @@ describe('P11.01 — readSubagentRunnerArtifact structured round-trip', () => {
   });
 });
 
+describe('P11.01 — buildRunnerInvocation skipped-outcome terminatedReason contract', () => {
+  it('defaults terminatedReason to completed for ran invocations', () => {
+    const inv = buildRunnerInvocation('claude-cli', 'sha', 'clean');
+    expect(inv.terminatedReason).toBe('completed');
+  });
+
+  it('requires explicit runner_unavailable for honest skipped invocations', () => {
+    const inv = buildRunnerInvocation('skipped', 'sha', 'skipped', {
+      terminatedReason: 'runner_unavailable',
+    });
+    expect(inv.terminatedReason).toBe('runner_unavailable');
+  });
+});
+
 describe('P11.01 — appendInvocationToArtifact', () => {
   it('creates a new structured artifact when the path does not exist', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-create-'));
