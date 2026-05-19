@@ -686,16 +686,25 @@ export async function runDeliveryOrchestrator(
         let terminatedReason: SubagentRunnerTerminatedReason =
           'runner_unavailable';
 
-        // Lightweight rate-limit / sandbox-denied signatures. Ambiguous runner
+        // Narrow rate-limit / sandbox-denied signatures. Ambiguous runner
         // output should surface honestly via terminatedReason — not as a clean
-        // outcome and not as a fallback trigger.
+        // outcome and not as a fallback trigger. Patterns are intentionally
+        // strict (anchored phrases / explicit error contexts) so legitimate
+        // review prose mentioning "rate limit" or "permission denied" does not
+        // get misclassified.
         const detectTerminatedReason = (
           stdout: string,
           stderr: string,
         ): SubagentRunnerTerminatedReason => {
           const blob = `${stdout}\n${stderr}`.toLowerCase();
-          if (/rate.?limit|429|quota exceeded/.test(blob)) return 'rate_limit';
-          if (/sandbox.?(denied|blocked)|permission denied/.test(blob)) {
+          if (
+            /\brate[\s_-]?limit(ed|ing|s)?\b|\b429\s+(too\s+many|rate)|\bquota\s+exceeded\b/.test(
+              blob,
+            )
+          ) {
+            return 'rate_limit';
+          }
+          if (/\bsandbox[\s_-]?(denied|blocked|violation)\b/.test(blob)) {
             return 'sandbox_denied';
           }
           return 'completed';
@@ -715,11 +724,21 @@ export async function runDeliveryOrchestrator(
                 timeout: RUNNER_TIMEOUT_MS,
                 encoding: 'utf-8',
               });
+              // spawnSync does NOT throw on ENOENT; it sets `spawned.error`
+              // with code 'ENOENT' and leaves status === null. Re-raise so
+              // tryRunner classifies it as `unavailable` and the loop falls
+              // back to the other runner. Timeouts ride a separate path below.
+              const spawnError = spawned.error as
+                | (Error & { code?: string })
+                | undefined;
+              if (spawnError && spawnError.code === 'ENOENT') {
+                throw spawnError;
+              }
               return {
                 exitCode: spawned.status,
                 timedOut:
                   spawned.signal === 'SIGTERM' ||
-                  spawned.error?.message?.includes('timed out') ||
+                  spawnError?.message?.includes('timed out') ||
                   false,
                 terminatedReason: detectTerminatedReason(
                   spawned.stdout ?? '',
