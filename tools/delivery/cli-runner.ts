@@ -570,6 +570,20 @@ export async function runDeliveryOrchestrator(
                   'Subagent review',
                 )
               : undefined;
+
+          // Validate state transition before touching the artifact so a failed
+          // record does not leave a dangling invocation on disk.
+          const nextState = recordSubagentReview(
+            state,
+            dispatch.outcome,
+            isDocOnly,
+            policy,
+            recorderPatchCommits,
+            undefined,
+            subagentTarget.id,
+            artifactRelPath,
+          );
+
           const recorderInvocation = buildRunnerInvocation(
             'operator-recorder',
             dispatch.reviewedHeadSha,
@@ -583,17 +597,6 @@ export async function runDeliveryOrchestrator(
             artifactAbsPath,
             subagentTarget.id,
             recorderInvocation,
-          );
-
-          const nextState = recordSubagentReview(
-            state,
-            dispatch.outcome,
-            isDocOnly,
-            policy,
-            recorderPatchCommits,
-            undefined,
-            subagentTarget.id,
-            artifactRelPath,
           );
           commitDeliveryArtifactAndPush({
             absolutePath: artifactAbsPath,
