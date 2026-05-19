@@ -9,9 +9,7 @@
       "terminatedReason": "completed",
       "findings": [],
       "probedSurfaces": [],
-      "patches": [
-        "72330b4"
-      ]
+      "patches": ["72330b4"]
     }
   ]
 }
