@@ -8,6 +8,7 @@ import {
   appendInvocationToArtifact,
   buildRunnerInvocation,
   readSubagentRunnerArtifact,
+  validateRunnerArtifact,
 } from '../subagent-runner';
 import type {
   SubagentRunnerArtifact,
@@ -91,6 +92,69 @@ describe('P11.01 — readSubagentRunnerArtifact legacy adapter', () => {
     } finally {
       await rm(tempDir, { recursive: true });
     }
+  });
+
+  it('reports a clear legacy field error when runnerKind is the wrong type', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-wrong-kind-'));
+    try {
+      const path = join(tempDir, 'bad.json');
+      await writeFile(
+        path,
+        JSON.stringify({
+          runnerKind: 123,
+          reviewedHeadSha: 'abc',
+          outcome: 'clean',
+          completedAt: '2026-05-18T15:29:44.213Z',
+        }),
+      );
+      expect(() => readSubagentRunnerArtifact(path, 'P9.99')).toThrow(
+        /runnerKind/,
+      );
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+});
+
+describe('P11.01 — validateRunnerArtifact rejects coerced array entries', () => {
+  it('rejects an invocation whose findings array contains non-string entries', () => {
+    expect(
+      validateRunnerArtifact({
+        ticket: 'P11.99',
+        invocations: [
+          {
+            runnerKind: 'claude-cli',
+            reviewedHeadSha: 'sha',
+            outcome: 'clean',
+            completedAt: '2026-05-19T00:00:00.000Z',
+            terminatedReason: 'completed',
+            findings: [1],
+            probedSurfaces: [],
+            patches: [],
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects an invocation whose probedSurfaces array contains objects', () => {
+    expect(
+      validateRunnerArtifact({
+        ticket: 'P11.99',
+        invocations: [
+          {
+            runnerKind: 'claude-cli',
+            reviewedHeadSha: 'sha',
+            outcome: 'clean',
+            completedAt: '2026-05-19T00:00:00.000Z',
+            terminatedReason: 'completed',
+            findings: [],
+            probedSurfaces: [{ a: 1 }],
+            patches: [],
+          },
+        ],
+      }),
+    ).toBeNull();
   });
 });
 

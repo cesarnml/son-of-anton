@@ -181,9 +181,12 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
   ) {
     return null;
   }
-  if (!Array.isArray(obj['findings'])) return null;
-  if (!Array.isArray(obj['probedSurfaces'])) return null;
-  if (!Array.isArray(obj['patches'])) return null;
+  const findings = validateStringArray(obj['findings']);
+  if (findings === null) return null;
+  const probedSurfaces = validateStringArray(obj['probedSurfaces']);
+  if (probedSurfaces === null) return null;
+  const patches = validateStringArray(obj['patches']);
+  if (patches === null) return null;
 
   return {
     runnerKind: obj['runnerKind'] as SubagentRunnerKind,
@@ -191,10 +194,18 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
     outcome: obj['outcome'] as SubagentRunnerOutcome,
     completedAt: obj['completedAt'] as string,
     terminatedReason: obj['terminatedReason'] as SubagentRunnerTerminatedReason,
-    findings: (obj['findings'] as unknown[]).map(String),
-    probedSurfaces: (obj['probedSurfaces'] as unknown[]).map(String),
-    patches: (obj['patches'] as unknown[]).map(String),
+    findings,
+    probedSurfaces,
+    patches,
   };
+}
+
+function validateStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  for (const entry of value) {
+    if (typeof entry !== 'string') return null;
+  }
+  return value as string[];
 }
 
 export function validateRunnerArtifact(
@@ -220,11 +231,7 @@ export function validateRunnerArtifact(
 function isLegacyShape(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-  return (
-    typeof obj['runnerKind'] === 'string' &&
-    !('invocations' in obj) &&
-    !('ticket' in obj)
-  );
+  return !('invocations' in obj) && !('ticket' in obj) && 'runnerKind' in obj;
 }
 
 function liftLegacyArtifact(
