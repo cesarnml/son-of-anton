@@ -558,11 +558,26 @@ export async function runDeliveryOrchestrator(
         );
 
         if (dispatch.kind === 'recorder') {
+          const recorderPatchCommits =
+            dispatch.outcome === 'patched'
+              ? resolveInternalReviewPatchCommits(
+                  subagentTarget.worktreePath,
+                  context,
+                  subagentArgs.patchCommitArgs.length > 0
+                    ? subagentArgs.patchCommitArgs
+                    : [dispatch.reviewedHeadSha],
+                  '[subagent-review]',
+                  'Subagent review',
+                )
+              : undefined;
           const recorderInvocation = buildRunnerInvocation(
             'operator-recorder',
             dispatch.reviewedHeadSha,
             dispatch.outcome,
-            { terminatedReason: 'completed' },
+            {
+              terminatedReason: 'completed',
+              patches: recorderPatchCommits?.map((c) => c.sha) ?? [],
+            },
           );
           appendInvocationToArtifact(
             artifactAbsPath,
@@ -575,7 +590,7 @@ export async function runDeliveryOrchestrator(
             dispatch.outcome,
             isDocOnly,
             policy,
-            undefined,
+            recorderPatchCommits,
             undefined,
             subagentTarget.id,
             artifactRelPath,

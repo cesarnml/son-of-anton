@@ -307,6 +307,7 @@ export type ParsedSubagentReviewArgs = {
   ticketId?: string;
   outcome?: 'clean' | 'patched';
   reviewedHeadSha?: string;
+  patchCommitArgs: string[];
   force: boolean;
 };
 
@@ -336,16 +337,22 @@ export function parseSubagentReviewArgs(
     const sha = positionals[cursor];
     if (sha === undefined || sha.trim() === '') {
       throw new Error(
-        'subagent-review recorder mode requires a HEAD SHA after the outcome: `subagent-review [ticket-id] <clean|patched> <sha>`.',
+        'subagent-review recorder mode requires a HEAD SHA after the outcome: `subagent-review [ticket-id] <clean|patched> <sha> [patch-commit-sha ...]`.',
       );
     }
     reviewedHeadSha = sha;
     cursor += 1;
   }
 
-  if (positionals[cursor] !== undefined) {
+  const patchCommitArgs = positionals.slice(cursor);
+  if (!outcome && patchCommitArgs.length > 0) {
     throw new Error(
-      `Unexpected positional argument: \`${positionals[cursor]}\`. Usage: \`subagent-review [ticket-id] [clean|patched <sha>] [--force]\`.`,
+      `Unexpected positional argument: \`${patchCommitArgs[0]}\`. Usage: \`subagent-review [ticket-id] [clean|patched <sha> [patch-commit-sha ...]] [--force]\`.`,
+    );
+  }
+  if (outcome === 'clean' && patchCommitArgs.length > 0) {
+    throw new Error(
+      'subagent-review patch commits are only allowed when outcome is `patched`.',
     );
   }
 
@@ -353,6 +360,7 @@ export function parseSubagentReviewArgs(
     ticketId,
     outcome,
     reviewedHeadSha,
+    patchCommitArgs,
     force: flags.has('force'),
   };
 }

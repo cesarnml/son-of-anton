@@ -63,13 +63,23 @@ describe('P11.03 — parseSubagentReviewArgs', () => {
     );
   });
 
-  it('rejects trailing positionals after recorder mode args', () => {
+  it('rejects patch-commit trailing positionals when outcome is clean', () => {
     expect(() =>
       parseSubagentReviewArgs(
-        ['P11.03', 'clean', 'abc123', 'extra'],
+        ['P11.03', 'clean', 'abc123', 'patch1'],
         new Set(),
       ),
-    ).toThrow(/Unexpected positional/);
+    ).toThrow(/only allowed when outcome is `patched`/);
+  });
+
+  it('accepts patch-commit trailing positionals when outcome is patched', () => {
+    const parsed = parseSubagentReviewArgs(
+      ['P11.03', 'patched', 'abc123', 'patch1', 'patch2'],
+      new Set(),
+    );
+    expect(parsed.outcome).toBe('patched');
+    expect(parsed.reviewedHeadSha).toBe('abc123');
+    expect(parsed.patchCommitArgs).toEqual(['patch1', 'patch2']);
   });
 });
 
