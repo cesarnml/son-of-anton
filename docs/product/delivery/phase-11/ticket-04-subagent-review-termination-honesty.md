@@ -41,8 +41,16 @@ Scope: delivery
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: the four invariants in `tools/delivery/test/p11-04.test.ts` — porcelain ordering, terminatedReason-blocks-clean, ambiguous-output-no-fallback, unavailable-does-fallback. They failed at the suite level because the helper functions (`decideSubagentOutcomeFromRunner`, `shouldFallbackToOtherRunner`) and the extended `SpawnResult` / `RunnerAttemptResult` carrying `terminatedReason` did not exist yet.
+
+Why this path: the smallest acceptable change extended `SpawnResult` with an optional `terminatedReason`, lifted it onto the `ran` variant of `RunnerAttemptResult`, and split the two policy decisions (honesty guard, fallback predicate) into pure helpers consumed by the CLI loop. The CLI now (a) detects rate-limit / sandbox-denied signatures in stdout/stderr at the spawn closure, (b) carries that reason through `tryRunner`, (c) overrides `outcome: 'clean'` to `'skipped'` when termination was not `completed`, and (d) only falls back on `unavailable | timeout`. `spawnSync` is already synchronous, so the porcelain sample is post-exit by construction; the test pins that contract.
+
+Sentinel choice for non-completed terminations: override `clean` → `'skipped'` (already in the `SubagentRunnerOutcome` union) and carry the honest `terminatedReason` on the invocation record. This avoids inventing a fourth outcome value, keeps downstream consumers exhaustive over `clean | patched | skipped`, and still distinguishes the failure mode through `terminatedReason`. `patched` is preserved when termination was not completed because the runner's writes are already on disk.
+
+Alternative considered: introducing a fourth outcome literal `'incomplete'`. Rejected because every artifact validator and policy site already pattern-matches `clean | patched | skipped`, and `'skipped'` + a non-completed `terminatedReason` already encode "the runner did not review the diff" honestly.
+
+Deferred: deeper rate-limit / sandbox-denial detection (e.g., structured error envelopes from the runner binaries) is out of scope. The substring detection runs at the spawn closure and is intentionally lightweight; richer detection can be added without changing the helper contract.
+
+`--force` interaction (Review Focus item): `--force` from P11.03 controls idempotency inside `decideSubagentReviewMode`. It does not touch the termination-honesty guard or the fallback predicate, so it cannot be used to record a dishonest `clean` from a non-completed runner.
+
+Contract note: no deviation from `Type: fix` / `Scope: delivery`.

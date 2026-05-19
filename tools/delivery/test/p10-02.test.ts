@@ -117,7 +117,11 @@ describe('P10.02 — tryRunner fallback behavior', () => {
       () => ({ exitCode: 0, timedOut: false }),
       () => true,
     );
-    expect(second).toEqual({ status: 'ran', outcome: 'patched' });
+    expect(second).toEqual({
+      status: 'ran',
+      outcome: 'patched',
+      terminatedReason: 'completed',
+    });
   });
 
   it('both runners unavailable → honest skip', () => {

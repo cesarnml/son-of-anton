@@ -119,12 +119,15 @@ import {
   appendInvocationToArtifact,
   buildSubagentReviewPrompt,
   buildRunnerInvocation,
+  decideSubagentOutcomeFromRunner,
   decideSubagentReviewMode,
   findDeliveryDocPaths,
   parseSubagentReviewArgs,
   readSubagentRunnerArtifact,
+  shouldFallbackToOtherRunner,
   tryReadSubagentRunnerArtifact,
   tryRunner,
+  type SubagentRunnerTerminatedReason,
 } from './subagent-runner';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
@@ -680,6 +683,23 @@ export async function runDeliveryOrchestrator(
 
         let outcome: 'clean' | 'patched' | 'skipped' = 'skipped';
         let usedRunner: 'claude-cli' | 'codex-exec' | 'skipped' = 'skipped';
+        let terminatedReason: SubagentRunnerTerminatedReason =
+          'runner_unavailable';
+
+        // Lightweight rate-limit / sandbox-denied signatures. Ambiguous runner
+        // output should surface honestly via terminatedReason — not as a clean
+        // outcome and not as a fallback trigger.
+        const detectTerminatedReason = (
+          stdout: string,
+          stderr: string,
+        ): SubagentRunnerTerminatedReason => {
+          const blob = `${stdout}\n${stderr}`.toLowerCase();
+          if (/rate.?limit|429|quota exceeded/.test(blob)) return 'rate_limit';
+          if (/sandbox.?(denied|blocked)|permission denied/.test(blob)) {
+            return 'sandbox_denied';
+          }
+          return 'completed';
+        };
 
         for (const runner of runnerOrder) {
           const runnerHeadBefore = readHeadSha();
@@ -701,6 +721,10 @@ export async function runDeliveryOrchestrator(
                   spawned.signal === 'SIGTERM' ||
                   spawned.error?.message?.includes('timed out') ||
                   false,
+                terminatedReason: detectTerminatedReason(
+                  spawned.stdout ?? '',
+                  spawned.stderr ?? '',
+                ),
               };
             },
             () => {
@@ -726,8 +750,17 @@ export async function runDeliveryOrchestrator(
               );
             }
 
-            outcome = result.outcome;
+            const decided = decideSubagentOutcomeFromRunner(result);
+            outcome = decided.outcome;
+            terminatedReason = decided.terminatedReason;
             usedRunner = runner;
+            break;
+          }
+
+          if (!shouldFallbackToOtherRunner(result)) {
+            // Defensive: tryRunner only emits ran|unavailable|timeout today,
+            // so this branch is unreachable. Keep it as a guard rail so future
+            // result kinds do not silently fall through into the fallback loop.
             break;
           }
 
@@ -738,8 +771,7 @@ export async function runDeliveryOrchestrator(
 
         // Write runner artifact (append-only invocations[] per ticket).
         const invocation = buildRunnerInvocation(usedRunner, headSha, outcome, {
-          terminatedReason:
-            outcome === 'skipped' ? 'runner_unavailable' : 'completed',
+          terminatedReason,
         });
         appendInvocationToArtifact(
           artifactAbsPath,

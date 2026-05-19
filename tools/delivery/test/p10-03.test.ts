@@ -87,7 +87,11 @@ describe('P10.03 — tryRunner: outcome detection is runner-agnostic', () => {
       () => ({ exitCode: 0, timedOut: false }),
       () => false,
     );
-    expect(result).toEqual({ status: 'ran', outcome: 'clean' });
+    expect(result).toEqual({
+      status: 'ran',
+      outcome: 'clean',
+      terminatedReason: 'completed',
+    });
   });
 
   it('returns ran+patched for codex-exec style invocation with changes', () => {
@@ -95,7 +99,11 @@ describe('P10.03 — tryRunner: outcome detection is runner-agnostic', () => {
       () => ({ exitCode: 0, timedOut: false }),
       () => true,
     );
-    expect(result).toEqual({ status: 'ran', outcome: 'patched' });
+    expect(result).toEqual({
+      status: 'ran',
+      outcome: 'patched',
+      terminatedReason: 'completed',
+    });
   });
 
   it('returns unavailable for codex-exec style when spawn fails', () => {

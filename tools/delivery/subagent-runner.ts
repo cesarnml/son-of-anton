@@ -34,10 +34,20 @@ export type SubagentRunnerArtifact = {
 export type SpawnResult = {
   exitCode: number | null;
   timedOut: boolean;
+  /**
+   * Optional honest termination reason flagged by the spawn closure (e.g. a
+   * rate-limit signature detected in stdout despite exit code 0). When omitted,
+   * tryRunner defaults to `'completed'`.
+   */
+  terminatedReason?: SubagentRunnerTerminatedReason;
 };
 
 export type RunnerAttemptResult =
-  | { status: 'ran'; outcome: 'clean' | 'patched' }
+  | {
+      status: 'ran';
+      outcome: 'clean' | 'patched';
+      terminatedReason: SubagentRunnerTerminatedReason;
+    }
   | { status: 'unavailable' }
   | { status: 'timeout' };
 
@@ -97,6 +107,8 @@ export function tryRunner(
 ): RunnerAttemptResult {
   let result: SpawnResult;
   try {
+    // Synchronous spawn — checkHasChanges below is guaranteed post-exit so the
+    // porcelain sample never races a runner that finishes its writes at exit.
     result = spawnProcess();
   } catch {
     return { status: 'unavailable' };
@@ -105,7 +117,42 @@ export function tryRunner(
   if (result.timedOut) return { status: 'timeout' };
 
   const hasChanges = checkHasChanges();
-  return { status: 'ran', outcome: hasChanges ? 'patched' : 'clean' };
+  return {
+    status: 'ran',
+    outcome: hasChanges ? 'patched' : 'clean',
+    terminatedReason: result.terminatedReason ?? 'completed',
+  };
+}
+
+/**
+ * The narrow set of runner-attempt outcomes that justify falling back to the
+ * other runner. Binary-availability failures and timeouts only — never
+ * ambiguous output (rate_limit, sandbox_denied, exit-code-0-with-no-work),
+ * which should surface honestly through terminatedReason instead.
+ */
+export function shouldFallbackToOtherRunner(
+  result: RunnerAttemptResult,
+): boolean {
+  return result.status === 'unavailable' || result.status === 'timeout';
+}
+
+/**
+ * Honesty guard: a runner that did not actually complete cannot record
+ * outcome=clean. The clean state asserts "the runner reviewed the diff and
+ * found nothing"; a rate_limit/sandbox_denied termination did not review the
+ * diff. Override clean → skipped in that case. Patched is preserved because it
+ * reflects real writes already on disk.
+ */
+export function decideSubagentOutcomeFromRunner(
+  result: Extract<RunnerAttemptResult, { status: 'ran' }>,
+): {
+  outcome: SubagentRunnerOutcome;
+  terminatedReason: SubagentRunnerTerminatedReason;
+} {
+  if (result.terminatedReason !== 'completed' && result.outcome === 'clean') {
+    return { outcome: 'skipped', terminatedReason: result.terminatedReason };
+  }
+  return { outcome: result.outcome, terminatedReason: result.terminatedReason };
 }
 
 const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [

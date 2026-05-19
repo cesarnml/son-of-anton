@@ -192,7 +192,11 @@ describe('P10.01 — tryRunner', () => {
       () => ({ exitCode: 0, timedOut: false }),
       () => false,
     );
-    expect(result).toEqual({ status: 'ran', outcome: 'clean' });
+    expect(result).toEqual({
+      status: 'ran',
+      outcome: 'clean',
+      terminatedReason: 'completed',
+    });
   });
 
   it('returns ran+patched when spawn succeeds and changes detected', () => {
@@ -200,7 +204,11 @@ describe('P10.01 — tryRunner', () => {
       () => ({ exitCode: 0, timedOut: false }),
       () => true,
     );
-    expect(result).toEqual({ status: 'ran', outcome: 'patched' });
+    expect(result).toEqual({
+      status: 'ran',
+      outcome: 'patched',
+      terminatedReason: 'completed',
+    });
   });
 
   it('returns unavailable when spawn throws', () => {
