@@ -119,8 +119,11 @@ import {
   appendInvocationToArtifact,
   buildSubagentReviewPrompt,
   buildRunnerInvocation,
+  decideSubagentReviewMode,
   findDeliveryDocPaths,
+  parseSubagentReviewArgs,
   readSubagentRunnerArtifact,
+  tryReadSubagentRunnerArtifact,
   tryRunner,
 } from './subagent-runner';
 
@@ -483,7 +486,11 @@ export async function runDeliveryOrchestrator(
         return 0;
       }
       case 'subagent-review': {
-        const subagentTicketId = parsed.positionals[0];
+        const subagentArgs = parseSubagentReviewArgs(
+          parsed.positionals,
+          parsed.flags,
+        );
+        const subagentTicketId = subagentArgs.ticketId;
         const subagentTarget =
           (subagentTicketId
             ? state.tickets.find((t) => t.id === subagentTicketId)
@@ -518,6 +525,84 @@ export async function runDeliveryOrchestrator(
           console.log('Doc-only ticket — subagent review auto-skipped.');
           await saveState(cwd, nextState);
           console.log(formatStatus(nextState, context.config));
+          return 0;
+        }
+
+        const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-runner.json`;
+        const artifactAbsPath = resolve(cwd, artifactRelPath);
+
+        // Resolve current HEAD for both recorder and idempotency dispatch.
+        const readHeadShaForDispatch = () => {
+          try {
+            return spawnSync('git', ['rev-parse', 'HEAD'], {
+              cwd: subagentTarget.worktreePath,
+              encoding: 'utf-8',
+            }).stdout.trim();
+          } catch {
+            return '';
+          }
+        };
+        const existingArtifact = tryReadSubagentRunnerArtifact(
+          artifactAbsPath,
+          subagentTarget.id,
+        );
+        const dispatchHeadSha = readHeadShaForDispatch();
+        const dispatch = decideSubagentReviewMode(
+          {
+            outcome: subagentArgs.outcome,
+            reviewedHeadSha: subagentArgs.reviewedHeadSha,
+            force: subagentArgs.force,
+          },
+          existingArtifact,
+          dispatchHeadSha,
+        );
+
+        if (dispatch.kind === 'recorder') {
+          const recorderInvocation = buildRunnerInvocation(
+            'operator-recorder',
+            dispatch.reviewedHeadSha,
+            dispatch.outcome,
+            { terminatedReason: 'completed' },
+          );
+          appendInvocationToArtifact(
+            artifactAbsPath,
+            subagentTarget.id,
+            recorderInvocation,
+          );
+
+          const nextState = recordSubagentReview(
+            state,
+            dispatch.outcome,
+            isDocOnly,
+            policy,
+            undefined,
+            undefined,
+            subagentTarget.id,
+            artifactRelPath,
+          );
+          commitDeliveryArtifactAndPush({
+            absolutePath: artifactAbsPath,
+            branch: subagentTarget.branch,
+            commitMessage: `chore(${subagentTarget.id}): record subagent-review runner artifact`,
+            ensureBranchPushed: context.platform.ensureBranchPushed,
+            relativeToRepo,
+            repoRoot: cwd,
+            runProcess: context.platform.runProcess,
+          });
+
+          console.log(
+            `Recorded operator-recorder invocation (outcome=${dispatch.outcome}, sha=${dispatch.reviewedHeadSha}). No runner subprocess invoked.`,
+          );
+          await saveState(cwd, nextState);
+          console.log(formatStatus(nextState, context.config));
+          return 0;
+        }
+
+        if (dispatch.kind === 'no-op') {
+          console.log(
+            `No-op: artifact already contains a valid invocation for HEAD ${dispatch.reviewedHeadSha}. Pass --force to re-run the runner.`,
+          );
+          console.log(formatStatus(state, context.config));
           return 0;
         }
 
@@ -638,8 +723,6 @@ export async function runDeliveryOrchestrator(
           terminatedReason:
             outcome === 'skipped' ? 'runner_unavailable' : 'completed',
         });
-        const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-runner.json`;
-        const artifactAbsPath = resolve(cwd, artifactRelPath);
         appendInvocationToArtifact(
           artifactAbsPath,
           subagentTarget.id,

@@ -104,7 +104,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  start [ticket-id]',
     '  post-red [ticket-id] [--red-commit-sha <sha>]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
-    '  subagent-review [ticket-id] [--preferred-runner <claude-cli|codex-exec>]',
+    '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]',
     '  open-pr [ticket-id]',
     '  poll-review [ticket-id]',
     '  triage-ticket <ticket-id>',

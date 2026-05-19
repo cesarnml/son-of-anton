@@ -42,8 +42,16 @@ Scope: delivery
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `parseSubagentReviewArgs` import failed at module load — the helper did not exist, so all 12 P11.03 tests aborted before running.
+
+Why this path: extracted `parseSubagentReviewArgs` and `decideSubagentReviewMode` as pure functions in `subagent-runner.ts` and threaded them through the existing `subagent-review` CLI case in `cli-runner.ts`. This keeps the dispatch logic unit-testable without refactoring the whole subagent-review case, and lets recorder/no-op short-circuit cleanly before the runner-invocation loop.
+
+Alternative considered: a full handler extraction (`runSubagentReviewCommandCore` with an injectable `runRunner` dep) was rejected — it would have pulled the multi-runner fallback, delivery-doc-write-boundary check, and artifact commit logic into a fresh function for the benefit of one extra integration test. The pure-function decision helper already proves the runner branch is not taken in recorder/no-op modes, which is the contract the ticket tests.
+
+Deferred: `--force` is intentionally scoped to skip _only_ the artifact-existence-at-HEAD idempotency check; future safety checks (e.g. those landed by P11.04 termination honesty) are not bypassed by `--force` here.
+
+Idempotency filter: matching invocations must have `outcome !== 'skipped'`. A skipped invocation at the current HEAD means no real review happened (runner unavailable / sandbox denied), so re-running is allowed without `--force`.
+
+HEAD detection edge case (product plan risk #3): primary-agent commits between subagent run and artifact write would shift HEAD. We read HEAD at dispatch time from `git rev-parse HEAD` in the ticket worktree; the recorded `reviewedHeadSha` reflects the SHA at the moment the recorder/runner was invoked, not the SHA at artifact write. Re-runs after follow-up patches see a new HEAD and re-invoke the runner; the `--force` flag covers the rare case where HEAD has not moved but the operator wants a fresh run.
+
+Contract note: none. `Type: feat`, `Scope: delivery` matched the template.

@@ -3,7 +3,11 @@ import { dirname } from 'node:path';
 
 export type SubagentRunnerOutcome = 'clean' | 'patched' | 'skipped';
 
-export type SubagentRunnerKind = 'claude-cli' | 'codex-exec' | 'skipped';
+export type SubagentRunnerKind =
+  | 'claude-cli'
+  | 'codex-exec'
+  | 'skipped'
+  | 'operator-recorder';
 
 export type SubagentRunnerTerminatedReason =
   | 'completed'
@@ -108,6 +112,7 @@ const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [
   'claude-cli',
   'codex-exec',
   'skipped',
+  'operator-recorder',
 ];
 const VALID_OUTCOMES: SubagentRunnerOutcome[] = ['clean', 'patched', 'skipped'];
 const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
@@ -296,6 +301,109 @@ export function readSubagentRunnerArtifact(
     );
   }
   return validated;
+}
+
+export type ParsedSubagentReviewArgs = {
+  ticketId?: string;
+  outcome?: 'clean' | 'patched';
+  reviewedHeadSha?: string;
+  force: boolean;
+};
+
+export function parseSubagentReviewArgs(
+  positionals: string[],
+  flags: Set<string>,
+): ParsedSubagentReviewArgs {
+  const isOutcome = (value: string | undefined): value is 'clean' | 'patched' =>
+    value === 'clean' || value === 'patched';
+
+  let cursor = 0;
+  let ticketId: string | undefined;
+
+  if (positionals[cursor] !== undefined && !isOutcome(positionals[cursor])) {
+    ticketId = positionals[cursor];
+    cursor += 1;
+  }
+
+  let outcome: 'clean' | 'patched' | undefined;
+  if (isOutcome(positionals[cursor])) {
+    outcome = positionals[cursor] as 'clean' | 'patched';
+    cursor += 1;
+  }
+
+  let reviewedHeadSha: string | undefined;
+  if (outcome) {
+    const sha = positionals[cursor];
+    if (sha === undefined || sha.trim() === '') {
+      throw new Error(
+        'subagent-review recorder mode requires a HEAD SHA after the outcome: `subagent-review [ticket-id] <clean|patched> <sha>`.',
+      );
+    }
+    reviewedHeadSha = sha;
+  }
+
+  return {
+    ticketId,
+    outcome,
+    reviewedHeadSha,
+    force: flags.has('force'),
+  };
+}
+
+export type SubagentReviewModeDecision =
+  | {
+      kind: 'recorder';
+      reviewedHeadSha: string;
+      outcome: 'clean' | 'patched';
+    }
+  | {
+      kind: 'no-op';
+      reviewedHeadSha: string;
+      existingInvocationIndex: number;
+    }
+  | { kind: 'invoke-runner' };
+
+export function decideSubagentReviewMode(
+  args: {
+    outcome?: 'clean' | 'patched';
+    reviewedHeadSha?: string;
+    force: boolean;
+  },
+  artifact: SubagentRunnerArtifact | null,
+  currentHeadSha: string,
+): SubagentReviewModeDecision {
+  if (args.outcome && args.reviewedHeadSha) {
+    return {
+      kind: 'recorder',
+      reviewedHeadSha: args.reviewedHeadSha,
+      outcome: args.outcome,
+    };
+  }
+
+  if (!args.force && artifact && currentHeadSha) {
+    const idx = artifact.invocations.findIndex(
+      (invocation) =>
+        invocation.reviewedHeadSha === currentHeadSha &&
+        invocation.outcome !== 'skipped',
+    );
+    if (idx >= 0) {
+      return {
+        kind: 'no-op',
+        reviewedHeadSha: currentHeadSha,
+        existingInvocationIndex: idx,
+      };
+    }
+  }
+
+  return { kind: 'invoke-runner' };
+}
+
+export function tryReadSubagentRunnerArtifact(
+  path: string,
+  ticket: string,
+): SubagentRunnerArtifact | null {
+  if (!existsSync(path)) return null;
+  return readSubagentRunnerArtifact(path, ticket);
 }
 
 export function appendInvocationToArtifact(

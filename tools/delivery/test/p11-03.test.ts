@@ -189,14 +189,14 @@ describe('P11.03 — operator-recorder invocation writes through buildRunnerInvo
               terminatedReason: 'completed',
               findings: [],
               probedSurfaces: [],
-              patches: ['deadbee'],
+              patches: ['cafef00'],
             },
           ],
         }),
       );
       const artifact = readSubagentRunnerArtifact(path, 'P11.03');
       expect(artifact.invocations[0]!.runnerKind).toBe('operator-recorder');
-      expect(artifact.invocations[0]!.patches).toEqual(['deadbee']);
+      expect(artifact.invocations[0]!.patches).toEqual(['cafef00']);
     } finally {
       await rm(tempDir, { recursive: true });
     }
