@@ -1,10 +1,30 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
 export type SubagentRunnerOutcome = 'clean' | 'patched' | 'skipped';
 
-export type SubagentRunnerArtifact = {
-  runnerKind: 'claude-cli' | 'codex-exec' | 'skipped';
+export type SubagentRunnerKind = 'claude-cli' | 'codex-exec' | 'skipped';
+
+export type SubagentRunnerTerminatedReason =
+  | 'completed'
+  | 'rate_limit'
+  | 'sandbox_denied'
+  | 'runner_unavailable';
+
+export type SubagentRunnerInvocation = {
+  runnerKind: SubagentRunnerKind;
   reviewedHeadSha: string;
   outcome: SubagentRunnerOutcome;
   completedAt: string;
+  terminatedReason: SubagentRunnerTerminatedReason;
+  findings: string[];
+  probedSurfaces: string[];
+  patches: string[];
+};
+
+export type SubagentRunnerArtifact = {
+  ticket: string;
+  invocations: SubagentRunnerInvocation[];
 };
 
 export type SpawnResult = {
@@ -84,31 +104,54 @@ export function tryRunner(
   return { status: 'ran', outcome: hasChanges ? 'patched' : 'clean' };
 }
 
-export function buildRunnerArtifact(
-  runnerKind: SubagentRunnerArtifact['runnerKind'],
-  reviewedHeadSha: string,
-  outcome: SubagentRunnerOutcome,
-): SubagentRunnerArtifact {
-  return {
-    runnerKind,
-    reviewedHeadSha,
-    outcome,
-    completedAt: new Date().toISOString(),
-  };
-}
-
-const VALID_RUNNER_KINDS: SubagentRunnerArtifact['runnerKind'][] = [
+const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [
   'claude-cli',
   'codex-exec',
   'skipped',
 ];
 const VALID_OUTCOMES: SubagentRunnerOutcome[] = ['clean', 'patched', 'skipped'];
+const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
+  'completed',
+  'rate_limit',
+  'sandbox_denied',
+  'runner_unavailable',
+];
 
-export function validateRunnerArtifact(
-  value: unknown,
-): SubagentRunnerArtifact | null {
+export type BuildRunnerInvocationOptions = {
+  terminatedReason?: SubagentRunnerTerminatedReason;
+  findings?: string[];
+  probedSurfaces?: string[];
+  patches?: string[];
+  completedAt?: string;
+};
+
+export function buildRunnerInvocation(
+  runnerKind: SubagentRunnerKind,
+  reviewedHeadSha: string,
+  outcome: SubagentRunnerOutcome,
+  options: BuildRunnerInvocationOptions = {},
+): SubagentRunnerInvocation {
+  return {
+    runnerKind,
+    reviewedHeadSha,
+    outcome,
+    completedAt: options.completedAt ?? new Date().toISOString(),
+    terminatedReason: options.terminatedReason ?? 'completed',
+    findings: options.findings ?? [],
+    probedSurfaces: options.probedSurfaces ?? [],
+    patches: options.patches ?? [],
+  };
+}
+
+export function buildRunnerArtifact(
+  ticket: string,
+  invocations: SubagentRunnerInvocation[],
+): SubagentRunnerArtifact {
+  return { ticket, invocations };
+}
+
+function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
   if (typeof value !== 'object' || value === null) return null;
-
   const obj = value as Record<string, unknown>;
 
   if (
@@ -117,27 +160,152 @@ export function validateRunnerArtifact(
   ) {
     return null;
   }
-
   if (
     typeof obj['reviewedHeadSha'] !== 'string' ||
     obj['reviewedHeadSha'] === ''
-  )
+  ) {
     return null;
-
+  }
   if (
     typeof obj['outcome'] !== 'string' ||
     !(VALID_OUTCOMES as string[]).includes(obj['outcome'])
   ) {
     return null;
   }
-
-  if (typeof obj['completedAt'] !== 'string' || obj['completedAt'] === '')
+  if (typeof obj['completedAt'] !== 'string' || obj['completedAt'] === '') {
     return null;
+  }
+  if (
+    typeof obj['terminatedReason'] !== 'string' ||
+    !(VALID_TERMINATED_REASONS as string[]).includes(obj['terminatedReason'])
+  ) {
+    return null;
+  }
+  if (!Array.isArray(obj['findings'])) return null;
+  if (!Array.isArray(obj['probedSurfaces'])) return null;
+  if (!Array.isArray(obj['patches'])) return null;
 
   return {
-    runnerKind: obj['runnerKind'] as SubagentRunnerArtifact['runnerKind'],
+    runnerKind: obj['runnerKind'] as SubagentRunnerKind,
     reviewedHeadSha: obj['reviewedHeadSha'] as string,
     outcome: obj['outcome'] as SubagentRunnerOutcome,
     completedAt: obj['completedAt'] as string,
+    terminatedReason: obj['terminatedReason'] as SubagentRunnerTerminatedReason,
+    findings: (obj['findings'] as unknown[]).map(String),
+    probedSurfaces: (obj['probedSurfaces'] as unknown[]).map(String),
+    patches: (obj['patches'] as unknown[]).map(String),
   };
+}
+
+export function validateRunnerArtifact(
+  value: unknown,
+): SubagentRunnerArtifact | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const obj = value as Record<string, unknown>;
+
+  if (typeof obj['ticket'] !== 'string' || obj['ticket'] === '') return null;
+  if (!Array.isArray(obj['invocations'])) return null;
+
+  const invocations: SubagentRunnerInvocation[] = [];
+  for (const raw of obj['invocations']) {
+    const validated = validateInvocation(raw);
+    if (!validated) return null;
+    invocations.push(validated);
+  }
+  if (invocations.length === 0) return null;
+
+  return { ticket: obj['ticket'] as string, invocations };
+}
+
+function isLegacyShape(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj['runnerKind'] === 'string' &&
+    !('invocations' in obj) &&
+    !('ticket' in obj)
+  );
+}
+
+function liftLegacyArtifact(
+  raw: Record<string, unknown>,
+  ticket: string,
+  sourcePath: string,
+): SubagentRunnerArtifact {
+  if (
+    typeof raw['reviewedHeadSha'] !== 'string' ||
+    raw['reviewedHeadSha'] === ''
+  ) {
+    throw new Error(
+      `Legacy subagent runner artifact at ${sourcePath} is missing required field: reviewedHeadSha.`,
+    );
+  }
+  if (
+    typeof raw['outcome'] !== 'string' ||
+    !(VALID_OUTCOMES as string[]).includes(raw['outcome'] as string)
+  ) {
+    throw new Error(
+      `Legacy subagent runner artifact at ${sourcePath} is missing required field: outcome.`,
+    );
+  }
+  if (typeof raw['completedAt'] !== 'string' || raw['completedAt'] === '') {
+    throw new Error(
+      `Legacy subagent runner artifact at ${sourcePath} is missing required field: completedAt.`,
+    );
+  }
+  if (!(VALID_RUNNER_KINDS as string[]).includes(raw['runnerKind'] as string)) {
+    throw new Error(
+      `Legacy subagent runner artifact at ${sourcePath} has invalid runnerKind: ${String(raw['runnerKind'])}.`,
+    );
+  }
+
+  const invocation: SubagentRunnerInvocation = {
+    runnerKind: raw['runnerKind'] as SubagentRunnerKind,
+    reviewedHeadSha: raw['reviewedHeadSha'],
+    outcome: raw['outcome'] as SubagentRunnerOutcome,
+    completedAt: raw['completedAt'],
+    terminatedReason: 'completed',
+    findings: [],
+    probedSurfaces: [],
+    patches: [],
+  };
+  return { ticket, invocations: [invocation] };
+}
+
+export function readSubagentRunnerArtifact(
+  path: string,
+  ticket: string,
+): SubagentRunnerArtifact {
+  const raw = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+
+  if (isLegacyShape(raw)) {
+    return liftLegacyArtifact(raw as Record<string, unknown>, ticket, path);
+  }
+
+  const validated = validateRunnerArtifact(raw);
+  if (!validated) {
+    throw new Error(
+      `Subagent runner artifact at ${path} is not a valid structured SubagentRunnerArtifact.`,
+    );
+  }
+  return validated;
+}
+
+export function appendInvocationToArtifact(
+  path: string,
+  ticket: string,
+  invocation: SubagentRunnerInvocation,
+): SubagentRunnerArtifact {
+  let existing: SubagentRunnerArtifact | null = null;
+  if (existsSync(path)) {
+    existing = readSubagentRunnerArtifact(path, ticket);
+  }
+  const invocations = existing
+    ? [...existing.invocations, invocation]
+    : [invocation];
+  const artifact: SubagentRunnerArtifact = { ticket, invocations };
+
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(artifact, null, 2) + '\n', 'utf-8');
+  return artifact;
 }

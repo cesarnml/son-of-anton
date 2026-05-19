@@ -148,12 +148,21 @@ describe('P10.02 — tryRunner fallback behavior', () => {
 
 // ─── validateRunnerArtifact ───────────────────────────────────────────────────
 
-describe('P10.02 — validateRunnerArtifact', () => {
+describe('P10.02 — validateRunnerArtifact (structured)', () => {
   const validArtifact: SubagentRunnerArtifact = {
-    runnerKind: 'claude-cli',
-    reviewedHeadSha: 'abc1234',
-    outcome: 'clean',
-    completedAt: '2026-01-01T00:00:00.000Z',
+    ticket: 'P10.02',
+    invocations: [
+      {
+        runnerKind: 'claude-cli',
+        reviewedHeadSha: 'abc1234',
+        outcome: 'clean',
+        completedAt: '2026-01-01T00:00:00.000Z',
+        terminatedReason: 'completed',
+        findings: [],
+        probedSurfaces: [],
+        patches: [],
+      },
+    ],
   };
 
   it('accepts valid clean artifact', () => {
@@ -161,34 +170,64 @@ describe('P10.02 — validateRunnerArtifact', () => {
   });
 
   it('accepts valid patched artifact', () => {
-    const artifact = { ...validArtifact, outcome: 'patched' as const };
-    expect(validateRunnerArtifact(artifact)).toEqual(artifact);
-  });
-
-  it('accepts skipped artifact', () => {
     const artifact: SubagentRunnerArtifact = {
-      runnerKind: 'skipped',
-      reviewedHeadSha: 'abc',
-      outcome: 'skipped',
-      completedAt: '2026-01-01T00:00:00.000Z',
+      ...validArtifact,
+      invocations: [
+        { ...validArtifact.invocations[0]!, outcome: 'patched' as const },
+      ],
     };
     expect(validateRunnerArtifact(artifact)).toEqual(artifact);
   });
 
-  it('returns null for missing runnerKind', () => {
-    const { runnerKind: _, ...rest } = validArtifact;
+  it('accepts skipped invocation', () => {
+    const artifact: SubagentRunnerArtifact = {
+      ticket: 'P10.02',
+      invocations: [
+        {
+          runnerKind: 'skipped',
+          reviewedHeadSha: 'abc',
+          outcome: 'skipped',
+          completedAt: '2026-01-01T00:00:00.000Z',
+          terminatedReason: 'runner_unavailable',
+          findings: [],
+          probedSurfaces: [],
+          patches: [],
+        },
+      ],
+    };
+    expect(validateRunnerArtifact(artifact)).toEqual(artifact);
+  });
+
+  it('returns null when invocations is missing', () => {
+    expect(validateRunnerArtifact({ ticket: 'P10.02' })).toBeNull();
+  });
+
+  it('returns null when ticket is missing', () => {
+    const { ticket: _, ...rest } = validArtifact;
     expect(validateRunnerArtifact(rest)).toBeNull();
   });
 
-  it('returns null for missing reviewedHeadSha', () => {
-    const { reviewedHeadSha: _, ...rest } = validArtifact;
-    expect(validateRunnerArtifact(rest)).toBeNull();
+  it('returns null when an invocation is missing reviewedHeadSha', () => {
+    const broken = {
+      ticket: 'P10.02',
+      invocations: [
+        {
+          ...validArtifact.invocations[0]!,
+          reviewedHeadSha: '',
+        },
+      ],
+    };
+    expect(validateRunnerArtifact(broken)).toBeNull();
   });
 
   it('returns null for unknown outcome value', () => {
-    expect(
-      validateRunnerArtifact({ ...validArtifact, outcome: 'unknown' }),
-    ).toBeNull();
+    const broken = {
+      ticket: 'P10.02',
+      invocations: [
+        { ...validArtifact.invocations[0]!, outcome: 'unknown' as string },
+      ],
+    };
+    expect(validateRunnerArtifact(broken)).toBeNull();
   });
 
   it('returns null for null input', () => {
@@ -197,6 +236,17 @@ describe('P10.02 — validateRunnerArtifact', () => {
 
   it('returns null for non-object input', () => {
     expect(validateRunnerArtifact('string')).toBeNull();
+  });
+
+  it('returns null for legacy 4-field shape (no longer a valid SubagentRunnerArtifact at the type level)', () => {
+    expect(
+      validateRunnerArtifact({
+        runnerKind: 'claude-cli',
+        reviewedHeadSha: 'abc1234',
+        outcome: 'clean',
+        completedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    ).toBeNull();
   });
 });
 

@@ -1,13 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import {
   getUsage,
   isStandaloneTriageCommand,
@@ -122,11 +116,12 @@ import {
   startTicket as startTicketImpl,
 } from './ticket-flow';
 import {
+  appendInvocationToArtifact,
   buildSubagentReviewPrompt,
-  buildRunnerArtifact,
+  buildRunnerInvocation,
   findDeliveryDocPaths,
+  readSubagentRunnerArtifact,
   tryRunner,
-  validateRunnerArtifact,
 } from './subagent-runner';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
@@ -638,15 +633,14 @@ export async function runDeliveryOrchestrator(
           );
         }
 
-        // Write runner artifact.
-        const artifact = buildRunnerArtifact(usedRunner, headSha, outcome);
+        // Write runner artifact (append-only invocations[] per ticket).
+        const invocation = buildRunnerInvocation(usedRunner, headSha, outcome);
         const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-runner.json`;
         const artifactAbsPath = resolve(cwd, artifactRelPath);
-        mkdirSync(dirname(artifactAbsPath), { recursive: true });
-        writeFileSync(
+        appendInvocationToArtifact(
           artifactAbsPath,
-          JSON.stringify(artifact, null, 2) + '\n',
-          'utf-8',
+          subagentTarget.id,
+          invocation,
         );
 
         const nextState = recordSubagentReview(
@@ -1424,17 +1418,19 @@ export async function openPullRequest(
         : undefined;
       const artifactExists =
         artifactPath !== undefined && existsSync(artifactPath);
-      const artifact = artifactExists
-        ? (() => {
-            try {
-              return validateRunnerArtifact(
-                JSON.parse(readFileSync(artifactPath, 'utf-8')),
-              );
-            } catch {
-              return null;
-            }
-          })()
-        : null;
+      const artifact =
+        artifactExists && artifactPath !== undefined
+          ? (() => {
+              try {
+                return readSubagentRunnerArtifact(
+                  artifactPath,
+                  targetTicket.id,
+                );
+              } catch {
+                return null;
+              }
+            })()
+          : null;
       if (!artifact) {
         throw createWorkflowContractError(
           'workflow.open_pr.requires_runner_review',

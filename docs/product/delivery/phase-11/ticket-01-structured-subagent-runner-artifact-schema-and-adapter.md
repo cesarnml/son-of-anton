@@ -42,8 +42,8 @@ Scope: delivery
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `readSubagentRunnerArtifact` did not exist; `tools/delivery/test/p11-01.test.ts` failed at module-load time.
+Why this path: split the constructor surface into `buildRunnerInvocation` (per-invocation building block) + `buildRunnerArtifact(ticket, invocations[])` (structured artifact) + `appendInvocationToArtifact` (write-side append-only). This made each call site explicit about whether it owns one invocation or the whole artifact, and let the writer collapse `read → append → write` into one helper that handles both legacy-on-disk and new-on-disk cases.
+Alternative considered: keep `buildRunnerArtifact(runnerKind, sha, outcome)` signature for backward compat and let it return an "artifact wrapping a single invocation". Rejected — it would hide the per-ticket append-only semantics inside an overloaded name and force callers that genuinely want one invocation (cli-runner's runner-result branch) to flatten the wrapping artifact again.
+Deferred: termination-honesty enforcement (CLI refusing `outcome: clean` for non-`completed` `terminatedReason`) is P11.04. Recorder-mode and artifact-existence-at-HEAD idempotency are P11.03. `findings`/`probedSurfaces`/`patches` are reserved fields populated by the subagent in P11.02+P11.03 work; for now `buildRunnerInvocation` defaults them to `[]`.
+Contract note: none.
