@@ -53,6 +53,24 @@ describe('P11.03 — parseSubagentReviewArgs', () => {
     expect(parsed.outcome).toBeUndefined();
     expect(parsed.reviewedHeadSha).toBeUndefined();
   });
+
+  it('rejects trailing positionals after ticket id when no outcome word is present', () => {
+    // Guards against operator typos like `subagent-review P11.03 clear abc` —
+    // without this, `clear` would be silently treated as a ticket id and `abc`
+    // would be discarded, falling through to runner mode.
+    expect(() => parseSubagentReviewArgs(['P11.03', 'abc'], new Set())).toThrow(
+      /Unexpected positional/,
+    );
+  });
+
+  it('rejects trailing positionals after recorder mode args', () => {
+    expect(() =>
+      parseSubagentReviewArgs(
+        ['P11.03', 'clean', 'abc123', 'extra'],
+        new Set(),
+      ),
+    ).toThrow(/Unexpected positional/);
+  });
 });
 
 describe('P11.03 — decideSubagentReviewMode dispatch (recorder, no-op, invoke-runner)', () => {

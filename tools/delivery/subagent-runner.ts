@@ -340,6 +340,13 @@ export function parseSubagentReviewArgs(
       );
     }
     reviewedHeadSha = sha;
+    cursor += 1;
+  }
+
+  if (positionals[cursor] !== undefined) {
+    throw new Error(
+      `Unexpected positional argument: \`${positionals[cursor]}\`. Usage: \`subagent-review [ticket-id] [clean|patched <sha>] [--force]\`.`,
+    );
   }
 
   return {
