@@ -1,6 +1,6 @@
 # Phase 11: Subagent-review class absorption and artifact honesty
 
-**Delivery status:** Decomposed. See [`docs/product/delivery/phase-11/implementation-plan.md`](../delivery/phase-11/implementation-plan.md) for the five-ticket breakdown (P11.01–P11.05).
+**Delivery status:** Shipped. Five-ticket stack (P11.01–P11.05) delivered via [`docs/product/delivery/phase-11/implementation-plan.md`](../delivery/phase-11/implementation-plan.md). Retrospective at [`docs/product/retrospectives/phase-11-subagent-review-class-absorption-and-artifact-honesty-retrospective.md`](../retrospectives/phase-11-subagent-review-class-absorption-and-artifact-honesty-retrospective.md).
 
 ## TL;DR
 

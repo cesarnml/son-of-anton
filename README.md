@@ -102,11 +102,12 @@ path instead.
   agent can read, plus per-agent adapters for platforms with specific file
   conventions (see [Agent compatibility](#agent-compatibility) below).
 - **Adversarial subagent review** — after each ticket, a second AI pass checks
-  the implementation assuming the first one cut corners. When the review runs
-  through an executor-owned CLI runner (`claude-cli` or `codex-exec`), it
-  patches findings autonomously and writes a durable proof artifact. When the
-  review runs agent-to-agent, the primary agent triages findings before
-  publishing.
+  the implementation assuming the first one cut corners. The runner is
+  advisory: it returns findings, probed surfaces, and a self-reported
+  termination reason, and the primary agent applies any resulting patches with
+  a `[subagent-review]` subject suffix. The CLI writes a structured
+  `SubagentRunnerArtifact` capturing each invocation as durable proof, and
+  refuses to record `clean` when the runner did not actually complete.
 - **Stacked PR model** — each ticket gets its own branch and PR, stacked in
   dependency order. Closeout squash-merges the whole phase onto main cleanly.
 - **Migration runner** — when Son of Anton ships structural changes, `bun run sync`
