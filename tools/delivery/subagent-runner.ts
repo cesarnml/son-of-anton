@@ -87,7 +87,7 @@ export function classifyRunnerTermination(
 ): SubagentRunnerTerminatedReason {
   const blob = `${stdout}\n${stderr}`.toLowerCase();
   if (
-    /\byou['’]?ve hit your limit\b|\brate[\s_-]?limit(ed|ing|s)?\b|\b429\s+(too\s+many|rate)|\bquota\s+exceeded\b/.test(
+    /\byou['’]?ve hit your limit\b|\brate[\s_-]?limited\b|\brate[\s_-]?limit\s+(?:exceeded|reached|hit)\b|\b429\s+(too\s+many|rate)|\bquota\s+exceeded\b/.test(
       blob,
     )
   ) {

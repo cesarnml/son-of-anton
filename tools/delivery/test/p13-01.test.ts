@@ -68,6 +68,16 @@ describe('P13.01 — non-clean runner termination classification', () => {
     ).toBe('rate_limit');
   });
 
+  it('does not classify successful review prose mentioning rate limit as rate_limit', () => {
+    expect(
+      classifyRunnerTermination(
+        0,
+        'Finding: the implementation preserves rate limit retry behavior.',
+        '',
+      ),
+    ).toBe('completed');
+  });
+
   it('does not allow runner_failed to record clean', () => {
     const result: RunnerAttemptResult = {
       status: 'ran',
