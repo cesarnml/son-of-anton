@@ -412,6 +412,7 @@ function syncStateWithPlan(
         ticketFile: definition.ticketFile,
         type: definition.type,
         scope: definition.scope,
+        redPolicy: previous?.redPolicy ?? definition.redPolicy,
         status: selectStatusValue(previous?.status, inferredTicket?.status),
         branch: resolvedBranch,
         baseBranch:

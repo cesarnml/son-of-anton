@@ -458,13 +458,15 @@ export function recordPostRed(
 
   if (!input.latestCommitSubject.includes('[red]')) {
     throw new Error(
-      `Ticket ${target.id} requires a HEAD commit subject containing \`[red]\` before post-red can be recorded.`,
+      `Ticket ${target.id} post-red requires a HEAD commit subject containing \`[red]\`. ` +
+        `Either author a \`[red]\` commit before continuing, or declare \`Red: skip\` in the ticket metadata if the ticket has no testable behavior.`,
     );
   }
 
   if (input.verifyExitCode === 0) {
     throw new Error(
-      `Ticket ${target.id} post-red requires a failing verification run before delivery can advance.`,
+      `Ticket ${target.id} post-red requires a failing verification run before delivery can advance. ` +
+        `Either author a \`[red]\` commit (with a test that genuinely fails) before continuing, or declare \`Red: skip\` in the ticket metadata if the ticket has no testable behavior.`,
     );
   }
 

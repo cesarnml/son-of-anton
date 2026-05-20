@@ -23,7 +23,6 @@ export type ParsedCliArgs = {
   subagentReviewPolicy?: ReviewPolicyStageValue;
   prReviewPolicy?: ReviewPolicyStageValue;
   preferredRunner?: 'claude-cli' | 'codex-exec';
-  redCommitSha?: string;
   baseline?: BaselineValue;
 };
 
@@ -102,7 +101,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  status',
     '  repair-state',
     '  start [ticket-id]',
-    '  post-red [ticket-id] [--red-commit-sha <sha>]',
+    '  post-red [ticket-id]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
     '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]',
     '  open-pr [ticket-id]',
@@ -132,7 +131,6 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let subagentReviewPolicy: ParsedCliArgs['subagentReviewPolicy'];
   let prReviewPolicy: ParsedCliArgs['prReviewPolicy'];
   let preferredRunner: ParsedCliArgs['preferredRunner'];
-  let redCommitSha: ParsedCliArgs['redCommitSha'];
   let baseline: ParsedCliArgs['baseline'];
   const flags = new Set<string>();
   const positionals: string[] = [];
@@ -236,17 +234,9 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     }
 
     if (value === '--red-commit-sha') {
-      const raw = argv[index + 1];
-
-      if (!raw || raw.trim() === '' || raw.startsWith('--')) {
-        throw new Error(
-          'Pass --red-commit-sha <sha> with a non-blank commit SHA.',
-        );
-      }
-
-      redCommitSha = raw.trim();
-      index += 1;
-      continue;
+      throw new Error(
+        '--red-commit-sha has been removed. Either author a `[red]` commit before continuing, or declare `Red: skip` in the ticket metadata if the ticket has no testable behavior.',
+      );
     }
 
     if (value === '--baseline') {
@@ -296,7 +286,6 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     subagentReviewPolicy,
     prReviewPolicy,
     preferredRunner,
-    redCommitSha,
     baseline,
   };
 }

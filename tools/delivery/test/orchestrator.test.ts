@@ -129,6 +129,7 @@ describe('delivery orchestrator', () => {
         id: 'P2.01',
         title: 'Enclosure-First Feed Parsing',
         slug: 'enclosure-first-feed-parsing',
+        redPolicy: 'required',
         ticketFile:
           'docs/product/delivery/phase-02/ticket-01-enclosure-first-feed-parsing.md',
       },
@@ -136,6 +137,7 @@ describe('delivery orchestrator', () => {
         id: 'P2.02',
         title: 'Movie Matcher Allows Missing Codec',
         slug: 'movie-matcher-allows-missing-codec',
+        redPolicy: 'required',
         ticketFile:
           'docs/product/delivery/phase-02/ticket-02-movie-matcher-allows-missing-codec.md',
       },
@@ -180,6 +182,7 @@ describe('delivery orchestrator', () => {
           slug: 'relative-scope',
           type: 'fix',
           scope: 'cli',
+          redPolicy: 'required',
           ticketFile:
             'docs/product/delivery/phase-99/ticket-01-fix-relative-scope.md',
         },

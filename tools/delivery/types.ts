@@ -31,12 +31,15 @@ export type InternalReviewPatchCommit = {
   subject: string;
 };
 
+import type { RedPolicy } from './ticket-metadata';
+
 export type TicketDefinition = {
   id: string;
   title: string;
   slug: string;
   type?: string;
   scope?: string;
+  redPolicy: RedPolicy;
   ticketFile: string;
 };
 

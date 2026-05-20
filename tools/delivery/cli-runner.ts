@@ -247,7 +247,6 @@ export async function runDeliveryOrchestrator(
         subagentReviewPolicy?: ReviewPolicyStageValue;
         prReviewPolicy?: ReviewPolicyStageValue;
         preferredRunner?: 'claude-cli' | 'codex-exec';
-        redCommitSha?: string;
         baseline?: 'orchestrator' | 'run-policy';
       }
     | undefined;
@@ -481,8 +480,6 @@ export async function runDeliveryOrchestrator(
           state,
           parsed.positionals[0],
           context,
-          {},
-          parsed.redCommitSha,
         );
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
@@ -1395,7 +1392,6 @@ export async function recordPostRed(
       stdout: string;
     };
   } = {},
-  redCommitSha?: string,
 ): Promise<DeliveryState> {
   const target =
     (ticketId
@@ -1415,26 +1411,18 @@ export async function recordPostRed(
   const isDocOnly = (
     dependencies.isLocalBranchDocOnly ?? isPlatformLocalBranchDocOnly
   )(target.worktreePath, target.baseBranch, context.config.runtime);
+  const isSkipPolicy = target.redPolicy === 'skip';
 
-  if (isDocOnly) {
-    console.log('Doc-only branch — post-red skipped.');
+  if (isDocOnly || isSkipPolicy) {
+    const reasons: string[] = [];
+    if (isSkipPolicy) {
+      reasons.push('Red: skip');
+    }
+    if (isDocOnly) {
+      reasons.push('doc-only branch');
+    }
+    console.log(`post-red skipped (${reasons.join(', ')}).`);
     return state;
-  }
-
-  // When --red-commit-sha is provided the operator is asserting that the named
-  // commit was the red commit. Skip the HEAD subject check and CI check — both
-  // are designed for the sequential red-then-green workflow where HEAD is still
-  // the red commit. With a named SHA the red evidence is already in history.
-  if (redCommitSha !== undefined) {
-    console.log(
-      `post-red: recording against named red commit ${redCommitSha} (skipping HEAD and CI checks).`,
-    );
-    return recordPostRedImpl(state, {
-      headSha: redCommitSha,
-      latestCommitSubject: '[red]',
-      ticketId,
-      verifyExitCode: 1,
-    });
   }
 
   const latestCommitSubject =
