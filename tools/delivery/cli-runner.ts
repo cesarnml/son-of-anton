@@ -1522,7 +1522,14 @@ export async function recordPostRed(
       reasons.push('doc-only branch');
     }
     console.log(`post-red skipped (${reasons.join(', ')}).`);
-    return state;
+    return {
+      ...state,
+      tickets: state.tickets.map((ticket) =>
+        ticket.id === target.id
+          ? { ...ticket, status: 'red_complete' as const }
+          : ticket,
+      ),
+    };
   }
 
   const latestCommitSubject =

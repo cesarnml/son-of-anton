@@ -181,7 +181,8 @@ describe('P9.02 tdd gate hardening', () => {
       },
     );
 
-    expect(nextState).toBe(skipState);
+    expect(nextState.tickets[0]?.status).toBe('red_complete');
+    expect(nextState.tickets[0]?.redCommitSha).toBeUndefined();
   });
 
   it('rejects post-red when HEAD commit subject lacks [red]', async () => {
