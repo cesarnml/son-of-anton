@@ -11,7 +11,6 @@ import {
 import { formatRunPolicy } from '../format';
 import { deriveRunPolicyFromConfig } from '../state';
 import {
-  buildSubagentReviewPrompt,
   buildRunnerArtifact,
   buildRunnerInvocation,
   findDeliveryDocPaths,
@@ -245,21 +244,11 @@ describe('P10.01 — tryRunner', () => {
 // ─── subagent review prompt boundary ─────────────────────────────────────────
 
 describe('P10.01 — subagent review hard write boundary', () => {
-  it('injects docs/product/delivery write boundary into runner prompts', () => {
-    const prompt = buildSubagentReviewPrompt({
-      baseBranch: 'main',
-      changedFiles: ['tools/delivery/cli-runner.ts'],
-    });
-
-    expect(prompt).toContain(
-      'Never modify files under docs/product/delivery/**',
-    );
-    expect(prompt).toContain('Findings for human review');
-    expect(prompt).toContain('independently inspect directly related');
-    expect(prompt).toContain('add attack surfaces');
-    expect(prompt).toContain('- tools/delivery/cli-runner.ts');
-    expect(prompt).not.toContain('Make any fixes you judge necessary');
-  });
+  // The generic changed-files runner prompt builder was removed in P13.03.
+  // Runner invocations now consume the primary-agent-authored prompt persisted
+  // by `write-subagent-adversarial-review`, so the boundary language lives in
+  // that prompt artifact and the adversarial-review template, not in a built-in
+  // builder. The path-classification helpers below are still authoritative.
 
   it('detects delivery doc paths across exact and nested paths', () => {
     expect(isDeliveryDocPath('docs/product/delivery')).toBe(true);

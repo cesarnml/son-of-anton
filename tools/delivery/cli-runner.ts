@@ -118,9 +118,8 @@ import {
 import {
   appendInvocationToArtifact,
   buildRunnerSpawnCommand,
-  buildSubagentReviewPrompt,
   buildRunnerInvocation,
-  decideSubagentOutcomeFromRunner,
+  decideAdvisoryRunnerOutcome,
   decideSubagentReviewMode,
   findDeliveryDocPaths,
   parseSubagentReviewArgs,
@@ -132,6 +131,7 @@ import {
 } from './subagent-runner';
 import {
   assertSubagentAdversarialPromptPresent,
+  requireSubagentAdversarialPromptForRunner,
   writeSubagentAdversarialPrompt,
 } from './subagent-prompt';
 import { readFileSync } from 'node:fs';
@@ -767,12 +767,13 @@ export async function runDeliveryOrchestrator(
             .filter(Boolean);
         };
         const headSha = readHeadSha();
-        const changedFiles = listDiffPaths(
-          `${subagentTarget.baseBranch}...HEAD`,
-        );
-        const reviewPrompt = buildSubagentReviewPrompt({
-          baseBranch: subagentTarget.baseBranch,
-          changedFiles,
+        // P13.03: the runner consumes the primary-agent-authored adversarial
+        // review prompt persisted under reviews/. There is no generic
+        // changed-files fallback; missing artifact → hard error from the
+        // resolver above.
+        const reviewPrompt = requireSubagentAdversarialPromptForRunner({
+          repoRoot: cwd,
+          ticket: subagentTarget,
         });
 
         const RUNNER_TIMEOUT_MS = 10 * 60 * 1000;
@@ -828,25 +829,42 @@ export async function runDeliveryOrchestrator(
 
           if (result.status === 'ran') {
             const runnerHeadAfter = readHeadSha();
-            const deliveryDocChanges = findDeliveryDocPaths([
-              ...(runnerHeadBefore !== runnerHeadAfter
-                ? listDiffPaths(`${runnerHeadBefore}..${runnerHeadAfter}`)
-                : []),
-              ...listDirtyPaths(),
-            ]);
+            const runnerWroteFiles =
+              runnerHeadBefore !== runnerHeadAfter ||
+              listDirtyPaths().length > 0;
 
-            if (deliveryDocChanges.length > 0) {
-              throw new Error(
-                `Subagent review modified docs/product/delivery/**, which is outside the subagent write boundary. Revert these files before recording subagent-review: ${deliveryDocChanges.join(', ')}`,
-              );
-            }
-
-            const decided = decideSubagentOutcomeFromRunner(result);
+            // Advisory-only contract (P13.03): any runner-driven file change is
+            // a contract violation, not a valid `patched` outcome. The decision
+            // helper collapses such cases to `skipped` with
+            // `terminatedReason: 'advisory_violation'` so the artifact records
+            // the violation honestly instead of silently treating runner writes
+            // as accepted patches. Delivery-doc writes are a strict subset of
+            // this general violation; we still surface them in the operator
+            // message to make the offending paths obvious.
+            const decided = decideAdvisoryRunnerOutcome(result, {
+              runnerWroteFiles,
+            });
             outcome = decided.outcome;
             terminatedReason = decided.terminatedReason;
             rawOutput = result.rawOutput;
             usedRunner = runner;
             fallbackLevel = runnerIndex === 0 ? 'preferred' : 'fallback';
+
+            if (runnerWroteFiles) {
+              const wroteHeadPaths =
+                runnerHeadBefore !== runnerHeadAfter
+                  ? listDiffPaths(`${runnerHeadBefore}..${runnerHeadAfter}`)
+                  : [];
+              const writePaths = [...wroteHeadPaths, ...listDirtyPaths()];
+              const deliveryDocChanges = findDeliveryDocPaths(writePaths);
+              const detail =
+                deliveryDocChanges.length > 0
+                  ? ` Delivery-doc paths affected: ${deliveryDocChanges.join(', ')}`
+                  : ` Affected paths: ${writePaths.join(', ')}`;
+              console.log(
+                `Runner ${runner} attempted file writes — recording as advisory_violation (advisory-only contract).${detail}`,
+              );
+            }
             break;
           }
 
@@ -863,9 +881,12 @@ export async function runDeliveryOrchestrator(
         }
 
         // Write runner artifact (append-only invocations[] per ticket).
+        // P13.03: persist the exact prompt bytes sent to the runner inline on
+        // the invocation so the artifact is a complete audit record.
         const invocation = buildRunnerInvocation(usedRunner, headSha, outcome, {
           terminatedReason,
           rawOutput,
+          filledPrompt: reviewPrompt,
           fallbackLevel,
         });
         appendInvocationToArtifact(

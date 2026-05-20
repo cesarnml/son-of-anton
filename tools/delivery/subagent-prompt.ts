@@ -85,6 +85,35 @@ export function readSubagentAdversarialPrompt(
   return readFileSync(resolve(repoRoot, relativePath), 'utf-8');
 }
 
+/**
+ * Resolve the exact prompt bytes that must be sent to the subagent runner.
+ *
+ * P13.03 contract: programmatic runner invocations must consume the
+ * primary-agent-authored prompt persisted by `write-subagent-adversarial-review`.
+ * There is no generic changed-files fallback. Missing state path or missing
+ * file on disk → hard error pointing the operator back to the prompt step.
+ */
+export function requireSubagentAdversarialPromptForRunner(input: {
+  repoRoot: string;
+  ticket: Pick<TicketState, 'id' | 'subagentAdversarialPromptPath'>;
+}): string {
+  const promptPath = input.ticket.subagentAdversarialPromptPath;
+  if (!promptPath) {
+    throw new Error(
+      `Ticket ${input.ticket.id} requires a subagent adversarial review prompt before invoking the runner. ` +
+        `Run \`write-subagent-adversarial-review ${input.ticket.id}\` first.`,
+    );
+  }
+  const absolutePath = resolve(input.repoRoot, promptPath);
+  if (!existsSync(absolutePath)) {
+    throw new Error(
+      `Recorded subagent adversarial review prompt for ticket ${input.ticket.id} is missing on disk at ${promptPath}. ` +
+        `Re-run \`write-subagent-adversarial-review ${input.ticket.id}\` before invoking the runner.`,
+    );
+  }
+  return readFileSync(absolutePath, 'utf-8');
+}
+
 export function subagentAdversarialPromptExists(absolutePath: string): boolean {
   return existsSync(absolutePath);
 }

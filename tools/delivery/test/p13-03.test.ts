@@ -93,17 +93,12 @@ describe('P13.03 — runner invocation persists inline filled prompt', () => {
       'Attack surfaces: cli-runner.ts subagent-review dispatch, no-write enforcement.\n' +
       'Diff context: tools/delivery/subagent-runner.ts.\n';
 
-    const invocation = buildRunnerInvocation(
-      'codex-exec',
-      'abc1234',
-      'clean',
-      {
-        terminatedReason: 'completed',
-        fallbackLevel: 'preferred',
-        rawOutput: 'No invariants broken.',
-        filledPrompt,
-      },
-    );
+    const invocation = buildRunnerInvocation('codex-exec', 'abc1234', 'clean', {
+      terminatedReason: 'completed',
+      fallbackLevel: 'preferred',
+      rawOutput: 'No invariants broken.',
+      filledPrompt,
+    });
 
     expect(invocation.filledPrompt).toBe(filledPrompt);
 

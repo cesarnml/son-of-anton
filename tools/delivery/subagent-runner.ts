@@ -14,7 +14,8 @@ export type SubagentRunnerTerminatedReason =
   | 'rate_limit'
   | 'sandbox_denied'
   | 'runner_unavailable'
-  | 'runner_failed';
+  | 'runner_failed'
+  | 'advisory_violation';
 
 export type SubagentRunnerFallbackLevel =
   | 'preferred'
@@ -29,6 +30,12 @@ export type SubagentRunnerInvocation = {
   completedAt: string;
   terminatedReason: SubagentRunnerTerminatedReason;
   rawOutput?: string;
+  /**
+   * The exact prompt bytes sent to the runner for this invocation. Captured
+   * inline so the runner artifact is a complete audit record without requiring
+   * a sidecar file. Recorder-mode and skipped invocations may omit this field.
+   */
+  filledPrompt?: string;
   fallbackLevel?: SubagentRunnerFallbackLevel;
   findings: string[];
   probedSurfaces: string[];
@@ -101,44 +108,6 @@ export function classifyRunnerTermination(
   return 'completed';
 }
 
-export type BuildSubagentReviewPromptInput = {
-  baseBranch: string;
-  changedFiles: string[];
-};
-
-export function buildSubagentReviewPrompt({
-  baseBranch,
-  changedFiles,
-}: BuildSubagentReviewPromptInput): string {
-  const files = changedFiles.length
-    ? changedFiles.map((file) => `- ${file}`).join('\n')
-    : '- (no changed files detected)';
-
-  return [
-    'Assume this implementation has holes. Find demonstrable ticket-relevant behavior breaks, not repo-wide hygiene issues.',
-    '',
-    `Review all code changes introduced in the current branch versus its base branch (${baseBranch}).`,
-    '',
-    'Changed files:',
-    files,
-    '',
-    'Hard write boundary:',
-    '- Never modify files under docs/product/delivery/**.',
-    '- If you find an issue there, report it under Findings for human review only.',
-    '- This includes ticket docs, implementation plans, handoffs, review artifacts, and rationale sections.',
-    '',
-    'Review boundary:',
-    '- Start from the changed files, then independently inspect directly related implementation code before deciding the review is complete.',
-    '- You may add attack surfaces when your repo read finds plausible ticket-relevant failure paths.',
-    '- Patch only demonstrated correctness gaps relevant to the branch behavior.',
-    '- Do not patch for style, preference, formatting, linting, or spellcheck noise.',
-    '- If full-repo verification fails on pre-existing or generated-doc paths, classify it as out of scope.',
-    '',
-    'Commit any fixes with messages ending with " [subagent-review]".',
-    'Do not rationalize away anything you notice: patch valid invariant breaks and report non-patched concerns for the human.',
-  ].join('\n');
-}
-
 export function isDeliveryDocPath(filePath: string): boolean {
   const normalized = filePath.replace(/\\/g, '/').replace(/^\.\//, '');
   return (
@@ -201,11 +170,9 @@ export function shouldFallbackToOtherRunner(
 }
 
 /**
- * Honesty guard: a runner that did not actually complete cannot record
- * outcome=clean. The clean state asserts "the runner reviewed the diff and
- * found nothing"; a rate_limit/sandbox_denied termination did not review the
- * diff. Override clean → skipped in that case. Patched is preserved because it
- * reflects real writes already on disk.
+ * @deprecated Legacy outcome resolver from before the advisory-only contract.
+ * Retained only for test compatibility; runner invocation now uses
+ * {@link decideAdvisoryRunnerOutcome} which enforces no-write semantics.
  */
 export function decideSubagentOutcomeFromRunner(
   result: Extract<RunnerAttemptResult, { status: 'ran' }>,
@@ -217,6 +184,36 @@ export function decideSubagentOutcomeFromRunner(
     return { outcome: 'skipped', terminatedReason: result.terminatedReason };
   }
   return { outcome: result.outcome, terminatedReason: result.terminatedReason };
+}
+
+/**
+ * Advisory-only contract for programmatic subagent runners.
+ *
+ * The runner is allowed to read and reason about the diff, but any file write
+ * it performs (tracked or untracked, committed or working-tree) is a contract
+ * violation, not a valid review outcome. This is the core P13.03 inversion:
+ * `patched` is reserved for primary-agent recorder mode. The runner reports
+ * findings; the primary agent applies any patches and records them separately.
+ *
+ * - runner wrote files → `{ outcome: 'skipped', terminatedReason: 'advisory_violation' }`
+ * - runner completed cleanly and made no writes → preserve `clean`
+ * - runner reported a non-completed termination reason (rate_limit, etc.) →
+ *   collapse to `skipped` with the original terminatedReason preserved
+ */
+export function decideAdvisoryRunnerOutcome(
+  result: Extract<RunnerAttemptResult, { status: 'ran' }>,
+  info: { runnerWroteFiles: boolean },
+): {
+  outcome: SubagentRunnerOutcome;
+  terminatedReason: SubagentRunnerTerminatedReason;
+} {
+  if (info.runnerWroteFiles) {
+    return { outcome: 'skipped', terminatedReason: 'advisory_violation' };
+  }
+  if (result.terminatedReason !== 'completed') {
+    return { outcome: 'skipped', terminatedReason: result.terminatedReason };
+  }
+  return { outcome: 'clean', terminatedReason: 'completed' };
 }
 
 const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [
@@ -232,6 +229,7 @@ const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
   'sandbox_denied',
   'runner_unavailable',
   'runner_failed',
+  'advisory_violation',
 ];
 const VALID_FALLBACK_LEVELS: SubagentRunnerFallbackLevel[] = [
   'preferred',
@@ -243,6 +241,7 @@ const VALID_FALLBACK_LEVELS: SubagentRunnerFallbackLevel[] = [
 export type BuildRunnerInvocationOptions = {
   terminatedReason?: SubagentRunnerTerminatedReason;
   rawOutput?: string;
+  filledPrompt?: string;
   fallbackLevel?: SubagentRunnerFallbackLevel;
   findings?: string[];
   probedSurfaces?: string[];
@@ -264,6 +263,9 @@ export function buildRunnerInvocation(
     terminatedReason: options.terminatedReason ?? 'completed',
     ...(options.rawOutput !== undefined
       ? { rawOutput: options.rawOutput }
+      : {}),
+    ...(options.filledPrompt !== undefined
+      ? { filledPrompt: options.filledPrompt }
       : {}),
     ...(options.fallbackLevel !== undefined
       ? { fallbackLevel: options.fallbackLevel }
@@ -322,6 +324,12 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
     return null;
   }
   if (
+    obj['filledPrompt'] !== undefined &&
+    typeof obj['filledPrompt'] !== 'string'
+  ) {
+    return null;
+  }
+  if (
     obj['fallbackLevel'] !== undefined &&
     (typeof obj['fallbackLevel'] !== 'string' ||
       !(VALID_FALLBACK_LEVELS as string[]).includes(obj['fallbackLevel']))
@@ -337,6 +345,9 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
     terminatedReason: obj['terminatedReason'] as SubagentRunnerTerminatedReason,
     ...(obj['rawOutput'] !== undefined
       ? { rawOutput: obj['rawOutput'] as string }
+      : {}),
+    ...(obj['filledPrompt'] !== undefined
+      ? { filledPrompt: obj['filledPrompt'] as string }
       : {}),
     ...(obj['fallbackLevel'] !== undefined
       ? { fallbackLevel: obj['fallbackLevel'] as SubagentRunnerFallbackLevel }
