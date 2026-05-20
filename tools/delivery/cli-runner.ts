@@ -117,6 +117,7 @@ import {
 } from './ticket-flow';
 import {
   appendInvocationToArtifact,
+  buildRunnerSpawnCommand,
   buildSubagentReviewPrompt,
   buildRunnerInvocation,
   decideSubagentOutcomeFromRunner,
@@ -682,40 +683,18 @@ export async function runDeliveryOrchestrator(
         let usedRunner: 'claude-cli' | 'codex-exec' | 'skipped' = 'skipped';
         let terminatedReason: SubagentRunnerTerminatedReason =
           'runner_unavailable';
+        let rawOutput: string | undefined;
+        let fallbackLevel: 'preferred' | 'fallback' | 'failed_all' =
+          'failed_all';
 
-        // Narrow rate-limit / sandbox-denied signatures. Ambiguous runner
-        // output should surface honestly via terminatedReason — not as a clean
-        // outcome and not as a fallback trigger. Patterns are intentionally
-        // strict (anchored phrases / explicit error contexts) so legitimate
-        // review prose mentioning "rate limit" or "permission denied" does not
-        // get misclassified.
-        const detectTerminatedReason = (
-          stdout: string,
-          stderr: string,
-        ): SubagentRunnerTerminatedReason => {
-          const blob = `${stdout}\n${stderr}`.toLowerCase();
-          if (
-            /\brate[\s_-]?limit(ed|ing|s)?\b|\b429\s+(too\s+many|rate)|\bquota\s+exceeded\b/.test(
-              blob,
-            )
-          ) {
-            return 'rate_limit';
-          }
-          if (/\bsandbox[\s_-]?(denied|blocked|violation)\b/.test(blob)) {
-            return 'sandbox_denied';
-          }
-          return 'completed';
-        };
-
-        for (const runner of runnerOrder) {
+        for (const [runnerIndex, runner] of runnerOrder.entries()) {
           const runnerHeadBefore = readHeadSha();
           const result = tryRunner(
             () => {
-              const args =
-                runner === 'claude-cli'
-                  ? ['--print', reviewPrompt, '--output-format', 'text']
-                  : [reviewPrompt];
-              const bin = runner === 'claude-cli' ? 'claude' : 'codex';
+              const { bin, args } = buildRunnerSpawnCommand(
+                runner,
+                reviewPrompt,
+              );
               const spawned = spawnSync(bin, args, {
                 cwd: worktreePath,
                 timeout: RUNNER_TIMEOUT_MS,
@@ -737,10 +716,8 @@ export async function runDeliveryOrchestrator(
                   spawned.signal === 'SIGTERM' ||
                   spawnError?.message?.includes('timed out') ||
                   false,
-                terminatedReason: detectTerminatedReason(
-                  spawned.stdout ?? '',
-                  spawned.stderr ?? '',
-                ),
+                stdout: spawned.stdout ?? '',
+                stderr: spawned.stderr ?? '',
               };
             },
             () => {
@@ -769,7 +746,9 @@ export async function runDeliveryOrchestrator(
             const decided = decideSubagentOutcomeFromRunner(result);
             outcome = decided.outcome;
             terminatedReason = decided.terminatedReason;
+            rawOutput = result.rawOutput;
             usedRunner = runner;
+            fallbackLevel = runnerIndex === 0 ? 'preferred' : 'fallback';
             break;
           }
 
@@ -788,6 +767,8 @@ export async function runDeliveryOrchestrator(
         // Write runner artifact (append-only invocations[] per ticket).
         const invocation = buildRunnerInvocation(usedRunner, headSha, outcome, {
           terminatedReason,
+          rawOutput,
+          fallbackLevel,
         });
         appendInvocationToArtifact(
           artifactAbsPath,

@@ -13,7 +13,14 @@ export type SubagentRunnerTerminatedReason =
   | 'completed'
   | 'rate_limit'
   | 'sandbox_denied'
-  | 'runner_unavailable';
+  | 'runner_unavailable'
+  | 'runner_failed';
+
+export type SubagentRunnerFallbackLevel =
+  | 'preferred'
+  | 'fallback'
+  | 'failed_all'
+  | 'not_applicable';
 
 export type SubagentRunnerInvocation = {
   runnerKind: SubagentRunnerKind;
@@ -21,6 +28,8 @@ export type SubagentRunnerInvocation = {
   outcome: SubagentRunnerOutcome;
   completedAt: string;
   terminatedReason: SubagentRunnerTerminatedReason;
+  rawOutput?: string;
+  fallbackLevel?: SubagentRunnerFallbackLevel;
   findings: string[];
   probedSurfaces: string[];
   patches: string[];
@@ -34,6 +43,9 @@ export type SubagentRunnerArtifact = {
 export type SpawnResult = {
   exitCode: number | null;
   timedOut: boolean;
+  stdout?: string;
+  stderr?: string;
+  rawOutput?: string;
   /**
    * Optional honest termination reason flagged by the spawn closure (e.g. a
    * rate-limit signature detected in stdout despite exit code 0). When omitted,
@@ -47,9 +59,47 @@ export type RunnerAttemptResult =
       status: 'ran';
       outcome: 'clean' | 'patched';
       terminatedReason: SubagentRunnerTerminatedReason;
+      rawOutput?: string;
     }
   | { status: 'unavailable' }
   | { status: 'timeout' };
+
+export function buildRunnerSpawnCommand(
+  runner: Extract<SubagentRunnerKind, 'claude-cli' | 'codex-exec'>,
+  reviewPrompt: string,
+): { bin: string; args: string[] } {
+  return runner === 'claude-cli'
+    ? { bin: 'claude', args: ['-p', reviewPrompt] }
+    : { bin: 'codex', args: ['exec', reviewPrompt] };
+}
+
+export function formatRawRunnerOutput(stdout = '', stderr = ''): string {
+  const sections: string[] = [];
+  if (stdout.trim() !== '') sections.push(`stdout:\n${stdout.trimEnd()}`);
+  if (stderr.trim() !== '') sections.push(`stderr:\n${stderr.trimEnd()}`);
+  return sections.join('\n\n');
+}
+
+export function classifyRunnerTermination(
+  exitCode: number | null,
+  stdout = '',
+  stderr = '',
+): SubagentRunnerTerminatedReason {
+  const blob = `${stdout}\n${stderr}`.toLowerCase();
+  if (
+    /\byou['’]?ve hit your limit\b|\brate[\s_-]?limit(ed|ing|s)?\b|\b429\s+(too\s+many|rate)|\bquota\s+exceeded\b/.test(
+      blob,
+    )
+  ) {
+    return 'rate_limit';
+  }
+  if (/\bsandbox[\s_-]?(denied|blocked|violation)\b/.test(blob)) {
+    return 'sandbox_denied';
+  }
+  if (exitCode !== 0) return 'runner_failed';
+  if (`${stdout}${stderr}`.trim() === '') return 'runner_failed';
+  return 'completed';
+}
 
 export type BuildSubagentReviewPromptInput = {
   baseBranch: string;
@@ -116,11 +166,25 @@ export function tryRunner(
 
   if (result.timedOut) return { status: 'timeout' };
 
+  const hasOutputFields =
+    result.stdout !== undefined ||
+    result.stderr !== undefined ||
+    result.rawOutput !== undefined;
+  const terminatedReason =
+    result.terminatedReason ??
+    (hasOutputFields
+      ? classifyRunnerTermination(result.exitCode, result.stdout, result.stderr)
+      : 'completed');
   const hasChanges = checkHasChanges();
   return {
     status: 'ran',
     outcome: hasChanges ? 'patched' : 'clean',
-    terminatedReason: result.terminatedReason ?? 'completed',
+    terminatedReason,
+    rawOutput:
+      result.rawOutput ??
+      (hasOutputFields
+        ? formatRawRunnerOutput(result.stdout, result.stderr)
+        : undefined),
   };
 }
 
@@ -167,10 +231,19 @@ const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
   'rate_limit',
   'sandbox_denied',
   'runner_unavailable',
+  'runner_failed',
+];
+const VALID_FALLBACK_LEVELS: SubagentRunnerFallbackLevel[] = [
+  'preferred',
+  'fallback',
+  'failed_all',
+  'not_applicable',
 ];
 
 export type BuildRunnerInvocationOptions = {
   terminatedReason?: SubagentRunnerTerminatedReason;
+  rawOutput?: string;
+  fallbackLevel?: SubagentRunnerFallbackLevel;
   findings?: string[];
   probedSurfaces?: string[];
   patches?: string[];
@@ -189,6 +262,12 @@ export function buildRunnerInvocation(
     outcome,
     completedAt: options.completedAt ?? new Date().toISOString(),
     terminatedReason: options.terminatedReason ?? 'completed',
+    ...(options.rawOutput !== undefined
+      ? { rawOutput: options.rawOutput }
+      : {}),
+    ...(options.fallbackLevel !== undefined
+      ? { fallbackLevel: options.fallbackLevel }
+      : {}),
     findings: options.findings ?? [],
     probedSurfaces: options.probedSurfaces ?? [],
     patches: options.patches ?? [],
@@ -239,6 +318,16 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
   if (probedSurfaces === null) return null;
   const patches = validateStringArray(obj['patches']);
   if (patches === null) return null;
+  if (obj['rawOutput'] !== undefined && typeof obj['rawOutput'] !== 'string') {
+    return null;
+  }
+  if (
+    obj['fallbackLevel'] !== undefined &&
+    (typeof obj['fallbackLevel'] !== 'string' ||
+      !(VALID_FALLBACK_LEVELS as string[]).includes(obj['fallbackLevel']))
+  ) {
+    return null;
+  }
 
   return {
     runnerKind: obj['runnerKind'] as SubagentRunnerKind,
@@ -246,6 +335,12 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
     outcome: obj['outcome'] as SubagentRunnerOutcome,
     completedAt: obj['completedAt'] as string,
     terminatedReason: obj['terminatedReason'] as SubagentRunnerTerminatedReason,
+    ...(obj['rawOutput'] !== undefined
+      ? { rawOutput: obj['rawOutput'] as string }
+      : {}),
+    ...(obj['fallbackLevel'] !== undefined
+      ? { fallbackLevel: obj['fallbackLevel'] as SubagentRunnerFallbackLevel }
+      : {}),
     findings,
     probedSurfaces,
     patches,

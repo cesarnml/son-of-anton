@@ -30,15 +30,10 @@ describe('P13.01 — runner spawn command shapes', () => {
 
 describe('P13.01 — raw runner response artifact evidence', () => {
   it('persists raw runner output and fallback metadata on invocations', () => {
-    const invocation = buildRunnerInvocation(
-      'codex-exec',
-      'abc123',
-      'clean',
-      {
-        fallbackLevel: 'preferred',
-        rawOutput: 'Invariant results\nAll held.',
-      },
-    );
+    const invocation = buildRunnerInvocation('codex-exec', 'abc123', 'clean', {
+      fallbackLevel: 'preferred',
+      rawOutput: 'Invariant results\nAll held.',
+    });
     const artifact: SubagentRunnerArtifact = {
       ticket: 'P13.01',
       invocations: [invocation],
