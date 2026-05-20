@@ -130,6 +130,11 @@ import {
   tryRunner,
   type SubagentRunnerTerminatedReason,
 } from './subagent-runner';
+import {
+  assertSubagentAdversarialPromptPresent,
+  writeSubagentAdversarialPrompt,
+} from './subagent-prompt';
+import { readFileSync } from 'node:fs';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 
@@ -218,6 +223,7 @@ export function assertWorktreeGuard(
       config,
       state.planPath,
       activeTicket.id,
+      activeTicket,
     );
     const nextCommandHint = nextCommand
       ? `\nNext command from worktree: ${nextCommand}`
@@ -486,6 +492,88 @@ export async function runDeliveryOrchestrator(
         console.log(formatStatus(nextState, context.config));
         return 0;
       }
+      case 'write-subagent-adversarial-review': {
+        const writeTicketId = parsed.positionals[0];
+        const writeTarget =
+          (writeTicketId
+            ? state.tickets.find((t) => t.id === writeTicketId)
+            : state.tickets.find((t) => t.status === 'verified')) ?? undefined;
+
+        if (!writeTarget) {
+          throw new Error(
+            writeTicketId
+              ? `Unknown ticket ${writeTicketId}.`
+              : 'No ticket at verified status found.',
+          );
+        }
+
+        if (writeTarget.status !== 'verified') {
+          throw new Error(
+            `Ticket ${writeTarget.id} must be at status verified before write-subagent-adversarial-review. Current status: ${writeTarget.status}.`,
+          );
+        }
+
+        const writePolicy = context.config.reviewPolicy.subagentReview;
+        if (writePolicy === 'disabled') {
+          throw new Error(
+            `subagentReview is disabled — write-subagent-adversarial-review is not applicable. Run open-pr next.`,
+          );
+        }
+
+        const writeIsDocOnly = isPlatformLocalBranchDocOnly(
+          writeTarget.worktreePath,
+          writeTarget.baseBranch,
+          context.config.runtime,
+        );
+        if (writePolicy === 'skip_doc_only' && writeIsDocOnly) {
+          throw new Error(
+            `Ticket ${writeTarget.id} is doc-only under skip_doc_only — subagent review auto-skips and no adversarial prompt is required. Run subagent-review next.`,
+          );
+        }
+
+        const promptContent = resolveAdversarialPromptContent({
+          repoRoot: cwd,
+          ticket: writeTarget,
+          promptFilePath: parsed.promptFile,
+        });
+
+        const written = writeSubagentAdversarialPrompt({
+          repoRoot: cwd,
+          reviewsDirPath: state.reviewsDirPath,
+          ticketId: writeTarget.id,
+          content: promptContent,
+        });
+
+        const nextState: DeliveryState = {
+          ...state,
+          tickets: state.tickets.map((t) =>
+            t.id === writeTarget.id
+              ? {
+                  ...t,
+                  subagentAdversarialPromptPath: written.relativePath,
+                  subagentAdversarialPromptWrittenAt: written.writtenAt,
+                }
+              : t,
+          ),
+        };
+
+        commitDeliveryArtifactAndPush({
+          absolutePath: written.absolutePath,
+          branch: writeTarget.branch,
+          commitMessage: `chore(${writeTarget.id}): record subagent adversarial review prompt`,
+          ensureBranchPushed: context.platform.ensureBranchPushed,
+          relativeToRepo,
+          repoRoot: cwd,
+          runProcess: context.platform.runProcess,
+        });
+
+        console.log(
+          `Recorded subagent adversarial review prompt for ${writeTarget.id} at ${written.relativePath}.`,
+        );
+        await saveState(cwd, nextState);
+        console.log(formatStatus(nextState, context.config));
+        return 0;
+      }
       case 'subagent-review': {
         const subagentArgs = parseSubagentReviewArgs(
           parsed.positionals,
@@ -624,6 +712,16 @@ export async function runDeliveryOrchestrator(
           console.log(formatStatus(state, context.config));
           return 0;
         }
+
+        // Gate runner invocation on a recorded primary-agent-authored
+        // adversarial review prompt. Doc-only auto-skip already returned above;
+        // `disabled` policy short-circuits inside the assertion helper.
+        assertSubagentAdversarialPromptPresent({
+          repoRoot: cwd,
+          ticket: subagentTarget,
+          isDocOnly,
+          policy,
+        });
 
         // Build runner order: preferred first, other second.
         const preferredRunner = parsed.preferredRunner;
@@ -1470,6 +1568,94 @@ export function shouldAutoRecordReviewSkippedForPollReview(
     policy === 'disabled' ||
     (policy === 'skip_doc_only' && ticket?.docOnly === true)
   );
+}
+
+function resolveAdversarialPromptContent(input: {
+  repoRoot: string;
+  ticket: TicketState;
+  promptFilePath?: string;
+}): string {
+  if (input.promptFilePath) {
+    try {
+      return readFileSync(
+        resolve(input.repoRoot, input.promptFilePath),
+        'utf-8',
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to read --prompt-file at ${input.promptFilePath}: ${(error as Error).message}`,
+        { cause: error },
+      );
+    }
+  }
+
+  const ticket = input.ticket;
+  let ticketSpec = '';
+  try {
+    ticketSpec = readFileSync(
+      resolve(input.repoRoot, ticket.ticketFile),
+      'utf-8',
+    );
+  } catch {
+    // Best-effort: an unreadable ticket file is surfaced through the content
+    // validator, which rejects empty / stub prompts.
+  }
+
+  const changedFiles = (() => {
+    try {
+      const out = spawnSync(
+        'git',
+        ['diff', '--name-only', `${ticket.baseBranch}...HEAD`],
+        { cwd: ticket.worktreePath, encoding: 'utf-8' },
+      );
+      return (out.stdout ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  })();
+
+  const fileList = changedFiles.length
+    ? changedFiles.map((f) => `- ${f}`).join('\n')
+    : '- (no changed files detected)';
+
+  return [
+    `# Adversarial review for ${ticket.id} — ${ticket.title}`,
+    '',
+    `Base branch: ${ticket.baseBranch}`,
+    `Branch: ${ticket.branch}`,
+    '',
+    '## Ticket scope',
+    '',
+    ticketSpec.trim() || '(ticket spec unavailable)',
+    '',
+    '## Files changed in this diff',
+    '',
+    fileList,
+    '',
+    '## Invariants to hold',
+    '',
+    'Derived from the ticket Outcome section. The subagent must treat each as a',
+    'machine-verifiable assertion and report `[held | broken | untested]`.',
+    '',
+    '## Attack surfaces to probe',
+    '',
+    'The subagent must probe each of the seven diff-derived classes listed in',
+    '`docs/template/delivery/adversarial-review-template.md` and add ticket-spec-derived',
+    'surfaces from the changed files above. Report coverage per surface using',
+    '`[probed]` / `[N/A — reason]` / `[blocked — missing-input]`.',
+    '',
+    '## Directives',
+    '',
+    '- Patch only demonstrable correctness gaps tied to ticket behavior.',
+    '- Do not patch files under `docs/product/delivery/**`.',
+    '- Surface doc-vs-code drift in `## Rationale` and contract docs under Findings.',
+    '- Cross-model preferred when available; same-type review is acceptable.',
+    '',
+    'Output strictly per the `Required output format` section of the adversarial review template.',
+  ].join('\n');
 }
 
 function normalizeUniquePatchCommitShas(rawShas: string[]): string[] {

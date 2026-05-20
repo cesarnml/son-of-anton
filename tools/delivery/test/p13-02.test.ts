@@ -60,8 +60,7 @@ function baseTicket(overrides: Partial<TicketState> = {}): TicketState {
       'docs/product/delivery/phase-13/ticket-02-write-subagent-adversarial-review-step.md',
     redPolicy: 'required',
     status: 'verified',
-    branch:
-      'agents/p13-02-add-write-subagent-adversarial-review-prompt-step',
+    branch: 'agents/p13-02-add-write-subagent-adversarial-review-prompt-step',
     baseBranch:
       'agents/p13-01-fix-runner-invocation-and-capture-raw-runner-evidence',
     worktreePath: '/tmp/p13_02',

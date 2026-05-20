@@ -54,3 +54,17 @@ Why this path: split prompt authoring from runner invocation without renaming th
 Alternative considered: rename the runner command to `subagent-adversarial-review`, rejected to avoid policy and config churn.
 Deferred: consuming the prompt in the runner and advisory-only no-write enforcement.
 Contract note: the primary agent writes the adversarial brief; the subagent performs the adversarial review.
+
+### Implementation notes (P13.02)
+
+- Added `write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]` as a new CLI command. It auto-derives a baseline prompt from the ticket spec and changed-files list when no `--prompt-file` is supplied, persists the prompt to `<reviewsDir>/<ticketId>-subagent-adversarial-prompt.md`, and stamps `subagentAdversarialPromptPath` / `subagentAdversarialPromptWrittenAt` onto the ticket state. The prompt artifact is committed and pushed using the same `commitDeliveryArtifactAndPush` helper as the subagent runner artifact.
+- A new module `tools/delivery/subagent-prompt.ts` owns the deterministic path derivation, the content validator (rejects empty, short, or template-placeholder-like content), the writer, and the runner-gate helper `assertSubagentAdversarialPromptPresent`.
+- `subagent-review` now invokes the gate after the doc-only auto-skip and before runner dispatch. The gate is a no-op when `subagentReview` is `"disabled"` or when the ticket is a doc-only auto-skip under `"skip_doc_only"`, so the existing skip semantics are preserved.
+- `resolveNextCommand` accepts an optional ticket projection. For `verified` tickets it routes to `write-subagent-adversarial-review` first, falls back to `subagent-review` once the prompt is recorded, and stays on `subagent-review` for doc-only tickets where post-verify already recorded `verifyOutcome=skipped`. The legacy two-arg call (no ticket) defaults to `write-subagent-adversarial-review` so older operator paths still drive the prompt step before the runner.
+- `status` now surfaces a `subagent_adversarial_prompt=written at <iso> (<path>)` line whenever the prompt artifact is recorded.
+
+Deferred (consistent with the phase plan):
+
+- Runner does not yet consume the recorded prompt — that lands in P13.03.
+- Advisory-only no-write subagent enforcement lands in P13.03.
+- Docs/skills/template alignment lands in P13.04.

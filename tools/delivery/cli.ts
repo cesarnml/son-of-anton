@@ -24,6 +24,7 @@ export type ParsedCliArgs = {
   prReviewPolicy?: ReviewPolicyStageValue;
   preferredRunner?: 'claude-cli' | 'codex-exec';
   baseline?: BaselineValue;
+  promptFile?: string;
 };
 
 export const STANDALONE_TRIAGE_COMMAND = 'triage-standalone';
@@ -103,6 +104,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  start [ticket-id]',
     '  post-red [ticket-id]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
+    '  write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]',
     '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]',
     '  open-pr [ticket-id]',
     '  poll-review [ticket-id]',
@@ -132,6 +134,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let prReviewPolicy: ParsedCliArgs['prReviewPolicy'];
   let preferredRunner: ParsedCliArgs['preferredRunner'];
   let baseline: ParsedCliArgs['baseline'];
+  let promptFile: ParsedCliArgs['promptFile'];
   const flags = new Set<string>();
   const positionals: string[] = [];
 
@@ -239,6 +242,18 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       );
     }
 
+    if (value === '--prompt-file') {
+      const raw = argv[index + 1];
+
+      if (raw === undefined || raw.startsWith('--') || raw.trim() === '') {
+        throw new Error('Pass --prompt-file <path>.');
+      }
+
+      promptFile = raw;
+      index += 1;
+      continue;
+    }
+
     if (value === '--baseline') {
       const raw = argv[index + 1];
 
@@ -287,6 +302,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     prReviewPolicy,
     preferredRunner,
     baseline,
+    promptFile,
   };
 }
 

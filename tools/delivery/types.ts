@@ -107,6 +107,8 @@ export type TicketState = TicketDefinition & {
   subagentReviewPatchCommits?: InternalReviewPatchCommit[];
   subagentReviewAgent?: string;
   subagentRunnerArtifactPath?: string;
+  subagentAdversarialPromptPath?: string;
+  subagentAdversarialPromptWrittenAt?: string;
   docOnly?: boolean;
   prNumber?: number;
   prUrl?: string;
