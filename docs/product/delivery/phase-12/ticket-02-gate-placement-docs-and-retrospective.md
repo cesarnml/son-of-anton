@@ -50,3 +50,5 @@ Why this path: doc-pass plus retrospective stub; smallest acceptable bundle to c
 Alternative considered: split docs and retrospective into two tickets — rejected as ceremony for a small phase.
 Deferred: any "while we're here" doc edits beyond the five named surfaces.
 Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+
+Scope note: `docs/overview/releases/beta-v1-status.md` also referenced the old `--red-commit-sha` recovery idea. Developer approved including that beta-status surface in this ticket on 2026-05-20.

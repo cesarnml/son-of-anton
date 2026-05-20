@@ -9,15 +9,21 @@ This repo now includes a small repo-local delivery orchestrator for stacked tick
 For every code ticket, these steps must run in this exact sequence:
 
 1. `start` — create worktree, materialize handoff
-2. Implement + verify (`bun run verify:quiet` inner loop, then `bun run ci:quiet` before open-pr)
-3. `post-verify [clean|patched]` — self-audit
-4. `subagent-review [clean|patched]` — second AI pass (required for code tickets when `subagentReview` is not `"disabled"`)
-5. `open-pr` — publish the PR (never before subagent-review completes)
-6. `poll-review` — external AI review window
-7. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
-8. `advance` — move to next ticket
+2. Write the failing behavior test and commit it with a `[red]` suffix
+3. `post-red` — verify and record the `[red]` commit before implementation
+4. Implement + verify (`bun run verify:quiet` inner loop, then `bun run ci:quiet` before open-pr)
+5. `post-verify [clean|patched]` — self-audit
+6. `subagent-review [clean|patched]` — second AI pass (required for code tickets when `subagentReview` is not `"disabled"`)
+7. `open-pr` — publish the PR (never before subagent-review completes)
+8. `poll-review` — external AI review window
+9. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
+10. `advance` — move to next ticket
 
-**subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
+Tickets declare `Red: required` or `Red: skip` in their metadata block. Code
+tickets use `Red: required`; tickets with no testable behavior may declare
+`Red: skip`, and doc-only branches also skip `post-red` structurally.
+
+**post-red must precede implementation. subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
 
 ## Stance
 
@@ -338,7 +344,7 @@ That inference is intentionally conservative. It reconstructs enough state to re
 
 ## Post-verify (ticket stacks)
 
-After **build mode** (implementation and automated verification), the agent switches to **post-verify review mode**: a deliberate pass over the diff and ticket acceptance before publishing the branch for external AI code review. Stay in the same implementation session — this is a mode switch, not a handoff.
+After **build mode** (implementation and automated verification), the agent switches to **post-verify review mode**: a deliberate pass over the diff and ticket acceptance before publishing the branch for external AI code review. Stay in the same implementation session — this is a mode switch, not a handoff. For code tickets, build mode begins only after `post-red` records the failing-test commit.
 
 Use the verification commands with two distinct purposes:
 
@@ -364,6 +370,7 @@ When omitted, outcome defaults to `clean`. The `status` command renders the outc
 
 - The diff matches the ticket and handoff; no unrelated scope crept in.
 - Automated verification for this change is green, with `bun run ci:quiet` completed for code tickets before publishing.
+- Code tickets passed `post-red` before implementation began; tickets with no testable behavior declared `Red: skip` or were structurally doc-only.
 - Higher-risk areas changed in the diff (data shape, migrations, auth, API contracts) got a second read in post-verify mode.
 - The delivery ticket doc has an updated **Rationale** when behavior or trade-offs changed (repo policy).
 
@@ -498,6 +505,7 @@ Available commands:
 - `repair-state`
 - `triage-standalone [--pr <number>]`
 - `start [ticket-id]`
+- `post-red [ticket-id]`
 - `post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]`
 - `subagent-review [clean|patched] [patch-commit-sha ...]`
 - `open-pr [ticket-id]`
@@ -533,7 +541,7 @@ No next command is printed in that case. A cook-mode agent self-terminates; the 
 
 ### `post-verify` — doc-only early failure
 
-When `post-verify` is run on a doc-only ticket (a ticket whose branch diff touches only `.md` files) and there are **no commits** on the branch ahead of origin, the command fails immediately with:
+When `post-verify` is run on a doc-only ticket (a ticket whose branch diff touches only `.md` or `.json` files) and there are **no commits** on the branch ahead of origin, the command fails immediately with:
 
 ```
 Error: No commits on branch for doc-only ticket <id>. Add or update documentation files before continuing.
@@ -557,6 +565,7 @@ Default `cook` flow (with repo-default `skip_doc_only` review policy):
 
 ```bash
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-red
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
 # for code tickets when subagentReview is required, pass --preferred-runner <claude-cli|codex-exec> to run the subagent review programmatically, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
@@ -573,6 +582,7 @@ With `subagentReview: "required"` in `orchestrator.config.json`, the subagent st
 
 ```bash
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-red
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
 # execution agent passes --preferred-runner <its-identity>; runner patches findings, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]

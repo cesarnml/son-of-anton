@@ -39,10 +39,17 @@ Do not mock:
 
 For each ticket:
 
-1. Write one failing test against a public behavior.
-2. Implement the smallest code needed to make it pass.
-3. Refactor for readability only after the test is green.
-4. Stop and review before taking the next behavior slice.
+1. Declare `Red: required` in the ticket metadata for code behavior, or `Red: skip` when there is no testable behavior.
+2. For `Red: required`, write one failing test against a public behavior.
+3. Commit the failing test with a `[red]` suffix.
+4. Run `bun run deliver --plan <plan-path> post-red` before implementation.
+5. Implement the smallest code needed to make it pass.
+6. Refactor for readability only after the test is green.
+7. Stop and review before taking the next behavior slice.
+
+`Red: skip` is the explicit metadata signal for tickets with no testable
+behavior, such as pure docs, scaffolding, ops, or deployment work. Branches that
+touch only `.md` or `.json` files also skip the red gate structurally.
 
 ## Example Ticket Rhythm
 
@@ -63,6 +70,7 @@ Bad sequence:
 A ticket is done when:
 
 - its new public behavior is covered by tests
+- its `Red:` metadata honestly says whether a failing-test gate applies
 - tests are green
 - code only includes the minimum support needed for that behavior
 - README or docs changes needed for that slice are included

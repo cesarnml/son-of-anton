@@ -30,6 +30,9 @@ Stage 2 — How (/soa decompose):
 
 Execute:
 7. bun run deliver --plan <plan-path> start
+8. For code tickets, write and commit the failing behavior test with `[red]`
+9. bun run deliver --plan <plan-path> post-red
+10. Implement, verify, and continue with the next command from status
 ```
 
 Both the product plan and implementation docs must be committed to `main` **before** the orchestrator creates any branches.
@@ -42,6 +45,9 @@ bun run deliver --plan <plan-path> start         # resume from current ticket
 ```
 
 Always read the handoff doc at `.agents/delivery/<plan-key>/handoffs/<ticket-id>.md` first.
+For code tickets, run `post-red` after the `[red]` commit and before implementation.
+Tickets with no testable behavior declare `Red: skip`; doc-only branches skip
+the red gate structurally.
 
 ## Runtime policy overrides
 
