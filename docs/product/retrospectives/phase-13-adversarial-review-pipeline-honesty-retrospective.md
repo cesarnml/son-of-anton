@@ -45,4 +45,4 @@ The phase achieved its goal: pre-PR subagent review is no longer a vague second 
 - Consider a short doc-surface test (like phase-08's `--baseline run-policy` assertions) that fails if `delivery-orchestrator.md` drops `write-subagent-adversarial-review` from the critical step order.
 - When `/soa update` propagates to consumer repos, call out the two-step flow and advisory-only template in release notes — no historical artifact migration, but operators need to stop filling templates that instruct subagents to patch.
 
-_Created: 2026-05-20. P13.04 PR open on branch `agents/p13-04-align-docs-skills-template-and-retrospective`._
+_Created: 2026-05-20. P13.04 [PR #48](https://github.com/cesarnml/son-of-anton/pull/48) open._

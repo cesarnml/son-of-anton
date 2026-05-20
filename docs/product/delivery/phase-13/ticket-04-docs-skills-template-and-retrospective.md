@@ -49,3 +49,4 @@ Alternative considered: docs first, rejected because phase-13 is motivated by do
 Deferred: broad historical artifact caveats and old-ticket re-review.
 Contract note: preserve `subagent-review` naming while making its adversarial subagent contract explicit.
 Implementation: updated `delivery-orchestrator.md`, `start-here.md`, `tdd-workflow.md`, `adversarial-review-template.md`, and `son-of-anton-ethos` to document `post-verify` → `write-subagent-adversarial-review` → `subagent-review` → `open-pr` with advisory-only runner semantics; wrote `docs/product/retrospectives/phase-13-adversarial-review-pipeline-honesty-retrospective.md`.
+Follow-up fix: `post-red` skip for `Red: skip` now advances to `red_complete` so stacked doc tickets can reach `post-verify` (P13.04 hit this on a code-heavy stacked branch).
