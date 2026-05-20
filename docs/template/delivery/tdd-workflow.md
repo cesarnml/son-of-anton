@@ -65,6 +65,20 @@ Bad sequence:
 - add persistence later
 - add tests after the entire feature works
 
+## Pre-PR subagent review (orchestrated code tickets)
+
+After implementation is green and `post-verify` is recorded, code tickets with
+`subagentReview` enabled follow the orchestrator's two-step pre-PR gate (not part of
+red-green-refactor itself, but mandatory before `open-pr`):
+
+1. Primary agent fills `docs/template/delivery/adversarial-review-template.md` from the diff and ticket spec.
+2. `write-subagent-adversarial-review` persists that prompt.
+3. `subagent-review --preferred-runner …` runs the advisory runner against the written prompt.
+4. Primary agent applies any prudent patches from findings, then `open-pr`.
+
+The runner must not modify files; only the primary agent commits `[subagent-review]` fixes.
+See `delivery-orchestrator.md` for policy variants (`required`, `skip_doc_only`, `disabled`).
+
 ## Definition Of Done
 
 A ticket is done when:

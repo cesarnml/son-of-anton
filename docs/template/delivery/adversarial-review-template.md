@@ -122,20 +122,22 @@ changed files and directly related code before deciding the review is complete.>
 
 ### Your directives
 
-**Scope:** You review and patch implementation code only. Do not expand scope beyond what
-the ticket outcome describes.
+**Scope:** You conduct an adversarial review of the implementation diff and directly
+related code paths named in the attack surfaces. Do not expand scope beyond what the
+ticket outcome describes.
 
-**Hard write boundary:** Do not patch files under `docs/product/delivery/**`. This
-includes ticket docs, implementation plans, handoffs, review artifacts, and
-`## Rationale` sections. Those files are primary-agent delivery artifacts and historical
-workflow evidence, not subagent patch surface.
+**Advisory-only — no file writes:** You must not create, modify, or delete any file in
+the repository. Your entire deliverable is findings prose in the required output format
+below. The primary execution agent owns all patches.
 
-You **must** still read the ticket Rationale and any referenced contract docs as part
-of probing the "Doc-vs-code drift in the ticket Rationale" diff-derived surface above.
-If you find drift — the Rationale claims a behavior the diff does not implement, or the
-diff implements behavior the Rationale does not describe — surface it under **Findings
-for human review** with the specific file, the conflicting claim, and what the diff
-actually does. The primary agent decides whether to patch docs or code.
+**Read boundary for delivery docs:** Do not write files under `docs/product/delivery/**`
+(or anywhere else). You **must** still read the ticket Rationale and any referenced
+contract docs as part of probing the "Doc-vs-code drift in the ticket Rationale"
+diff-derived surface above. If you find drift — the Rationale claims a behavior the diff
+does not implement, or the diff implements behavior the Rationale does not describe —
+surface it under **Findings for human review** with the specific file, the conflicting
+claim, and what the diff actually does. The primary agent decides whether to patch docs
+or code.
 
 **Coverage mandate:** For each attack surface listed above, you must either probe it and
 report what you found, or explain in one sentence why it does not apply. "I didn't check"
@@ -144,24 +146,19 @@ You may add extra attack surfaces when your independent repo read finds a plausi
 ticket-relevant failure path. Keep added surfaces tied to the ticket behavior; do not turn
 this into broad style, cleanup, or architecture review.
 
-**Patch discipline:** Patch only when one of the following holds:
+**Finding discipline:** Report a finding when one of the following holds:
 
 1. The code breaks a stated invariant.
 2. The code introduces a correctness gap you can demonstrate.
 3. **Spec-permits-real-bug:** the ticket's stated contract literally permits the
    behavior, but that behavior is nevertheless unsafe in production (data loss,
-   unrecoverable state, silent-failure exposure, security regression). Patch
-   and explain in Findings which spec clause permitted the unsafe behavior so
-   the primary agent can decide whether to update the spec.
+   unrecoverable state, silent-failure exposure, security regression). Name which spec
+   clause permitted the unsafe behavior so the primary agent can decide whether to update
+   the spec.
 
-Do not patch for style, preference, or hypothetical future requirements. If you notice
-something worth flagging but it is outside these three clauses, put it in Findings for
-human review — do not patch it.
-
-**Verification discipline:** Prefer scoped verification for the implementation/test files
-under review. If a full-repo check fails on pre-existing files or generated
-`docs/product/delivery/**` files, classify it as out of scope. Do not patch generated docs
-to satisfy formatting, linting, or spellcheck.
+Do not report style, preference, or hypothetical future requirements as blocking findings.
+If you notice something worth flagging but it is outside these three clauses, put it in
+**Findings for human review** only.
 
 **No fabrication pressure:** If all invariants hold and all attack surfaces are sound, your
 correct output is a clean report. Do not invent findings to justify the review step.
@@ -170,7 +167,7 @@ correct output is a clean report. Do not invent findings to justify the review s
 
 ### Required output format
 
-After completing your review and any patches, report in this exact structure:
+After completing your review, report in this exact structure (prose only — no file edits):
 
 **Invariant results**
 For each invariant: `[held | broken | untested]` — one line explaining what you tried.
@@ -180,15 +177,15 @@ For each attack surface (both ticket-spec-derived and the seven diff-derived cla
 `[probed | N/A — <reason> | blocked — missing-input]`
 If probed: what you tried and what you found (one to three sentences).
 
-**Patches applied**
+**Actionable findings**
+For each finding the primary agent should consider patching: file/path, what is wrong,
+which invariant or finding-discipline clause applies, and a concrete fix recommendation.
 If none: "None."
-If any: for each patch — file, change summary, which invariant or patch-discipline clause
-it fixes (invariant break, demonstrable correctness gap, or spec-permits-real-bug).
 
 **Findings for human review**
-Things you noticed that are outside the three patch-discipline clauses and were not
-patched, including any doc-vs-code drift surfaced under the diff-derived "Doc-vs-code
-drift in the ticket Rationale" class. If none: "None."
+Things you noticed that are outside the three finding-discipline clauses, including any
+doc-vs-code drift surfaced under the diff-derived "Doc-vs-code drift in the ticket
+Rationale" class. If none: "None."
 
 **Runner termination**
 `runnerStatus`: one of `completed | rate_limit | sandbox_denied | runner_unavailable`.

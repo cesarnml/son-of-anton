@@ -32,10 +32,13 @@ Execute:
 7. bun run deliver --plan <plan-path> start
 8. For code tickets, write and commit the failing behavior test with `[red]`
 9. bun run deliver --plan <plan-path> post-red
-10. Implement, verify, and continue with the next command from status
+10. Implement, verify, and continue with the next command from `status`
+11. For code tickets with subagent review enabled: `post-verify` → `write-subagent-adversarial-review` → `subagent-review` → `open-pr` (see `delivery-orchestrator.md`)
 ```
 
 Both the product plan and implementation docs must be committed to `main` **before** the orchestrator creates any branches.
+
+The pre-PR subagent gate is a **two-step** flow: the primary agent authors the filled adversarial prompt (`write-subagent-adversarial-review`); the runner step (`subagent-review --preferred-runner …`) consumes that exact prompt and returns findings prose only. Policy surface names stay `subagentReview`, `--subagent-review-policy`, and `subagent-review`.
 
 ## Resuming in-progress work
 

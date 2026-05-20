@@ -13,17 +13,18 @@ For every code ticket, these steps must run in this exact sequence:
 3. `post-red` — verify and record the `[red]` commit before implementation
 4. Implement + verify (`bun run verify:quiet` inner loop, then `bun run ci:quiet` before open-pr)
 5. `post-verify [clean|patched]` — self-audit
-6. `subagent-review [clean|patched]` — second AI pass (required for code tickets when `subagentReview` is not `"disabled"`)
-7. `open-pr` — publish the PR (never before subagent-review completes)
-8. `poll-review` — external AI review window
-9. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
-10. `advance` — move to next ticket
+6. `write-subagent-adversarial-review` — primary agent authors the filled adversarial prompt (required for code tickets when `subagentReview` is not `"disabled"`)
+7. `subagent-review` — advisory subagent pass against that exact prompt (programmatic runner with `--preferred-runner`, or recorder mode)
+8. `open-pr` — publish the PR (never before the subagent adversarial review gate completes)
+9. `poll-review` — external AI review window
+10. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
+11. `advance` — move to next ticket
 
 Tickets declare `Red: required` or `Red: skip` in their metadata block. Code
 tickets use `Red: required`; tickets with no testable behavior may declare
 `Red: skip`, and doc-only branches also skip `post-red` structurally.
 
-**post-red must precede implementation. subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
+**post-red must precede implementation. write-subagent-adversarial-review must precede subagent-review. subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
 
 ## Stance
 
@@ -374,37 +375,47 @@ When omitted, outcome defaults to `clean`. The `status` command renders the outc
 - Higher-risk areas changed in the diff (data shape, migrations, auth, API contracts) got a second read in post-verify mode.
 - The delivery ticket doc has an updated **Rationale** when behavior or trade-offs changed (repo policy).
 
-Then run `post-verify`, then (if `subagentReview` is enabled) `subagent-review`, then `open-pr`.
+Then run `post-verify`, then (if `subagentReview` is enabled) `write-subagent-adversarial-review`, then `subagent-review`, then `open-pr`.
 
-## Subagent review (ticket stacks)
+## Subagent adversarial review (ticket stacks)
 
-When `reviewPolicy.subagentReview` is `"required"`, the agent must record a subagent review outcome before `open-pr` is allowed for code tickets.
+When `reviewPolicy.subagentReview` is `"required"` or `"skip_doc_only"`, code tickets must complete the two-step pre-PR subagent gate before `open-pr`: prompt authoring, then advisory runner review.
 
 **Role split:**
 
-- **Primary agent** executes and patches during build and post-verify mode.
-- **Review subagent** reviews and patches its own findings autonomously — a second AI pass before the PR is published. The primary agent does not triage subagent output; the subagent acts on what it finds.
+- **Primary agent** executes and patches during build and post-verify mode, authors the filled adversarial prompt, applies any prudent patches from subagent findings, and records the final review outcome.
+- **Review subagent** is an advisory runner — a second AI pass before the PR is published. It probes the attack surfaces in the written prompt and returns findings prose only. It must not modify any files in the worktree. The primary agent decides what to patch and commits with a `[subagent-review]` suffix when it applies subagent-driven fixes.
 - **External AI vendors** (e.g. CodeRabbit, Qodo) review post-publication during `poll-review`.
+
+**Step 1 — Author the prompt (`write-subagent-adversarial-review`):**
+
+1. Read `docs/template/delivery/adversarial-review-template.md`. Fill in invariants, attack surfaces (including the seven diff-derived classes), and diff context from the current ticket diff and spec. This is primary-agent work — the subagent does not author its own brief.
+2. Record the filled prompt:
+
+```bash
+bun run deliver --plan <plan> write-subagent-adversarial-review
+# optional: --prompt-file <path> when the filled template already exists on disk
+```
+
+The command persists the prompt under `reviews/<ticket>-subagent-adversarial-prompt.md`, commits it from the ticket worktree, and stores `subagentAdversarialPromptPath` on the ticket in delivery state.
+
+**Step 2 — Run advisory review (`subagent-review`):**
 
 **Runner selection:** The execution agent declares its own identity via `--preferred-runner <claude-cli|codex-exec>`. The CLI tries the preferred runner first, falls back to the other, and records an honest `skipped` artifact if neither is available. No config change is needed when switching agent platforms (Claude Code, Codex, Cursor, etc.).
 
-The runner writes a `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-runner.json`, then stages, commits, and pushes that artifact from the ticket worktree. `open-pr` fails closed when `subagentReview` is not `"disabled"` and a non-skipped outcome is recorded but the artifact file is missing.
+The runner receives the exact bytes from `write-subagent-adversarial-review`, invokes verified headless forms (`claude -p` / `codex exec`), and writes a `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-runner.json` with the filled prompt and raw runner response inline. The orchestrator stages, commits, and pushes that artifact from the ticket worktree. `open-pr` fails closed when `subagentReview` is not `"disabled"` and a non-skipped outcome is recorded but the artifact file is missing.
 
-**Hard write boundary:** Review subagents must never modify files under `docs/product/delivery/**`. Those files are primary-agent delivery artifacts and historical workflow evidence. A subagent may report concerns about them under Findings for human review, but must not patch them. The programmatic runner fails the subagent-review step if a runner changes that path.
+**Advisory-only contract:** The runner must not write files. If the worktree has new modifications after the runner exits, the CLI records `outcome: skipped` with `terminatedReason: advisory_violation` — not a completed clean review. Non-zero exit codes, empty output, and rate-limit signatures are also recorded as non-`completed` termination; the CLI refuses `outcome: clean` unless `terminatedReason` is `completed`.
 
-**Running subagent review:**
-
-1. Read `docs/template/delivery/adversarial-review-template.md`. Fill in invariants, attack surfaces, and diff context from the current ticket diff and spec. Pass the completed template as the runner's prompt. The listed surfaces are the starting map; the runner may independently inspect directly related implementation code and add ticket-relevant attack surfaces.
-2. The runner executes, patches what it finds, and exits. Outcome is detected via commit movement or `git status --porcelain` (changes present → `patched`; no changes → `clean`).
-3. **Stay idle. No read-ahead.** Wait for the runner to complete before doing anything else.
-4. Record the outcome.
+3. **Stay idle. No read-ahead.** Wait for the runner subprocess to exit before doing anything else.
+4. The primary agent reads findings, applies any prudent patches, then records:
 
 ```bash
-bun run deliver --plan <plan> subagent-review clean    # subagent found nothing worth patching
-bun run deliver --plan <plan> subagent-review patched <sha...>  # subagent findings were applied
+bun run deliver --plan <plan> subagent-review clean    # no primary-agent patches from subagent findings
+bun run deliver --plan <plan> subagent-review patched <sha...>  # primary agent applied subagent-driven fixes
 ```
 
-Without `--preferred-runner`, the CLI is a state recorder only and does not invoke the subagent or runner. With `--preferred-runner`, the CLI invokes the runner, passes a prompt containing the `docs/product/delivery/**` hard write boundary, writes the runner artifact, and records the detected outcome. A recorded subagent patch commit must use a subject suffix of `[subagent-review]`.
+Without `--preferred-runner`, the CLI is a state recorder only and does not invoke a runner. With `--preferred-runner`, the CLI invokes the runner against the persisted prompt, enforces the advisory-only contract, writes the runner artifact, and records the detected outcome. Primary-agent patch commits that respond to subagent findings must use a subject suffix of `[subagent-review]`.
 
 **Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 
@@ -507,7 +518,8 @@ Available commands:
 - `start [ticket-id]`
 - `post-red [ticket-id]`
 - `post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]`
-- `subagent-review [clean|patched] [patch-commit-sha ...]`
+- `write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]`
+- `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]`
 - `open-pr [ticket-id]`
 - `poll-review [ticket-id]`
 - `triage-ticket <ticket-id>`
@@ -567,9 +579,11 @@ Default `cook` flow (with repo-default `skip_doc_only` review policy):
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-red
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
-# for code tickets when subagentReview is required, pass --preferred-runner <claude-cli|codex-exec> to run the subagent review programmatically, then record:
+# for code tickets when subagentReview is enabled:
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
+# pass --preferred-runner <claude-cli|codex-exec> to run the advisory subagent programmatically, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
-# for doc-only tickets under skip_doc_only, subagent-review auto-records skipped
+# for doc-only tickets under skip_doc_only, subagent-review auto-records skipped (no prompt step)
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
 # poll-review auto-records clean/skipped when prReview is disabled or no findings detected — skip record-review in those cases
@@ -584,7 +598,8 @@ With `subagentReview: "required"` in `orchestrator.config.json`, the subagent st
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md start
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-red
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
-# execution agent passes --preferred-runner <its-identity>; runner patches findings, then record:
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
+# execution agent passes --preferred-runner <its-identity>; runner returns findings prose only; primary agent patches if prudent, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
