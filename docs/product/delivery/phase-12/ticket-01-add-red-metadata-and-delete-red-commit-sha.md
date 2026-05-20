@@ -53,8 +53,18 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `parseRedPolicy` unit test (`tools/delivery/test/ticket-metadata.test.ts`) asserting `Red: skip` parses to `'skip'`. Failed because `tools/delivery/ticket-metadata.ts` did not exist. Committed as `113de218`.
+
+Why this path: The parser lives in a dedicated `ticket-metadata.ts` module (rather than inline in `planning.ts` next to `parseTicketType`/`parseTicketScope`) because the strict-throw semantics differ from those lenient parsers. A dedicated module isolates the strict-validation contract and gives it focused tests. `planning.ts` provides a thin `parseTicketRedPolicy` wrapper that handles FS-read failure by returning `'required'` (matches the lenient pattern of its siblings — graceful when ticket files are missing during plan parsing).
+
+Alternative considered: parsing `Red:` at `start`-time inside `ticket-flow.ts` and writing the value directly to `state.json`. Rejected because the existing precedent (Type/Scope lifted by `planning.ts` into `TicketDefinition`) is cleaner — let plan-read populate the definition, then `state.ts` lifts it onto the saved ticket state alongside type/scope. State.json gains `redPolicy` automatically on first save.
+
+Deferred: comprehensive backward-compat for state.json files predating phase-12 (`state.ts` falls back to `definition.redPolicy` when `previous?.redPolicy` is absent — that's sufficient for current consumers since `/soa update` policy requires closing the current phase first).
+
+Skip-precedence implementation: the OR semantics is `redPolicy === 'skip' || isLocalBranchDocOnly`. Both reasons are accumulated into the log message so the operator knows which signal(s) fired (`post-red skipped (Red: skip)`, `post-red skipped (doc-only branch)`, or `post-red skipped (Red: skip, doc-only branch)`).
+
+Bypass deletion completeness verified via `git grep 'red-commit-sha\|redCommitSha'` after the change: all remaining hits are the legitimate `redCommitSha` state field (recorded when post-red passes against a real `[red]` HEAD) plus the rejection error message in `cli.ts`. No CLI-flag-supplied references remain.
+
+Test surface: `ticket-metadata.test.ts` covers parser accept/default/throw/case/empty/extra-tokens paths. `p7-03.test.ts` replaces the `--red-commit-sha flag` describe block with a `--red-commit-sha removed` block that asserts the error names both honest paths. `p9-02.test.ts` replaces the bypass test with a `Red: skip` skip-honoring test. `orchestrator.test.ts` updated to include `redPolicy: 'required'` in expected `parsePlan` output.
+
+Contract note: no deviation from the ticket metadata contract. `Type: feat`, `Scope: delivery`, `Red: required` all matched and were honored. The ticket itself committed `[red]` and `[green]` in sequence and ran `post-red` successfully — eating-own-dogfood through the existing gate (phase-12's reordering is a docs change in T2; the code change lands here).
