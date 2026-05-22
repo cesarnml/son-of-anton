@@ -2,6 +2,9 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   buildRunnerInvocation,
+  getFallbackFrom,
+  getPrimaryAgent,
+  getRunnerSelfReport,
   validateRunnerArtifact,
 } from '../subagent-runner';
 import type {
@@ -11,12 +14,17 @@ import type {
 
 describe('P14.01 — outcome vocabulary expands to include deferred', () => {
   it('round-trips a deferred outcome through the validator', () => {
-    const invocation = buildRunnerInvocation('claude-cli', 'abc123', 'deferred', {
-      primaryAgent: 'claude-code',
-      schemaVersion: 1,
-      runnerSelfReport: 'clean',
-      fallbackFrom: null,
-    });
+    const invocation = buildRunnerInvocation(
+      'claude-cli',
+      'abc123',
+      'deferred',
+      {
+        primaryAgent: 'claude-code',
+        schemaVersion: 1,
+        runnerSelfReport: 'clean',
+        fallbackFrom: null,
+      },
+    );
     const artifact: SubagentRunnerArtifact = {
       ticket: 'P14.01',
       invocations: [invocation],
@@ -102,11 +110,19 @@ describe('P14.01 — permissive parse for legacy rows', () => {
     const validated = validateRunnerArtifact(artifact);
     expect(validated).not.toBeNull();
     const row = validated!.invocations[0] as SubagentRunnerInvocation;
-    expect(row.primaryAgent).toBe('unknown');
-    expect(row.runnerSelfReport).toBeNull();
-    expect(row.fallbackFrom).toBeNull();
+    // Phase-14 fields are absent on legacy rows; reader getters materialize
+    // the documented defaults (`"unknown"`, `null`, `null`) without mutating
+    // the stored row shape.
+    expect(row.primaryAgent).toBeUndefined();
+    expect(row.runnerSelfReport).toBeUndefined();
+    expect(row.fallbackFrom).toBeUndefined();
+    expect(getPrimaryAgent(row)).toBe('unknown');
+    expect(getRunnerSelfReport(row)).toBeNull();
+    expect(getFallbackFrom(row)).toBeNull();
     // schemaVersion may be 0 or absent — both signal "pre-Phase-14".
-    expect(row.schemaVersion === undefined || row.schemaVersion === 0).toBe(true);
+    expect(row.schemaVersion === undefined || row.schemaVersion === 0).toBe(
+      true,
+    );
   });
 
   it('tolerates an unknown future schemaVersion rather than throwing', () => {

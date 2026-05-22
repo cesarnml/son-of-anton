@@ -49,8 +49,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `expect(row.primaryAgent).toBe('unknown')` on a legacy-shaped row — validator did not project that default.
+Why this path: The Outcome contract reads "primaryAgent absent → 'unknown'" but materializing that into the validator output broke nine existing P10/P11/P13 `toEqual(artifact)` tests by adding fields not present on the input artifact. We split the contract: the validator preserves input shape exactly (no back-fill), and reader-side helpers (`getPrimaryAgent`, `getRunnerSelfReport`, `getFallbackFrom`) materialize the documented defaults. Same semantics, no churn on legacy assertions. `schemaVersion` absence is also preserved so legacy rows remain byte-distinguishable from Phase-14 rows.
+Alternative considered: Back-fill defaults inside `validateRunnerArtifact` and update each `toEqual(artifact)` legacy test to include the new fields. Rejected: widens the diff across prior phases' tests without any change in stored ledger shape and risks masking real divergence when later phases assert exact artifact shapes.
+Deferred: Caller migration of `cli-runner.ts` / `subagent-runner.ts` to populate the new fields lands in P14.02+. This ticket only ships the schema, validator, writer surface, and reader helpers so P14.02 has a target.
+Contract note: none — "tolerated with sensible defaults" is honored via reader helpers rather than parse-time back-fill, which keeps the writer surface monotonic.

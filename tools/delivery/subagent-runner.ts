@@ -1,7 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-export type SubagentRunnerOutcome = 'clean' | 'patched' | 'skipped';
+export type SubagentRunnerOutcome =
+  | 'clean'
+  | 'patched'
+  | 'deferred'
+  | 'skipped';
+
+export const SUBAGENT_LEDGER_SCHEMA_VERSION = 1;
 
 export type SubagentRunnerKind =
   | 'claude-cli'
@@ -40,6 +46,27 @@ export type SubagentRunnerInvocation = {
    */
   filledPrompt?: string;
   fallbackLevel?: SubagentRunnerFallbackLevel;
+  /**
+   * Ledger schema version for this row. Pre-Phase-14 rows omit this field;
+   * the validator preserves that absence rather than back-filling it.
+   */
+  schemaVersion?: number;
+  /**
+   * Free-form identity of the primary agent that drove this ticket
+   * (e.g. `"claude-code"`, `"codex-cli"`). Defaults to `"unknown"` when a
+   * row is parsed without it.
+   */
+  primaryAgent?: string;
+  /**
+   * Self-reported `runnerStatus` value emitted by the model in its prose,
+   * when parseable. `null` when the runner did not surface one.
+   */
+  runnerSelfReport?: string | null;
+  /**
+   * Originally-requested subagent kind when a fallback fired. `null` when no
+   * fallback was needed.
+   */
+  fallbackFrom?: SubagentRunnerKind | null;
   findings: string[];
   probedSurfaces: string[];
   patches: string[];
@@ -277,7 +304,12 @@ const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [
   'skipped',
   'operator-recorder',
 ];
-const VALID_OUTCOMES: SubagentRunnerOutcome[] = ['clean', 'patched', 'skipped'];
+const VALID_OUTCOMES: SubagentRunnerOutcome[] = [
+  'clean',
+  'patched',
+  'deferred',
+  'skipped',
+];
 const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
   'completed',
   'rate_limit',
@@ -298,6 +330,10 @@ export type BuildRunnerInvocationOptions = {
   rawOutput?: string;
   filledPrompt?: string;
   fallbackLevel?: SubagentRunnerFallbackLevel;
+  schemaVersion?: number;
+  primaryAgent?: string;
+  runnerSelfReport?: string | null;
+  fallbackFrom?: SubagentRunnerKind | null;
   findings?: string[];
   probedSurfaces?: string[];
   patches?: string[];
@@ -324,6 +360,18 @@ export function buildRunnerInvocation(
       : {}),
     ...(options.fallbackLevel !== undefined
       ? { fallbackLevel: options.fallbackLevel }
+      : {}),
+    ...(options.schemaVersion !== undefined
+      ? { schemaVersion: options.schemaVersion }
+      : {}),
+    ...(options.primaryAgent !== undefined
+      ? { primaryAgent: options.primaryAgent }
+      : {}),
+    ...(options.runnerSelfReport !== undefined
+      ? { runnerSelfReport: options.runnerSelfReport }
+      : {}),
+    ...(options.fallbackFrom !== undefined
+      ? { fallbackFrom: options.fallbackFrom }
       : {}),
     findings: options.findings ?? [],
     probedSurfaces: options.probedSurfaces ?? [],
@@ -391,7 +439,41 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
   ) {
     return null;
   }
+  if (
+    obj['schemaVersion'] !== undefined &&
+    (typeof obj['schemaVersion'] !== 'number' ||
+      !Number.isInteger(obj['schemaVersion']))
+  ) {
+    return null;
+  }
+  if (
+    obj['primaryAgent'] !== undefined &&
+    typeof obj['primaryAgent'] !== 'string'
+  ) {
+    return null;
+  }
+  if (
+    obj['runnerSelfReport'] !== undefined &&
+    obj['runnerSelfReport'] !== null &&
+    typeof obj['runnerSelfReport'] !== 'string'
+  ) {
+    return null;
+  }
+  if (
+    obj['fallbackFrom'] !== undefined &&
+    obj['fallbackFrom'] !== null &&
+    (typeof obj['fallbackFrom'] !== 'string' ||
+      !(VALID_RUNNER_KINDS as string[]).includes(obj['fallbackFrom']))
+  ) {
+    return null;
+  }
 
+  // The validator preserves input shape: Phase-14 fields are emitted only when
+  // present in the source row. Readers should apply `getPrimaryAgent` /
+  // `getRunnerSelfReport` / `getFallbackFrom` to materialize the documented
+  // defaults (`"unknown"`, `null`, `null`) for legacy rows. Forward-compat note:
+  // an unknown future `schemaVersion` (e.g. `999`) parses without throwing — the
+  // contract for unknown versions is "read what you can; don't enforce".
   return {
     runnerKind: obj['runnerKind'] as SubagentRunnerKind,
     reviewedHeadSha: obj['reviewedHeadSha'] as string,
@@ -407,10 +489,51 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
     ...(obj['fallbackLevel'] !== undefined
       ? { fallbackLevel: obj['fallbackLevel'] as SubagentRunnerFallbackLevel }
       : {}),
+    ...(obj['schemaVersion'] !== undefined
+      ? { schemaVersion: obj['schemaVersion'] as number }
+      : {}),
+    ...(obj['primaryAgent'] !== undefined
+      ? { primaryAgent: obj['primaryAgent'] as string }
+      : {}),
+    ...(obj['runnerSelfReport'] !== undefined
+      ? { runnerSelfReport: obj['runnerSelfReport'] as string | null }
+      : {}),
+    ...(obj['fallbackFrom'] !== undefined
+      ? { fallbackFrom: obj['fallbackFrom'] as SubagentRunnerKind | null }
+      : {}),
     findings,
     probedSurfaces,
     patches,
   };
+}
+
+/**
+ * Materialize the documented default for a row missing `primaryAgent`. Pre-
+ * Phase-14 rows render as `"unknown"`; Phase-14 rows preserve whatever the
+ * writer recorded.
+ */
+export function getPrimaryAgent(row: SubagentRunnerInvocation): string {
+  return row.primaryAgent ?? 'unknown';
+}
+
+/**
+ * Materialize the documented default for a row missing `runnerSelfReport`.
+ * Defaults to `null` (no parseable self-report).
+ */
+export function getRunnerSelfReport(
+  row: SubagentRunnerInvocation,
+): string | null {
+  return row.runnerSelfReport ?? null;
+}
+
+/**
+ * Materialize the documented default for a row missing `fallbackFrom`.
+ * Defaults to `null` (no fallback fired).
+ */
+export function getFallbackFrom(
+  row: SubagentRunnerInvocation,
+): SubagentRunnerKind | null {
+  return row.fallbackFrom ?? null;
 }
 
 function validateStringArray(value: unknown): string[] | null {
