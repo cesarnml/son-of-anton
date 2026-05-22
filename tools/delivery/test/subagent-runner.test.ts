@@ -146,3 +146,202 @@ describe('P14.01 — permissive parse for legacy rows', () => {
     expect(validated!.invocations[0]?.schemaVersion).toBe(999);
   });
 });
+
+// P14.02 helpers imported via dynamic require so the file still parses
+// while they don't yet exist (red state). Once `subagent-runner.ts` exports
+// them, the live functions take over and the assertions become meaningful.
+const sr = await import('../subagent-runner');
+const coerceCodexCliClassification = (
+  sr as {
+    coerceCodexCliClassification?: (input: {
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+    }) => {
+      outcome: 'clean' | 'skipped';
+      terminatedReason: 'completed' | 'rate_limit';
+      runnerSelfReport: string | null;
+    };
+  }
+).coerceCodexCliClassification;
+const resolveSubagentSelection = (
+  sr as {
+    resolveSubagentSelection?: (input: {
+      flag: 'claude-cli' | 'codex-cli' | undefined;
+      configField: 'claude-cli' | 'codex-cli' | undefined;
+    }) => { kind: 'claude-cli' | 'codex-cli'; source: 'flag' | 'config' };
+  }
+).resolveSubagentSelection;
+const resolvePrimaryAgent = (
+  sr as {
+    resolvePrimaryAgent?: (input: {
+      flag: string | undefined;
+      configField: string | undefined;
+    }) => string;
+  }
+).resolvePrimaryAgent;
+const runSubagentWithFallback = (
+  sr as {
+    runSubagentWithFallback?: (
+      requested: 'claude-cli' | 'codex-cli',
+      attempt: (kind: 'claude-cli' | 'codex-cli') => {
+        status: 'ran' | 'unavailable' | 'timeout';
+        outcome?: 'clean' | 'patched';
+        terminatedReason?: string;
+      },
+    ) => {
+      ranKind: 'claude-cli' | 'codex-cli' | 'skipped';
+      fallbackFrom: 'claude-cli' | 'codex-cli' | null;
+      fallbackLevel: 'preferred' | 'fallback' | 'failed_all';
+      result: { status: 'ran' | 'unavailable' | 'timeout' };
+      attemptedKinds: ('claude-cli' | 'codex-cli')[];
+    };
+  }
+).runSubagentWithFallback;
+
+describe('P14.02 — coerceCodexCliClassification', () => {
+  it('trusts runnerStatus: completed even when stderr resembles rate-limit prose', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 0,
+      stdout: 'findings...\n\nrunnerStatus: completed\n',
+      stderr: 'warning: you may have hit your rate limit on prior call\n',
+    });
+    expect(result.outcome).toBe('clean');
+    expect(result.terminatedReason).toBe('completed');
+    expect(result.runnerSelfReport).toBe('completed');
+  });
+
+  it('classifies authentic rate-limit signal (structured) as skipped/rate_limit', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 7,
+      stdout: '',
+      stderr: '{"error":"rate_limited","retryAfter":60}\n',
+    });
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('rate_limit');
+  });
+
+  it('records runnerSelfReport: null when the trailer is absent', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 0,
+      stdout: 'findings without any trailer',
+      stderr: '',
+    });
+    expect(result.runnerSelfReport).toBeNull();
+  });
+});
+
+describe('P14.02 — resolveSubagentSelection', () => {
+  it('returns the flag value (source=flag) when provided', () => {
+    expect(resolveSubagentSelection).toBeDefined();
+    expect(
+      resolveSubagentSelection!({ flag: 'codex-cli', configField: undefined }),
+    ).toEqual({ kind: 'codex-cli', source: 'flag' });
+  });
+
+  it('falls back to the config field (source=config) when flag missing', () => {
+    expect(resolveSubagentSelection).toBeDefined();
+    expect(
+      resolveSubagentSelection!({ flag: undefined, configField: 'claude-cli' }),
+    ).toEqual({ kind: 'claude-cli', source: 'config' });
+  });
+
+  it('throws when both flag and config field are absent, naming both resolutions', () => {
+    expect(resolveSubagentSelection).toBeDefined();
+    let caught: Error | null = null;
+    try {
+      resolveSubagentSelection!({ flag: undefined, configField: undefined });
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toMatch(/--subagent/);
+    expect(caught!.message).toMatch(/subagentRunner/);
+  });
+
+  it('flag wins over config when both are set', () => {
+    expect(resolveSubagentSelection).toBeDefined();
+    expect(
+      resolveSubagentSelection!({
+        flag: 'codex-cli',
+        configField: 'claude-cli',
+      }),
+    ).toEqual({ kind: 'codex-cli', source: 'flag' });
+  });
+});
+
+describe('P14.02 — resolvePrimaryAgent', () => {
+  it('returns the flag value (free-form passthrough)', () => {
+    expect(resolvePrimaryAgent).toBeDefined();
+    expect(
+      resolvePrimaryAgent!({ flag: 'cursor', configField: undefined }),
+    ).toBe('cursor');
+  });
+
+  it('falls back to the config field', () => {
+    expect(resolvePrimaryAgent).toBeDefined();
+    expect(
+      resolvePrimaryAgent!({ flag: undefined, configField: 'composer' }),
+    ).toBe('composer');
+  });
+
+  it('returns "unknown" when neither flag nor config is set', () => {
+    expect(resolvePrimaryAgent).toBeDefined();
+    expect(
+      resolvePrimaryAgent!({ flag: undefined, configField: undefined }),
+    ).toBe('unknown');
+  });
+
+  it('accepts arbitrary free-form values without validation', () => {
+    expect(resolvePrimaryAgent).toBeDefined();
+    for (const v of ['aider', 'copilot', 'composer', 'mystery-agent']) {
+      expect(resolvePrimaryAgent!({ flag: v, configField: undefined })).toBe(v);
+    }
+  });
+});
+
+describe('P14.02 — runSubagentWithFallback', () => {
+  const ran = (outcome: 'clean' | 'patched' = 'clean') => ({
+    status: 'ran' as const,
+    outcome,
+    terminatedReason: 'completed' as const,
+  });
+  const unavailable = { status: 'unavailable' as const };
+
+  it('uses the requested runner with no fallbackFrom when it succeeds', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return ran();
+    });
+    expect(result.ranKind).toBe('codex-cli');
+    expect(result.fallbackFrom).toBeNull();
+    expect(result.fallbackLevel).toBe('preferred');
+    expect(calls).toEqual(['codex-cli']);
+  });
+
+  it('falls back to the other runner and records fallbackFrom', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli' ? unavailable : ran();
+    });
+    expect(result.ranKind).toBe('claude-cli');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(result.fallbackLevel).toBe('fallback');
+    expect(calls).toEqual(['codex-cli', 'claude-cli']);
+  });
+
+  it('records failed_all and preserves the originally-requested kind when both unavailable', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const result = runSubagentWithFallback!('codex-cli', () => unavailable);
+    expect(result.fallbackLevel).toBe('failed_all');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(result.result.status).toBe('unavailable');
+  });
+});
