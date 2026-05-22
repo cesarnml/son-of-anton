@@ -1,3 +1,12 @@
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'bun:test';
 
 import {
@@ -6,6 +15,7 @@ import {
   getPrimaryAgent,
   getRunnerSelfReport,
   validateRunnerArtifact,
+  writeSubagentReviewOutcome,
 } from '../subagent-runner';
 import type {
   SubagentRunnerArtifact,
@@ -393,5 +403,65 @@ describe('P14.02 — runSubagentWithFallback', () => {
     expect(result.fallbackLevel).toBe('failed_all');
     expect(result.fallbackFrom).toBe('codex-cli');
     expect(result.result.status).toBe('unavailable');
+  });
+});
+
+describe('P14.05 — stderr trace discipline', () => {
+  it('writes the model report without stderr admixture', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'soa-p14-05-report-'));
+    try {
+      const stdout = 'Final report\n\nrunnerStatus: completed';
+      const stderr = Array.from(
+        { length: 1001 },
+        (_, index) => `stderr noise ${index + 1}`,
+      ).join('\n');
+
+      const written = writeSubagentReviewOutcome({
+        repoRoot,
+        reviewsDirPath: 'docs/product/delivery/phase-14/reviews',
+        ticketId: 'P14.05',
+        stdout,
+        stderr,
+      });
+
+      expect(readFileSync(written.absolutePath, 'utf-8')).toBe(`${stdout}\n`);
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('writes stderr to a sibling trace log', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'soa-p14-05-trace-'));
+    try {
+      const stdout = 'Final report\n\nrunnerStatus: completed';
+      const stderr = 'hook output\nconfig dump\n';
+
+      writeSubagentReviewOutcome({
+        repoRoot,
+        reviewsDirPath: 'docs/product/delivery/phase-14/reviews',
+        ticketId: 'P14.05',
+        stdout,
+        stderr,
+      });
+
+      const tracePath = join(
+        repoRoot,
+        'docs/product/delivery/phase-14/reviews/P14.05-subagent-review.trace.log',
+      );
+      expect(readFileSync(tracePath, 'utf-8')).toBe(stderr);
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps subagent trace logs out of git by default', () => {
+    const gitignore = readFileSync(join(import.meta.dir, '../../../.gitignore'), {
+      encoding: 'utf-8',
+    });
+
+    expect(gitignore).toContain('*-subagent-review.trace.log');
+    expect(
+      existsSync(join(import.meta.dir, '../../../docs/template/stubs/.gitignore')),
+    ).toBe(false);
   });
 });
