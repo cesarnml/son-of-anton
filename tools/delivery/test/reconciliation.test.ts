@@ -356,6 +356,20 @@ describe('P14.03 — recordAcknowledgment', () => {
     ).toThrow(/commit/);
   });
 
+  it('--ack-reconciliation clean requires non-empty --reason', () => {
+    expect(RM.recordAcknowledgment).toBeDefined();
+    const path = freshArtifact('P14.03');
+    expect(() =>
+      RM.recordAcknowledgment!({
+        artifactPath: path,
+        ticket: 'P14.03',
+        reviewedHeadSha: 'rev0',
+        variant: 'clean',
+        reason: '   ',
+      }),
+    ).toThrow(/reason/);
+  });
+
   it('--ack-reconciliation deferred requires non-empty --reason', () => {
     expect(RM.recordAcknowledgment).toBeDefined();
     const path = freshArtifact('P14.03');

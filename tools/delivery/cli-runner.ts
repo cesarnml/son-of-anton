@@ -617,11 +617,12 @@ export async function runDeliveryOrchestrator(
             deferTarget.subagentRunnerArtifactPath ??
             `${state.reviewsDirPath}/${deferTarget.id}-subagent-runner.json`;
           const artifactAbs = resolve(cwd, artifactRel);
-          const reviewedHeadShaForDefer = readFileSync('/dev/null', 'utf-8')
-            ? 'unknown'
-            : 'unknown';
-          // Use the latest invocation's reviewedHeadSha when present.
-          let reviewedHead = reviewedHeadShaForDefer;
+          // Use the latest invocation's reviewedHeadSha. A corrupt artifact
+          // must surface as an error — silently writing `reviewedHeadSha:
+          // "unknown"` would heal the corruption with a sentinel value that
+          // never matches a real SHA, leaving the reconciliation gate
+          // permanently unsatisfied.
+          let reviewedHead = 'unknown';
           if (existsSync(artifactAbs)) {
             try {
               const a = JSON.parse(readFileSync(artifactAbs, 'utf-8')) as {
@@ -629,8 +630,11 @@ export async function runDeliveryOrchestrator(
               };
               const last = a.invocations?.[a.invocations.length - 1];
               if (last?.reviewedHeadSha) reviewedHead = last.reviewedHeadSha;
-            } catch {
-              /* ignore */
+            } catch (parseError) {
+              throw new Error(
+                `record-deferred: failed to parse subagent runner artifact at ${artifactAbs}: ${String(parseError)}. Fix or remove the corrupt artifact before recording a deferred row.`,
+                { cause: parseError },
+              );
             }
           }
           const primaryAgentForDefer = resolvePrimaryAgent({
@@ -2336,6 +2340,25 @@ function runReconciliationGate(
       ticket: string;
       invocations: Array<Record<string, unknown>>;
     };
+    // Dedup: if an existing patched row for this reviewedHeadSha already
+    // records the same commit SHAs, skip the append. Prevents unbounded row
+    // accumulation when commitDeliveryArtifactAndPush fails between writes
+    // and re-runs of the gate.
+    const alreadyRecorded = parsed.invocations.some((row) => {
+      if (row['outcome'] !== 'patched') return false;
+      if (row['reviewedHeadSha'] !== ctx.reviewedHeadSha) return false;
+      const existing = row['patches'];
+      if (!Array.isArray(existing)) return false;
+      return decision.commitShas.every((sha) =>
+        (existing as unknown[]).includes(sha),
+      );
+    });
+    if (alreadyRecorded) {
+      console.log(
+        `reconcile-subagent-review: patched row for ${decision.commitShas.join(', ')} already recorded; skipping duplicate.`,
+      );
+      return;
+    }
     parsed.invocations.push({
       runnerKind: 'operator-recorder',
       reviewedHeadSha: ctx.reviewedHeadSha,
