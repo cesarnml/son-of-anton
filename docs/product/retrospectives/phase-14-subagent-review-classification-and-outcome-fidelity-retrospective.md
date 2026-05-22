@@ -46,4 +46,4 @@ The phase achieved its stated goal relative to the codogotchi P2 audit. The prim
 - Add a maintainer quick-start line to README: example `orchestrator.config.json` with `subagentRunner` for repos that always use one CLI family.
 - On the next consumer `/soa update`, spot-check one repo for stale `codex-exec` or old triplet paths outside the subtree (P14.04 deferral assumed clean checkpoints only).
 
-_Created: 2026-05-22. P14.06 PR pending._
+_Created: 2026-05-22. [PR #55](https://github.com/cesarnml/son-of-anton/pull/55) open._
