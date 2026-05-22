@@ -147,7 +147,7 @@ import {
   requireSubagentAdversarialPromptForRunner,
   writeSubagentAdversarialPrompt,
 } from './subagent-prompt';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 
