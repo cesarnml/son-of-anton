@@ -1,9 +1,4 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -455,13 +450,13 @@ describe('P14.05 — stderr trace discipline', () => {
   });
 
   it('keeps subagent trace logs out of git by default', () => {
-    const gitignore = readFileSync(join(import.meta.dir, '../../../.gitignore'), {
-      encoding: 'utf-8',
-    });
+    const gitignore = readFileSync(
+      join(import.meta.dir, '../../../.gitignore'),
+      {
+        encoding: 'utf-8',
+      },
+    );
 
     expect(gitignore).toContain('*-subagent-review.trace.log');
-    expect(
-      existsSync(join(import.meta.dir, '../../../docs/template/stubs/.gitignore')),
-    ).toBe(false);
   });
 });

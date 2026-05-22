@@ -54,6 +54,21 @@ write_soa_version() {
   echo "$1" > "$REPO_ROOT/.soa-sync-version"
 }
 
+ensure_gitignore_pattern() {
+  local pattern="$1"
+  local gitignore="$REPO_ROOT/.gitignore"
+
+  if [ -f "$gitignore" ] && grep -qxF "$pattern" "$gitignore"; then
+    return
+  fi
+
+  if [ -f "$gitignore" ] && [ -s "$gitignore" ] && [ "$(tail -c 1 "$gitignore")" != "" ]; then
+    printf '\n' >> "$gitignore"
+  fi
+  printf '%s\n' "$pattern" >> "$gitignore"
+  echo "  updated: .gitignore ($pattern)"
+}
+
 # ---------------------------------------------------------------------------
 # Migrations
 # ---------------------------------------------------------------------------
@@ -245,6 +260,8 @@ EOF_CONFIG
     cp "$SOURCE_SOA_SKILL" "$GLOBAL_SOA_SKILL"
     echo "  refreshed: ~/.claude/skills/soa/SKILL.md"
   fi
+
+  ensure_gitignore_pattern "*-subagent-review.trace.log"
 
   echo ""
   echo "soa-sync: setup complete."

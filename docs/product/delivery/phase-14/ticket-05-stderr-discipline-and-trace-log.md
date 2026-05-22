@@ -53,8 +53,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `bun test tools/delivery/test/subagent-runner.test.ts` failed because `report.md` still contained a combined `stdout:`/`stderr:` body, no sibling `trace.log` was written, and the repo ignore surface lacked `*-subagent-review.trace.log`.
+Why this path: `writeSubagentReviewOutcome` now writes stdout as the durable report, writes stderr to a sibling trace log, and returns both paths while keeping the ledger `rawOutput` pointed at the report. `tryRunner` carries stdout/stderr alongside the legacy formatted raw output so callers can persist the streams separately without changing classification behavior.
+Alternative considered: embedding the trace path in the ledger was rejected because the trace is explicitly local-only and gitignored; persisting a path in committed JSON would imply a durable artifact contract that this ticket intentionally avoids.
+Deferred: no archival of trace logs beyond the active worktree; no broader prompt/report content changes beyond excluding generated prompt/report artifacts from Prettier's source-formatting surface.
+Contract note: root `.gitignore` is the canonical ignore template in this repo; `scripts/soa-sync.sh` now appends the trace-log pattern for consumer repos during `/soa update`.

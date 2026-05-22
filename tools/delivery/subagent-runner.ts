@@ -97,6 +97,8 @@ export type RunnerAttemptResult =
       outcome: 'clean' | 'patched';
       terminatedReason: SubagentRunnerTerminatedReason;
       rawOutput?: string;
+      stdout?: string;
+      stderr?: string;
     }
   | { status: 'unavailable' }
   | { status: 'timeout' };
@@ -358,12 +360,20 @@ export function runSubagentWithFallback(
 }
 
 export const SUBAGENT_REVIEW_OUTCOME_SUFFIX = '-subagent-review.report.md';
+export const SUBAGENT_REVIEW_TRACE_SUFFIX = '-subagent-review.trace.log';
 
 export function deriveSubagentReviewOutcomePath(
   reviewsDirPath: string,
   ticketId: string,
 ): string {
   return `${reviewsDirPath}/${ticketId}${SUBAGENT_REVIEW_OUTCOME_SUFFIX}`;
+}
+
+export function deriveSubagentReviewTracePath(
+  reviewsDirPath: string,
+  ticketId: string,
+): string {
+  return `${reviewsDirPath}/${ticketId}${SUBAGENT_REVIEW_TRACE_SUFFIX}`;
 }
 
 export function formatRawRunnerOutput(stdout = '', stderr = ''): string {
@@ -376,10 +386,12 @@ export function formatRawRunnerOutput(stdout = '', stderr = ''): string {
 export type SubagentReviewOutcomeWriteResult = {
   absolutePath: string;
   relativePath: string;
+  traceAbsolutePath: string;
+  traceRelativePath: string;
 };
 
 /**
- * Format runner stdout/stderr and persist under the plan reviews directory.
+ * Persist the runner's model report and local stderr trace sidecar.
  * The runner artifact stores `relativePath` in `rawOutput`, not the prose body.
  */
 export function writeSubagentReviewOutcome(input: {
@@ -388,24 +400,28 @@ export function writeSubagentReviewOutcome(input: {
   ticketId: string;
   stdout?: string;
   stderr?: string;
-  /** When set, written as-is (must already be formatRawRunnerOutput-shaped). */
+  /** When set, written as-is as the report body. */
   content?: string;
 }): SubagentReviewOutcomeWriteResult {
-  const body =
-    input.content ??
-    formatRawRunnerOutput(input.stdout ?? '', input.stderr ?? '');
+  const body = input.content ?? input.stdout ?? '';
   const relativePath = deriveSubagentReviewOutcomePath(
     input.reviewsDirPath,
     input.ticketId,
   );
+  const traceRelativePath = deriveSubagentReviewTracePath(
+    input.reviewsDirPath,
+    input.ticketId,
+  );
   const absolutePath = join(input.repoRoot, relativePath);
+  const traceAbsolutePath = join(input.repoRoot, traceRelativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
   writeFileSync(
     absolutePath,
     body.endsWith('\n') ? body : `${body}\n`,
     'utf-8',
   );
-  return { absolutePath, relativePath };
+  writeFileSync(traceAbsolutePath, input.stderr ?? '', 'utf-8');
+  return { absolutePath, relativePath, traceAbsolutePath, traceRelativePath };
 }
 
 export function isSubagentReviewOutcomePath(value: string): boolean {
@@ -478,6 +494,8 @@ export function tryRunner(
     status: 'ran',
     outcome: hasChanges ? 'patched' : 'clean',
     terminatedReason,
+    stdout: result.stdout,
+    stderr: result.stderr,
     rawOutput:
       result.rawOutput ??
       (hasOutputFields

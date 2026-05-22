@@ -7,7 +7,6 @@ import {
   SUBAGENT_REVIEW_OUTCOME_SUFFIX,
   buildRunnerInvocation,
   deriveSubagentReviewOutcomePath,
-  formatRawRunnerOutput,
   isSubagentAdversarialPromptReference,
   isSubagentReviewOutcomePath,
   validateRunnerArtifact,
@@ -15,7 +14,7 @@ import {
 } from '../subagent-runner';
 
 describe('P13.04 — subagent review sidecar artifacts', () => {
-  it('writeSubagentReviewOutcome persists formatRawRunnerOutput-shaped prose', () => {
+  it('writeSubagentReviewOutcome persists runner stdout as report prose', () => {
     const repoRoot = mkdtempSync(join(tmpdir(), 'p13-04-outcome-'));
     const reviewsDirPath = 'docs/product/delivery/phase-13/reviews';
     const ticketId = 'P13.04';
@@ -36,9 +35,7 @@ describe('P13.04 — subagent review sidecar artifacts', () => {
     );
 
     const onDisk = readFileSync(written.absolutePath, 'utf-8');
-    expect(onDisk).toBe(
-      `${formatRawRunnerOutput('Invariant results\nAll held.', '')}\n`,
-    );
+    expect(onDisk).toBe('Invariant results\nAll held.\n');
   });
 
   it('runner artifact stores path references, not embedded prose', () => {

@@ -880,6 +880,8 @@ export async function runDeliveryOrchestrator(
         let terminatedReason: SubagentRunnerTerminatedReason =
           'runner_unavailable';
         let runnerOutputText: string | undefined;
+        let runnerStdout: string | undefined;
+        let runnerStderr: string | undefined;
         let runnerSelfReport: string | null = null;
 
         const fallbackOutcome = runSubagentWithFallback(
@@ -953,6 +955,8 @@ export async function runDeliveryOrchestrator(
               outcome = decided.outcome;
               terminatedReason = decided.terminatedReason;
               runnerOutputText = result.rawOutput;
+              runnerStdout = result.stdout;
+              runnerStderr = result.stderr;
 
               if (runnerWroteFiles) {
                 const wroteHeadPaths =
@@ -1000,7 +1004,8 @@ export async function runDeliveryOrchestrator(
             repoRoot: cwd,
             reviewsDirPath: state.reviewsDirPath,
             ticketId: subagentTarget.id,
-            content: runnerOutputText,
+            stdout: runnerStdout ?? runnerOutputText,
+            stderr: runnerStderr ?? '',
           });
         }
 
