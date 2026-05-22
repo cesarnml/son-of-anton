@@ -88,9 +88,9 @@ function baseTicket(overrides: Partial<TicketState> = {}): TicketState {
 describe('P13.03 — runner invocation records prompt and outcome path refs', () => {
   it('round-trips filledPrompt and rawOutput path refs through validateRunnerArtifact', () => {
     const filledPrompt =
-      'docs/product/delivery/phase-13/reviews/P13.03-subagent-adversarial-prompt.md';
+      'docs/product/delivery/phase-13/reviews/P13.03-subagent-review.prompt.md';
     const rawOutput =
-      'docs/product/delivery/phase-13/reviews/P13.03-subagent-review-outcome.md';
+      'docs/product/delivery/phase-13/reviews/P13.03-subagent-review.report.md';
 
     const invocation = buildRunnerInvocation('codex-cli', 'abc1234', 'clean', {
       terminatedReason: 'completed',
@@ -141,7 +141,7 @@ describe('P13.03 — runner is advisory-only (no-write contract)', () => {
         buildRunnerInvocation('codex-cli', 'abc1234', 'skipped', {
           terminatedReason: 'advisory_violation',
           rawOutput:
-            'docs/product/delivery/phase-13/reviews/P13.03-subagent-review-outcome.md',
+            'docs/product/delivery/phase-13/reviews/P13.03-subagent-review.report.md',
         }),
       ],
     };
@@ -298,7 +298,7 @@ describe('P13.03 — runner-prompt resolver refuses generic fallback', () => {
     try {
       const ticket = baseTicket({
         subagentAdversarialPromptPath:
-          'docs/product/delivery/phase-13/reviews/P13.03-subagent-adversarial-prompt.md',
+          'docs/product/delivery/phase-13/reviews/P13.03-subagent-review.prompt.md',
       });
       expect(() =>
         requireSubagentAdversarialPromptForRunner({ repoRoot, ticket }),
@@ -314,7 +314,7 @@ describe('P13.03 — runner-prompt resolver refuses generic fallback', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'p13-03-prompt-ok-'));
     const reviewsDirPath = 'docs/product/delivery/phase-13/reviews';
     mkdirSync(join(repoRoot, reviewsDirPath), { recursive: true });
-    const relativePath = `${reviewsDirPath}/P13.03-subagent-adversarial-prompt.md`;
+    const relativePath = `${reviewsDirPath}/P13.03-subagent-review.prompt.md`;
     const content =
       '# Adversarial review for P13.03\n\n' +
       'Invariants: runner reads this exact file.\n' +

@@ -395,7 +395,7 @@ describe('delivery orchestrator', () => {
     });
     const writtenAt = '2026-05-20T17:31:26.246Z';
     const promptPath =
-      'docs/product/delivery/phase-02/reviews/P2.01-subagent-adversarial-prompt.md';
+      'docs/product/delivery/phase-02/reviews/P2.01-subagent-review.prompt.md';
 
     const existing: DeliveryState = {
       planKey: 'phase-02',

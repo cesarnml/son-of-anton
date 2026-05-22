@@ -30,7 +30,7 @@ describe('P11.01 — readSubagentRunnerArtifact legacy adapter', () => {
         outcome: 'clean',
         completedAt: '2026-05-18T15:29:44.213Z',
       };
-      const path = join(tempDir, 'P9.99-subagent-runner.json');
+      const path = join(tempDir, 'P9.99-subagent-review.ledger.json');
       await writeFile(path, JSON.stringify(legacy));
 
       const artifact = readSubagentRunnerArtifact(path, 'P9.99');
@@ -186,7 +186,7 @@ describe('P11.01 — readSubagentRunnerArtifact structured round-trip', () => {
         ticket: 'P11.99',
         invocations: [invocation1, invocation2],
       };
-      const path = join(tempDir, 'P11.99-subagent-runner.json');
+      const path = join(tempDir, 'P11.99-subagent-review.ledger.json');
       await writeFile(path, JSON.stringify(artifact, null, 2));
 
       const round = readSubagentRunnerArtifact(path, 'P11.99');
@@ -215,7 +215,7 @@ describe('P11.01 — appendInvocationToArtifact', () => {
   it('creates a new structured artifact when the path does not exist', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-create-'));
     try {
-      const path = join(tempDir, 'P11.99-subagent-runner.json');
+      const path = join(tempDir, 'P11.99-subagent-review.ledger.json');
       const invocation = buildRunnerInvocation(
         'claude-cli',
         'sha-new',
@@ -237,7 +237,7 @@ describe('P11.01 — appendInvocationToArtifact', () => {
   it('appends to an existing structured artifact (append-only)', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-append-'));
     try {
-      const path = join(tempDir, 'P11.99-subagent-runner.json');
+      const path = join(tempDir, 'P11.99-subagent-review.ledger.json');
       const first = buildRunnerInvocation('claude-cli', 'sha-1', 'clean');
       const second = buildRunnerInvocation('codex-cli', 'sha-2', 'patched');
       appendInvocationToArtifact(path, 'P11.99', first);
@@ -257,7 +257,7 @@ describe('P11.01 — appendInvocationToArtifact', () => {
   it('appends to a legacy 4-field artifact by lifting it first', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-legacy-append-'));
     try {
-      const path = join(tempDir, 'P11.99-subagent-runner.json');
+      const path = join(tempDir, 'P11.99-subagent-review.ledger.json');
       await writeFile(
         path,
         JSON.stringify({

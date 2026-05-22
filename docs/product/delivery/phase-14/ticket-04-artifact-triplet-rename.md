@@ -64,8 +64,12 @@ No `[red]` commit. Proceed directly to the rename sweep.
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [N/A — Red:skip rename ticket; no failing test required]
-Why this path: [why this rename approach was chosen, especially if a single-sweep vs incremental approach was considered]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: N/A — Red:skip rename ticket; no failing test required. Existing flow tests prove no behavior regression after the path-string sweep.
+
+Why this path: single-sweep rename across writers, file-resolution probes, tests, docs/template, and consumer-facing skill prose plus a `git mv` of the existing P14.01-03 phase-14 artifact files to the new triplet names. Internal path references inside the renamed `.ledger.json` files and the (gitignored) `state.json` were migrated in lockstep so the new names are the only path probed.
+
+Alternative considered: leaving pre-rename phase-14 artifact files under old names with only writer code updated. Rejected — the implementation-plan stop condition explicitly says any remaining consumer-discoverable old-name reference is a stop trigger.
+
+Deferred: pre-Phase-14 ledger artifacts (e.g. `docs/product/delivery/phase-13/reviews/P13.01-subagent-runner.json`) stay byte-identical per the phase-14 plan's "pre-Phase-14 ledger rows stay byte-identical" deferral. Historical plan/retrospective/ticket prose that names the old triplet as the renamed-from value is preserved as narrative; only active runtime path strings and templated/skill prose were rewritten.
+
+Contract note: `runnerKind` JSON field is unchanged; only artifact filenames moved. No dual-name fallback shipped.

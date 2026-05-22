@@ -36,12 +36,12 @@ export type SubagentRunnerInvocation = {
   completedAt: string;
   terminatedReason: SubagentRunnerTerminatedReason;
   /**
-   * Repo-relative path to `reviews/<ticket>-subagent-review-outcome.md` (runner
+   * Repo-relative path to `reviews/<ticket>-subagent-review.report.md` (runner
    * prose). Legacy artifacts may still store inline stdout/stderr text.
    */
   rawOutput?: string;
   /**
-   * Repo-relative path to `reviews/<ticket>-subagent-adversarial-prompt.md`.
+   * Repo-relative path to `reviews/<ticket>-subagent-review.prompt.md`.
    * Legacy artifacts may still store inline prompt text.
    */
   filledPrompt?: string;
@@ -357,7 +357,7 @@ export function runSubagentWithFallback(
   };
 }
 
-export const SUBAGENT_REVIEW_OUTCOME_SUFFIX = '-subagent-review-outcome.md';
+export const SUBAGENT_REVIEW_OUTCOME_SUFFIX = '-subagent-review.report.md';
 
 export function deriveSubagentReviewOutcomePath(
   reviewsDirPath: string,
@@ -413,7 +413,7 @@ export function isSubagentReviewOutcomePath(value: string): boolean {
 }
 
 export function isSubagentAdversarialPromptReference(value: string): boolean {
-  return value.endsWith('-subagent-adversarial-prompt.md');
+  return value.endsWith('-subagent-review.prompt.md');
 }
 
 export function classifyRunnerTermination(

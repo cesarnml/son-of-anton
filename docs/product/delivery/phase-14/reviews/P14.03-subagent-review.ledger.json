@@ -7,8 +7,8 @@
       "outcome": "clean",
       "completedAt": "2026-05-22T06:40:43.087Z",
       "terminatedReason": "completed",
-      "rawOutput": "docs/product/delivery/phase-14/reviews/P14.03-subagent-review-outcome.md",
-      "filledPrompt": "docs/product/delivery/phase-14/reviews/P14.03-subagent-adversarial-prompt.md",
+      "rawOutput": "docs/product/delivery/phase-14/reviews/P14.03-subagent-review.report.md",
+      "filledPrompt": "docs/product/delivery/phase-14/reviews/P14.03-subagent-review.prompt.md",
       "fallbackLevel": "preferred",
       "schemaVersion": 1,
       "primaryAgent": "claude",
@@ -26,9 +26,7 @@
       "terminatedReason": "completed",
       "findings": [],
       "probedSurfaces": [],
-      "patches": [
-        "8d2a8c02891762a57a3a97a63614656f259e7e7a"
-      ],
+      "patches": ["8d2a8c02891762a57a3a97a63614656f259e7e7a"],
       "schemaVersion": 1,
       "primaryAgent": "unknown",
       "runnerSelfReport": null,

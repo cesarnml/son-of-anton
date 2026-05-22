@@ -60,7 +60,7 @@ const RM = rec as unknown as {
 
 function freshArtifact(ticket: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'p14-03-reconciliation-'));
-  const path = join(dir, `${ticket}-subagent-runner.json`);
+  const path = join(dir, `${ticket}-subagent-review.ledger.json`);
   const initial = {
     ticket,
     invocations: [

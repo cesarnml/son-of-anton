@@ -31,7 +31,7 @@ describe('P13.01 — runner spawn command shapes', () => {
 describe('P13.01 — raw runner response artifact evidence', () => {
   it('persists rawOutput path ref and fallback metadata on invocations', () => {
     const outcomePath =
-      'docs/product/delivery/phase-13/reviews/P13.01-subagent-review-outcome.md';
+      'docs/product/delivery/phase-13/reviews/P13.01-subagent-review.report.md';
     const invocation = buildRunnerInvocation('codex-cli', 'abc123', 'clean', {
       fallbackLevel: 'preferred',
       rawOutput: outcomePath,

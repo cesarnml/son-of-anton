@@ -401,13 +401,13 @@ bun run deliver --plan <plan> write-subagent-adversarial-review
 # optional: --prompt-file <path> when the filled template already exists on disk
 ```
 
-The command persists the prompt under `reviews/<ticket>-subagent-adversarial-prompt.md`, commits it from the ticket worktree, and stores `subagentAdversarialPromptPath` on the ticket in delivery state.
+The command persists the prompt under `reviews/<ticket>-subagent-review.prompt.md`, commits it from the ticket worktree, and stores `subagentAdversarialPromptPath` on the ticket in delivery state.
 
 **Step 2 — Run advisory review (`subagent-review`):**
 
 **Runner selection:** The execution agent declares its own identity via `--subagent <claude-cli|codex-cli>`. The CLI tries the preferred runner first, falls back to the other, and records an honest `skipped` artifact if neither is available. No config change is needed when switching agent platforms (Claude Code, Codex, Cursor, etc.).
 
-The runner receives the exact bytes from `reviews/<ticket>-subagent-adversarial-prompt.md`, invokes verified headless forms (`claude -p` / `codex exec`), persists runner prose to `reviews/<ticket>-subagent-review-outcome.md`, and writes a `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-runner.json` whose `filledPrompt` and `rawOutput` fields are repo-relative paths to those sidecars (not embedded text). The orchestrator stages, commits, and pushes the JSON plus sidecar files from the ticket worktree. `open-pr` fails closed when `subagentReview` is not `"disabled"` and a non-skipped outcome is recorded but the artifact file is missing.
+The runner receives the exact bytes from `reviews/<ticket>-subagent-review.prompt.md`, invokes verified headless forms (`claude -p` / `codex exec`), persists runner prose to `reviews/<ticket>-subagent-review.report.md`, and writes a `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-review.ledger.json` whose `filledPrompt` and `rawOutput` fields are repo-relative paths to those sidecars (not embedded text). The orchestrator stages, commits, and pushes the JSON plus sidecar files from the ticket worktree. `open-pr` fails closed when `subagentReview` is not `"disabled"` and a non-skipped outcome is recorded but the artifact file is missing.
 
 **Advisory-only contract:** The runner must not write files. If the worktree has new modifications after the runner exits, the CLI records `outcome: skipped` with `terminatedReason: advisory_violation` — not a completed clean review. Non-zero exit codes, empty output, and rate-limit signatures are also recorded as non-`completed` termination; the CLI refuses `outcome: clean` unless `terminatedReason` is `completed`.
 

@@ -43,9 +43,9 @@ describe('P13.04 — subagent review sidecar artifacts', () => {
 
   it('runner artifact stores path references, not embedded prose', () => {
     const promptPath =
-      'docs/product/delivery/phase-13/reviews/P13.04-subagent-adversarial-prompt.md';
+      'docs/product/delivery/phase-13/reviews/P13.04-subagent-review.prompt.md';
     const outcomePath =
-      'docs/product/delivery/phase-13/reviews/P13.04-subagent-review-outcome.md';
+      'docs/product/delivery/phase-13/reviews/P13.04-subagent-review.report.md';
 
     expect(isSubagentAdversarialPromptReference(promptPath)).toBe(true);
     expect(isSubagentReviewOutcomePath(outcomePath)).toBe(true);

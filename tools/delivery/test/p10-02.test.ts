@@ -352,7 +352,7 @@ describe('P10.02 — subagent runner artifact persistence', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'subagent-artifact-'));
     const artifactPath = join(
       repoRoot,
-      'docs/product/delivery/phase-10/reviews/P10.02-subagent-runner.json',
+      'docs/product/delivery/phase-10/reviews/P10.02-subagent-review.ledger.json',
     );
     const pushedBranches: string[] = [];
 

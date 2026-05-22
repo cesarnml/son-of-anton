@@ -615,7 +615,7 @@ export async function runDeliveryOrchestrator(
           }
           const artifactRel =
             deferTarget.subagentRunnerArtifactPath ??
-            `${state.reviewsDirPath}/${deferTarget.id}-subagent-runner.json`;
+            `${state.reviewsDirPath}/${deferTarget.id}-subagent-review.ledger.json`;
           const artifactAbs = resolve(cwd, artifactRel);
           // Use the latest invocation's reviewedHeadSha. A corrupt artifact
           // must surface as an error — silently writing `reviewedHeadSha:
@@ -704,7 +704,7 @@ export async function runDeliveryOrchestrator(
           return 0;
         }
 
-        const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-runner.json`;
+        const artifactRelPath = `${state.reviewsDirPath}/${subagentTarget.id}-subagent-review.ledger.json`;
         const artifactAbsPath = resolve(cwd, artifactRelPath);
 
         // Resolve current HEAD for both recorder and idempotency dispatch.
@@ -2247,7 +2247,7 @@ function loadReconciliationContext(
   }
   const artifactRel =
     ticket.subagentRunnerArtifactPath ??
-    `${state.reviewsDirPath}/${ticket.id}-subagent-runner.json`;
+    `${state.reviewsDirPath}/${ticket.id}-subagent-review.ledger.json`;
   const artifactAbs = resolve(cwd, artifactRel);
   let rows: Array<{ outcome: string; reviewedHeadSha?: string }> = [];
   let reviewedHeadSha = '';
@@ -2280,7 +2280,7 @@ function loadReconciliationContext(
     reviewedHeadSha,
   );
 
-  const outcomePath = `${state.reviewsDirPath}/${ticket.id}-subagent-review-outcome.md`;
+  const outcomePath = `${state.reviewsDirPath}/${ticket.id}-subagent-review.report.md`;
   const outcomeAbs = resolve(cwd, outcomePath);
   const reportMarkdown = existsSync(outcomeAbs)
     ? readFileSync(outcomeAbs, 'utf-8')
