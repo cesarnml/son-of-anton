@@ -235,6 +235,75 @@ function isCodexCliAuthenticRateLimit(input: {
   );
 }
 
+// Authentic rate-limit signal for claude-cli — Anthropic API structured error
+// shape. Prose like "you've hit your limit" alone is NOT authentic; only the
+// quoted `{"type":"rate_limit_error"}` (or `"overloaded_error"`) token counts.
+function isClaudeCliAuthenticRateLimit(input: {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}): boolean {
+  const blob = `${input.stdout}\n${input.stderr}`;
+  return /"type"\s*:\s*"(?:rate_limit_error|overloaded_error)"/.test(blob);
+}
+
+/**
+ * P14.02 — claude-cli classification fidelity, symmetric to codex-cli.
+ *
+ * Trusts the model's self-reported `runnerStatus: <value>` trailer when
+ * present. Only escalates to skipped/rate_limit on the runner's authentic
+ * structured signal (Anthropic API `"type":"rate_limit_error"`), not on
+ * stderr text that resembles rate-limit prose. Prevents prose like
+ * "you have hit your rate limit" from producing a silent `skipped`.
+ */
+export function coerceClaudeCliClassification(input: {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}): {
+  outcome: 'clean' | 'skipped';
+  terminatedReason: SubagentRunnerTerminatedReason;
+  runnerSelfReport: string | null;
+} {
+  const runnerSelfReport = parseRunnerStatusTrailer(input.stdout);
+
+  if (isClaudeCliAuthenticRateLimit(input)) {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'rate_limit',
+      runnerSelfReport,
+    };
+  }
+
+  if (runnerSelfReport === 'completed') {
+    return {
+      outcome: 'clean',
+      terminatedReason: 'completed',
+      runnerSelfReport,
+    };
+  }
+
+  if (input.exitCode !== 0) {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'runner_failed',
+      runnerSelfReport,
+    };
+  }
+  if (`${input.stdout}${input.stderr}`.trim() === '') {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'runner_failed',
+      runnerSelfReport,
+    };
+  }
+  return {
+    outcome: 'clean',
+    terminatedReason: 'completed',
+    runnerSelfReport,
+  };
+}
+
 /**
  * P14.02 — Runner availability fallback.
  *

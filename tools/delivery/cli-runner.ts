@@ -119,6 +119,7 @@ import {
   appendInvocationToArtifact,
   buildRunnerSpawnCommand,
   buildRunnerInvocation,
+  coerceClaudeCliClassification,
   coerceCodexCliClassification,
   decideAdvisoryRunnerOutcome,
   decideSubagentReviewMode,
@@ -835,27 +836,23 @@ export async function runDeliveryOrchestrator(
                 }
                 const stdout = spawned.stdout ?? '';
                 const stderr = spawned.stderr ?? '';
-                // P14.02: codex-cli classification trusts the model's
+                // P14.02: per-runner classification trusts the model's
                 // self-reported runnerStatus trailer and only escalates to
-                // skipped/rate_limit on authentic structured signals.
-                if (runner === 'codex-cli') {
-                  const classified = coerceCodexCliClassification({
-                    exitCode: spawned.status,
-                    stdout,
-                    stderr,
-                  });
-                  runnerSelfReport = classified.runnerSelfReport;
-                  return {
-                    exitCode: spawned.status,
-                    timedOut:
-                      spawned.signal === 'SIGTERM' ||
-                      spawnError?.message?.includes('timed out') ||
-                      false,
-                    stdout,
-                    stderr,
-                    terminatedReason: classified.terminatedReason,
-                  };
-                }
+                // skipped/rate_limit on authentic structured signals (not
+                // stderr/stdout prose). Symmetric for codex-cli and claude-cli.
+                const classified =
+                  runner === 'codex-cli'
+                    ? coerceCodexCliClassification({
+                        exitCode: spawned.status,
+                        stdout,
+                        stderr,
+                      })
+                    : coerceClaudeCliClassification({
+                        exitCode: spawned.status,
+                        stdout,
+                        stderr,
+                      });
+                runnerSelfReport = classified.runnerSelfReport;
                 return {
                   exitCode: spawned.status,
                   timedOut:
@@ -864,6 +861,7 @@ export async function runDeliveryOrchestrator(
                     false,
                   stdout,
                   stderr,
+                  terminatedReason: classified.terminatedReason,
                 };
               },
               () => {

@@ -165,6 +165,19 @@ const coerceCodexCliClassification = (
     };
   }
 ).coerceCodexCliClassification;
+const coerceClaudeCliClassification = (
+  sr as {
+    coerceClaudeCliClassification?: (input: {
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+    }) => {
+      outcome: 'clean' | 'skipped';
+      terminatedReason: 'completed' | 'rate_limit';
+      runnerSelfReport: string | null;
+    };
+  }
+).coerceClaudeCliClassification;
 const resolveSubagentSelection = (
   sr as {
     resolveSubagentSelection?: (input: {
@@ -232,6 +245,42 @@ describe('P14.02 — coerceCodexCliClassification', () => {
       stderr: '',
     });
     expect(result.runnerSelfReport).toBeNull();
+  });
+});
+
+describe('P14.02 — coerceClaudeCliClassification (symmetric to codex-cli)', () => {
+  it('treats stderr/stdout prose like "you have hit your rate limit" as completed/clean', () => {
+    expect(coerceClaudeCliClassification).toBeDefined();
+    const result = coerceClaudeCliClassification!({
+      exitCode: 0,
+      stdout: 'review report ...',
+      stderr: 'warning: you have hit your rate limit on prior call',
+    });
+    expect(result.outcome).toBe('clean');
+    expect(result.terminatedReason).toBe('completed');
+  });
+
+  it('classifies authentic Anthropic rate_limit_error JSON token as skipped/rate_limit', () => {
+    expect(coerceClaudeCliClassification).toBeDefined();
+    const result = coerceClaudeCliClassification!({
+      exitCode: 0,
+      stdout: '',
+      stderr:
+        '{"type":"error","error":{"type":"rate_limit_error","message":"Number of request tokens has exceeded your per-minute rate limit"}}',
+    });
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('rate_limit');
+  });
+
+  it('also accepts the overloaded_error structured token', () => {
+    expect(coerceClaudeCliClassification).toBeDefined();
+    const result = coerceClaudeCliClassification!({
+      exitCode: 0,
+      stdout: '',
+      stderr: '{"type":"overloaded_error"}',
+    });
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('rate_limit');
   });
 });
 
