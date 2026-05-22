@@ -26,6 +26,9 @@ export type ParsedCliArgs = {
   primary?: string;
   baseline?: BaselineValue;
   promptFile?: string;
+  ackReconciliation?: 'patched' | 'deferred' | 'clean';
+  commitSha?: string;
+  reason?: string;
 };
 
 export const STANDALONE_TRIAGE_COMMAND = 'triage-standalone';
@@ -107,7 +110,9 @@ export function getUsage(runDeliverInvocation: string): string {
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
     '  write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]',
     '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli>] [--primary <name>]',
-    '  open-pr [ticket-id]',
+    '  subagent-review record-deferred --reason "<rationale>" [ticket-id]',
+    '  reconcile-subagent-review [ticket-id]',
+    '  open-pr [ticket-id] [--ack-reconciliation <patched|deferred|clean>] [--commit <sha>] [--reason "<text>"]',
     '  poll-review [ticket-id]',
     '  triage-ticket <ticket-id>',
     '  record-review <ticket-id> <clean|patched|operator_input_needed> [note]',
@@ -124,6 +129,9 @@ export function getUsage(runDeliverInvocation: string): string {
     '  --pr-review-policy <required|skip_doc_only|disabled>',
     '  --subagent <claude-cli|codex-cli>',
     '  --primary <free-form name>',
+    '  --ack-reconciliation <patched|deferred|clean>',
+    '  --commit <sha>',
+    '  --reason "<text>"',
     '  --baseline <orchestrator|run-policy>',
   ].join('\n');
 }
@@ -138,6 +146,9 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let primary: ParsedCliArgs['primary'];
   let baseline: ParsedCliArgs['baseline'];
   let promptFile: ParsedCliArgs['promptFile'];
+  let ackReconciliation: ParsedCliArgs['ackReconciliation'];
+  let commitSha: ParsedCliArgs['commitSha'];
+  let reason: ParsedCliArgs['reason'];
   const flags = new Set<string>();
   const positionals: string[] = [];
 
@@ -292,6 +303,43 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       continue;
     }
 
+    if (value === '--ack-reconciliation') {
+      const raw = argv[index + 1];
+      const VALID = ['patched', 'deferred', 'clean'] as const;
+      if (
+        raw === undefined ||
+        raw.startsWith('--') ||
+        !(VALID as readonly string[]).includes(raw)
+      ) {
+        throw new Error(`Pass --ack-reconciliation <${VALID.join('|')}>.`);
+      }
+      ackReconciliation = raw as 'patched' | 'deferred' | 'clean';
+      index += 1;
+      continue;
+    }
+
+    if (value === '--commit') {
+      const raw = argv[index + 1];
+      if (raw === undefined || raw.startsWith('--') || raw.trim() === '') {
+        throw new Error('Pass --commit <sha>.');
+      }
+      commitSha = raw.trim();
+      index += 1;
+      continue;
+    }
+
+    if (value === '--reason') {
+      const raw = argv[index + 1];
+      if (raw === undefined || raw.startsWith('--')) {
+        throw new Error(
+          'Pass --reason "<rationale>" (the rationale is captured on the ledger for audit).',
+        );
+      }
+      reason = raw;
+      index += 1;
+      continue;
+    }
+
     if (value === '--phase') {
       throw new Error(
         '--phase has been removed. Pass --plan <plan-path> instead.',
@@ -325,6 +373,9 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     primary,
     baseline,
     promptFile,
+    ackReconciliation,
+    commitSha,
+    reason,
   };
 }
 

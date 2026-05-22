@@ -116,6 +116,12 @@ import {
   startTicket as startTicketImpl,
 } from './ticket-flow';
 import {
+  ReconciliationBlockedError,
+  reconcileReview,
+  recordAcknowledgment,
+  recordDeferred,
+} from './reconciliation';
+import {
   appendInvocationToArtifact,
   buildRunnerSpawnCommand,
   buildRunnerInvocation,
@@ -593,6 +599,65 @@ export async function runDeliveryOrchestrator(
         return 0;
       }
       case 'subagent-review': {
+        // P14.03: `subagent-review record-deferred --reason "<text>"` appends
+        // a `deferred` ledger row alongside the existing runner/recorder rows.
+        if (parsed.positionals[0] === 'record-deferred') {
+          const deferTarget =
+            (parsed.positionals[1]
+              ? state.tickets.find((t) => t.id === parsed.positionals[1])
+              : state.tickets.find(
+                  (t) => t.status === 'subagent_review_complete',
+                )) ?? undefined;
+          if (!deferTarget) {
+            throw new Error(
+              'record-deferred requires a ticket at subagent_review_complete (or pass an explicit ticket id).',
+            );
+          }
+          const artifactRel =
+            deferTarget.subagentRunnerArtifactPath ??
+            `${state.reviewsDirPath}/${deferTarget.id}-subagent-runner.json`;
+          const artifactAbs = resolve(cwd, artifactRel);
+          const reviewedHeadShaForDefer = readFileSync('/dev/null', 'utf-8')
+            ? 'unknown'
+            : 'unknown';
+          // Use the latest invocation's reviewedHeadSha when present.
+          let reviewedHead = reviewedHeadShaForDefer;
+          if (existsSync(artifactAbs)) {
+            try {
+              const a = JSON.parse(readFileSync(artifactAbs, 'utf-8')) as {
+                invocations?: Array<{ reviewedHeadSha?: string }>;
+              };
+              const last = a.invocations?.[a.invocations.length - 1];
+              if (last?.reviewedHeadSha) reviewedHead = last.reviewedHeadSha;
+            } catch {
+              /* ignore */
+            }
+          }
+          const primaryAgentForDefer = resolvePrimaryAgent({
+            flag: parsed.primary,
+            configField: context.config.primaryAgent,
+          });
+          recordDeferred({
+            artifactPath: artifactAbs,
+            ticket: deferTarget.id,
+            reviewedHeadSha: reviewedHead,
+            reason: parsed.reason ?? '',
+            primaryAgent: primaryAgentForDefer,
+          });
+          commitDeliveryArtifactAndPush({
+            absolutePath: artifactAbs,
+            branch: deferTarget.branch,
+            commitMessage: `chore(${deferTarget.id}): record subagent-review deferred row`,
+            ensureBranchPushed: context.platform.ensureBranchPushed,
+            relativeToRepo,
+            repoRoot: cwd,
+            runProcess: context.platform.runProcess,
+          });
+          console.log(
+            `Recorded deferred row for ${deferTarget.id} (reason captured).`,
+          );
+          return 0;
+        }
         const subagentArgs = parseSubagentReviewArgs(
           parsed.positionals,
           parsed.flags,
@@ -983,7 +1048,23 @@ export async function runDeliveryOrchestrator(
         console.log(formatStatus(nextState, context.config));
         return 0;
       }
+      case 'reconcile-subagent-review': {
+        await runReconcileSubagentReview(
+          state,
+          cwd,
+          context,
+          parsed.positionals[0],
+        );
+        return 0;
+      }
       case 'open-pr': {
+        // P14.03: --ack-reconciliation appends an operator-explicit row to
+        // the runner artifact, then proceeds to the standard open-pr gate.
+        if (parsed.ackReconciliation) {
+          await runAckReconciliation(state, cwd, context, parsed);
+        }
+        // Hard-block silent-lie conditions before publish.
+        runReconciliationGate(state, cwd, context, parsed.positionals[0]);
         const nextState = await openPullRequest(
           state,
           cwd,
@@ -2085,4 +2166,259 @@ function formatError(error: unknown): string {
   }
 
   return String(error);
+}
+
+// ─── P14.03 reconciliation helpers ────────────────────────────────────────
+
+function gitListChangedPaths(
+  worktreePath: string,
+  from: string,
+  to: string,
+): string[] {
+  const r = spawnSync('git', ['diff', '--name-only', `${from}..${to}`], {
+    cwd: worktreePath,
+    encoding: 'utf-8',
+  });
+  return (r.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function gitListCommitsInRange(
+  worktreePath: string,
+  from: string,
+  to: string,
+): { sha: string; subject: string }[] {
+  const r = spawnSync('git', ['log', '--pretty=%H%x09%s', `${from}..${to}`], {
+    cwd: worktreePath,
+    encoding: 'utf-8',
+  });
+  return (r.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [sha, ...rest] = line.split('\t');
+      return { sha: sha ?? '', subject: rest.join('\t') };
+    });
+}
+
+function gitListCommitFiles(worktreePath: string, sha: string): string[] {
+  const r = spawnSync('git', ['show', '--pretty=format:', '--name-only', sha], {
+    cwd: worktreePath,
+    encoding: 'utf-8',
+  });
+  return (r.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function loadReconciliationContext(
+  state: DeliveryState,
+  cwd: string,
+  ticketId?: string,
+): {
+  ticket: TicketState;
+  artifactAbs: string;
+  artifactRows: Array<{ outcome: string; reviewedHeadSha?: string }>;
+  reviewedHeadSha: string;
+  headSha: string;
+  reviewedPaths: string[];
+  reportMarkdown: string;
+} {
+  const ticket =
+    (ticketId
+      ? state.tickets.find((t) => t.id === ticketId)
+      : (state.tickets.find((t) => t.status === 'subagent_review_complete') ??
+        state.tickets.find((t) => t.status === 'verified') ??
+        state.tickets.find((t) => t.status === 'in_review'))) ?? undefined;
+  if (!ticket) {
+    throw new Error(
+      ticketId
+        ? `Unknown ticket ${ticketId}.`
+        : 'No ticket at subagent_review_complete / verified / in_review found.',
+    );
+  }
+  const artifactRel =
+    ticket.subagentRunnerArtifactPath ??
+    `${state.reviewsDirPath}/${ticket.id}-subagent-runner.json`;
+  const artifactAbs = resolve(cwd, artifactRel);
+  let rows: Array<{ outcome: string; reviewedHeadSha?: string }> = [];
+  let reviewedHeadSha = '';
+  if (existsSync(artifactAbs)) {
+    try {
+      const parsed = JSON.parse(readFileSync(artifactAbs, 'utf-8')) as {
+        invocations?: Array<{ outcome: string; reviewedHeadSha?: string }>;
+      };
+      rows = parsed.invocations ?? [];
+      const last = rows[rows.length - 1];
+      if (last?.reviewedHeadSha) reviewedHeadSha = last.reviewedHeadSha;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!reviewedHeadSha) {
+    throw new Error(
+      `No reviewedHeadSha recorded for ${ticket.id}. Run subagent-review first.`,
+    );
+  }
+  const headSha = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: ticket.worktreePath,
+    encoding: 'utf-8',
+  }).stdout.trim();
+
+  // Reviewed paths = files modified between baseBranch and reviewedHeadSha.
+  const reviewedPaths = gitListChangedPaths(
+    ticket.worktreePath,
+    ticket.baseBranch,
+    reviewedHeadSha,
+  );
+
+  const outcomePath = `${state.reviewsDirPath}/${ticket.id}-subagent-review-outcome.md`;
+  const outcomeAbs = resolve(cwd, outcomePath);
+  const reportMarkdown = existsSync(outcomeAbs)
+    ? readFileSync(outcomeAbs, 'utf-8')
+    : '';
+
+  return {
+    ticket,
+    artifactAbs,
+    artifactRows: rows,
+    reviewedHeadSha,
+    headSha,
+    reviewedPaths,
+    reportMarkdown,
+  };
+}
+
+function runReconciliationGate(
+  state: DeliveryState,
+  cwd: string,
+  context: DeliveryOrchestratorContext,
+  ticketId?: string,
+): void {
+  if (context.config.reviewPolicy.subagentReview === 'disabled') return;
+  let ctx: ReturnType<typeof loadReconciliationContext>;
+  try {
+    ctx = loadReconciliationContext(state, cwd, ticketId);
+  } catch {
+    // No artifact / no reviewedHeadSha: existing open-pr gate handles
+    // missing-artifact cases. Reconciliation only applies when a row exists.
+    return;
+  }
+  // If the only recorded outcome is `skipped`, the runner gate didn't review
+  // anything — reconciliation is N/A.
+  const hasNonSkipped = ctx.artifactRows.some((r) => r.outcome !== 'skipped');
+  if (!hasNonSkipped) return;
+
+  const decision = reconcileReview({
+    artifactRows: ctx.artifactRows,
+    reportMarkdown: ctx.reportMarkdown,
+    reviewedHeadSha: ctx.reviewedHeadSha,
+    headSha: ctx.headSha,
+    reviewedPaths: ctx.reviewedPaths,
+    listCommitSubjects: (from, to) =>
+      gitListCommitsInRange(ctx.ticket.worktreePath, from, to),
+    listCommitFiles: (sha) => gitListCommitFiles(ctx.ticket.worktreePath, sha),
+    listChangedPathsInRange: (from, to) =>
+      gitListChangedPaths(ctx.ticket.worktreePath, from, to),
+  });
+
+  if (decision.kind === 'blocked') {
+    throw new ReconciliationBlockedError(decision.condition, decision.message);
+  }
+
+  if (decision.kind === 'patched') {
+    // Append a patched row referencing detected commit SHAs.
+    const parsed = JSON.parse(readFileSync(ctx.artifactAbs, 'utf-8')) as {
+      ticket: string;
+      invocations: Array<Record<string, unknown>>;
+    };
+    parsed.invocations.push({
+      runnerKind: 'operator-recorder',
+      reviewedHeadSha: ctx.reviewedHeadSha,
+      outcome: 'patched',
+      completedAt: new Date().toISOString(),
+      terminatedReason: 'completed',
+      findings: [],
+      probedSurfaces: [],
+      patches: decision.commitShas,
+      schemaVersion: SUBAGENT_LEDGER_SCHEMA_VERSION,
+      primaryAgent: 'unknown',
+      runnerSelfReport: null,
+      fallbackFrom: null,
+    });
+    writeFileSync(
+      ctx.artifactAbs,
+      JSON.stringify(parsed, null, 2) + '\n',
+      'utf-8',
+    );
+    commitDeliveryArtifactAndPush({
+      absolutePath: ctx.artifactAbs,
+      branch: ctx.ticket.branch,
+      commitMessage: `chore(${ctx.ticket.id}): reconciliation appended patched row`,
+      ensureBranchPushed: context.platform.ensureBranchPushed,
+      relativeToRepo,
+      repoRoot: cwd,
+      runProcess: context.platform.runProcess,
+    });
+    console.log(
+      `reconcile-subagent-review: appended patched row referencing ${decision.commitShas.join(', ')}`,
+    );
+  }
+}
+
+async function runReconcileSubagentReview(
+  state: DeliveryState,
+  cwd: string,
+  context: DeliveryOrchestratorContext,
+  ticketId?: string,
+): Promise<void> {
+  runReconciliationGate(state, cwd, context, ticketId);
+  console.log(
+    'reconcile-subagent-review: ledger is consistent with git state.',
+  );
+}
+
+async function runAckReconciliation(
+  state: DeliveryState,
+  cwd: string,
+  context: DeliveryOrchestratorContext,
+  parsed: {
+    ackReconciliation?: 'patched' | 'deferred' | 'clean';
+    commitSha?: string;
+    reason?: string;
+    primary?: string;
+    positionals: string[];
+  },
+): Promise<void> {
+  if (!parsed.ackReconciliation) return;
+  const ctx = loadReconciliationContext(state, cwd, parsed.positionals[0]);
+  const primaryAgent = resolvePrimaryAgent({
+    flag: parsed.primary,
+    configField: context.config.primaryAgent,
+  });
+  recordAcknowledgment({
+    artifactPath: ctx.artifactAbs,
+    ticket: ctx.ticket.id,
+    reviewedHeadSha: ctx.reviewedHeadSha,
+    variant: parsed.ackReconciliation,
+    commitSha: parsed.commitSha,
+    reason: parsed.reason,
+    primaryAgent,
+  });
+  commitDeliveryArtifactAndPush({
+    absolutePath: ctx.artifactAbs,
+    branch: ctx.ticket.branch,
+    commitMessage: `chore(${ctx.ticket.id}): record subagent-review ack-reconciliation (${parsed.ackReconciliation})`,
+    ensureBranchPushed: context.platform.ensureBranchPushed,
+    relativeToRepo,
+    repoRoot: cwd,
+    runProcess: context.platform.runProcess,
+  });
+  console.log(
+    `Recorded ${parsed.ackReconciliation} acknowledgment row for ${ctx.ticket.id}.`,
+  );
 }

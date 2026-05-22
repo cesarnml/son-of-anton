@@ -71,8 +71,19 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: 20-test `reconciliation.test.ts` covering `detectLabeledCommits`, `parseActionableFindings`, `reconcileReview` (clean / patched / Condition A / Condition B / deferred-row bypass), `recordDeferred` (valid / empty / whitespace), and `recordAcknowledgment` (patched / deferred / clean variants plus their required-field rejection).
+
+Why this path:
+
+- All reconciliation logic lives in pure helpers under `tools/delivery/reconciliation.ts` with dependency-injected git adapters so tests don't touch a real git repo. The CLI `cli-runner.ts` glue supplies the real adapters via `spawnSync`-backed thunks (`gitListChangedPaths`, `gitListCommitsInRange`, `gitListCommitFiles`).
+- Stable error-message strings are exported as `RECONCILIATION_BLOCKED_MESSAGE_A` and `RECONCILIATION_BLOCKED_MESSAGE_B` constants. Headless integrations match against the prefix (`reconcile-subagent-review: Condition A —` / `— Condition B —`). Tests assert the exact constant.
+- `reviewedPaths` is derived at gate time from `git diff --name-only <baseBranch>..<reviewedHeadSha>`. That choice avoids adding new state and stays computationally cheap. The alternative of parsing the prompt's "Files touched" section was rejected because the prompt text is operator-authored and drift between the prompt prose and the actual diff would produce false negatives in the gate.
+- Multi-commit reconciliation works: `detectLabeledCommits` enumerates every `[subagent-review]`-labeled commit in range whose change-set intersects `reviewedPaths` and returns the full SHA array. The appended `patched` row carries all of them in `patches: [...]`.
+- `--ack-reconciliation patched --commit <sha>` accepts arbitrary operator-provided SHAs without re-running `detectLabeledCommits`. This handles squash-merge collapsing of the labeled commit (PF5).
+- `record-deferred` rejects empty and whitespace-only reasons so the audit trail intent of the field cannot be defeated by passing `""` or `"   "`.
+
+Alternative considered: making `reconcile-subagent-review` a hidden internal step driven only by `open-pr`. Rejected because the ticket explicitly defines it as a separately invokable command — operators benefit from being able to run the gate alone for diagnostics before the publish-time invocation.
+
+Deferred: structured findings parsing beyond the `Actionable findings` section detector. The current implementation only asks "are there actionable findings? yes/no" — it does not extract per-finding identity for individual patch mapping. The phase 14 product plan explicitly defers structured findings parsing.
+
+Contract note: `reconcile-subagent-review` is gated inside `open-pr` as well (calling `runReconciliationGate` before publish), so the operator can either run the explicit step or let `open-pr` perform it implicitly. Status transitions are unchanged — a patched row appended by reconciliation does not alter `subagentReviewOutcome` on the ticket state; the row count in the artifact is the authoritative audit trail.
