@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   getUsage,
   isStandaloneTriageCommand,
@@ -890,50 +891,78 @@ export async function runDeliveryOrchestrator(
             const runnerHeadBefore = readHeadSha();
             const result = tryRunner(
               () => {
+                const outputLastMessageDir =
+                  runner === 'codex-cli'
+                    ? mkdtempSync(join(tmpdir(), 'soa-codex-runner-'))
+                    : undefined;
+                const outputLastMessagePath = outputLastMessageDir
+                  ? join(outputLastMessageDir, 'last-message.md')
+                  : undefined;
                 const { bin, args } = buildRunnerSpawnCommand(
                   runner,
                   reviewPrompt,
+                  { outputLastMessagePath },
                 );
-                const spawned = spawnSync(bin, args, {
-                  cwd: worktreePath,
-                  timeout: RUNNER_TIMEOUT_MS,
-                  encoding: 'utf-8',
-                });
-                const spawnError = spawned.error as
-                  | (Error & { code?: string })
-                  | undefined;
-                if (spawnError && spawnError.code === 'ENOENT') {
-                  throw spawnError;
+                try {
+                  const spawned = spawnSync(bin, args, {
+                    cwd: worktreePath,
+                    timeout: RUNNER_TIMEOUT_MS,
+                    encoding: 'utf-8',
+                  });
+                  const spawnError = spawned.error as
+                    | (Error & { code?: string })
+                    | undefined;
+                  if (spawnError && spawnError.code === 'ENOENT') {
+                    throw spawnError;
+                  }
+                  const stdoutFromFile =
+                    outputLastMessagePath && existsSync(outputLastMessagePath)
+                      ? readFileSync(outputLastMessagePath, 'utf-8')
+                      : '';
+                  const stdout = stdoutFromFile || spawned.stdout || '';
+                  const stderr = [
+                    spawned.stderr ?? '',
+                    spawnError && spawnError.code !== 'ENOENT'
+                      ? spawnError.message
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                  // P14.02: per-runner classification trusts the model's
+                  // self-reported runnerStatus trailer and only escalates to
+                  // skipped/rate_limit on authentic structured signals (not
+                  // stderr/stdout prose). Symmetric for codex-cli and claude-cli.
+                  const classified =
+                    runner === 'codex-cli'
+                      ? coerceCodexCliClassification({
+                          exitCode: spawned.status,
+                          stdout,
+                          stderr,
+                        })
+                      : coerceClaudeCliClassification({
+                          exitCode: spawned.status,
+                          stdout,
+                          stderr,
+                        });
+                  runnerSelfReport = classified.runnerSelfReport;
+                  return {
+                    exitCode: spawned.status,
+                    timedOut:
+                      spawned.signal === 'SIGTERM' ||
+                      spawnError?.message?.includes('timed out') ||
+                      false,
+                    stdout,
+                    stderr,
+                    terminatedReason: classified.terminatedReason,
+                  };
+                } finally {
+                  if (outputLastMessageDir) {
+                    rmSync(outputLastMessageDir, {
+                      recursive: true,
+                      force: true,
+                    });
+                  }
                 }
-                const stdout = spawned.stdout ?? '';
-                const stderr = spawned.stderr ?? '';
-                // P14.02: per-runner classification trusts the model's
-                // self-reported runnerStatus trailer and only escalates to
-                // skipped/rate_limit on authentic structured signals (not
-                // stderr/stdout prose). Symmetric for codex-cli and claude-cli.
-                const classified =
-                  runner === 'codex-cli'
-                    ? coerceCodexCliClassification({
-                        exitCode: spawned.status,
-                        stdout,
-                        stderr,
-                      })
-                    : coerceClaudeCliClassification({
-                        exitCode: spawned.status,
-                        stdout,
-                        stderr,
-                      });
-                runnerSelfReport = classified.runnerSelfReport;
-                return {
-                  exitCode: spawned.status,
-                  timedOut:
-                    spawned.signal === 'SIGTERM' ||
-                    spawnError?.message?.includes('timed out') ||
-                    false,
-                  stdout,
-                  stderr,
-                  terminatedReason: classified.terminatedReason,
-                };
               },
               () => {
                 return (
@@ -1049,9 +1078,15 @@ export async function runDeliveryOrchestrator(
         });
 
         if (outcome === 'skipped') {
-          console.log(
-            'All runners unavailable — subagent review honestly skipped.',
-          );
+          if (usedRunner === 'skipped') {
+            console.log(
+              'All runners unavailable — subagent review honestly skipped.',
+            );
+          } else {
+            console.log(
+              `Runner ${usedRunner} completed with terminatedReason=${terminatedReason} — subagent review honestly skipped.`,
+            );
+          }
         }
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));

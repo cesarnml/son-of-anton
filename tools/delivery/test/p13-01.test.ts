@@ -16,7 +16,25 @@ describe('P13.01 — runner spawn command shapes', () => {
   it('uses codex exec for codex-cli runner invocations', () => {
     expect(buildRunnerSpawnCommand('codex-cli', 'review prompt')).toEqual({
       bin: 'codex',
-      args: ['exec', 'review prompt'],
+      args: ['exec', '--color', 'never', 'review prompt'],
+    });
+  });
+
+  it('uses codex --output-last-message when a report path is supplied', () => {
+    expect(
+      buildRunnerSpawnCommand('codex-cli', 'review prompt', {
+        outputLastMessagePath: '/tmp/report.md',
+      }),
+    ).toEqual({
+      bin: 'codex',
+      args: [
+        'exec',
+        '--output-last-message',
+        '/tmp/report.md',
+        '--color',
+        'never',
+        'review prompt',
+      ],
     });
   });
 

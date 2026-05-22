@@ -242,6 +242,29 @@ describe('P14.02 — coerceCodexCliClassification', () => {
     expect(result.terminatedReason).toBe('rate_limit');
   });
 
+  it('ignores rate-limit tokens echoed from prompts or source code in stderr', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 0,
+      stdout: 'review findings\n\nrunnerStatus: completed',
+      stderr:
+        'prompt text: return /"(?:error|status|code|type)"\\s*:\\s*"(?:rate_limited|rate_limit_exceeded|RATE_LIMIT(?:_EXCEEDED)?)"/.test(blob);',
+    });
+    expect(result.outcome).toBe('clean');
+    expect(result.terminatedReason).toBe('completed');
+  });
+
+  it('classifies authentic rate-limit JSON lines as skipped/rate_limit', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 0,
+      stdout: '',
+      stderr: '{"error":"rate_limited","retryAfter":60}\n',
+    });
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('rate_limit');
+  });
+
   it('records runnerSelfReport: null when the trailer is absent', () => {
     expect(coerceCodexCliClassification).toBeDefined();
     const result = coerceCodexCliClassification!({

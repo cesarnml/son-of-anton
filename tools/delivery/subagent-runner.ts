@@ -106,10 +106,22 @@ export type RunnerAttemptResult =
 export function buildRunnerSpawnCommand(
   runner: Extract<SubagentRunnerKind, 'claude-cli' | 'codex-cli'>,
   reviewPrompt: string,
+  options: { outputLastMessagePath?: string } = {},
 ): { bin: string; args: string[] } {
   return runner === 'claude-cli'
     ? { bin: 'claude', args: ['-p', reviewPrompt] }
-    : { bin: 'codex', args: ['exec', reviewPrompt] };
+    : {
+        bin: 'codex',
+        args: [
+          'exec',
+          ...(options.outputLastMessagePath
+            ? ['--output-last-message', options.outputLastMessagePath]
+            : []),
+          '--color',
+          'never',
+          reviewPrompt,
+        ],
+      };
 }
 
 /**
@@ -231,10 +243,12 @@ function isCodexCliAuthenticRateLimit(input: {
   stderr: string;
 }): boolean {
   if (input.exitCode === 7) return true;
-  const blob = `${input.stdout}\n${input.stderr}`;
-  return /"(?:error|status|code|type)"\s*:\s*"(?:rate_limited|rate_limit_exceeded|RATE_LIMIT(?:_EXCEEDED)?)"/.test(
-    blob,
-  );
+  return hasStructuredRateLimitToken(`${input.stdout}\n${input.stderr}`, [
+    'error',
+    'status',
+    'code',
+    'type',
+  ]);
 }
 
 // Authentic rate-limit signal for claude-cli — Anthropic API structured error
@@ -245,8 +259,51 @@ function isClaudeCliAuthenticRateLimit(input: {
   stdout: string;
   stderr: string;
 }): boolean {
-  const blob = `${input.stdout}\n${input.stderr}`;
-  return /"type"\s*:\s*"(?:rate_limit_error|overloaded_error)"/.test(blob);
+  return hasStructuredRateLimitToken(`${input.stdout}\n${input.stderr}`, [
+    'type',
+  ]);
+}
+
+function hasStructuredRateLimitToken(blob: string, keys: string[]): boolean {
+  const allowedKeys = new Set(keys);
+  return blob
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('{') && line.endsWith('}'))
+    .some((line) => {
+      try {
+        return jsonContainsRateLimitToken(JSON.parse(line), allowedKeys);
+      } catch {
+        return false;
+      }
+    });
+}
+
+function jsonContainsRateLimitToken(
+  value: unknown,
+  allowedKeys: Set<string>,
+): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => jsonContainsRateLimitToken(item, allowedKeys));
+  }
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      allowedKeys.has(key) &&
+      typeof child === 'string' &&
+      /^(?:rate_limited|rate_limit_exceeded|RATE_LIMIT(?:_EXCEEDED)?|rate_limit_error|overloaded_error)$/.test(
+        child,
+      )
+    ) {
+      return true;
+    }
+    if (jsonContainsRateLimitToken(child, allowedKeys)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
