@@ -102,12 +102,15 @@ path instead.
   agent can read, plus per-agent adapters for platforms with specific file
   conventions (see [Agent compatibility](#agent-compatibility) below).
 - **Adversarial subagent review** — after each ticket, a second AI pass checks
-  the implementation assuming the first one cut corners. The runner is
-  advisory: it returns findings, probed surfaces, and a self-reported
-  termination reason, and the primary agent applies any resulting patches with
-  a `[subagent-review]` subject suffix. The CLI writes a structured
-  `SubagentRunnerArtifact` capturing each invocation as durable proof, and
-  refuses to record `clean` when the runner did not actually complete.
+  the implementation assuming the first one cut corners. Artifacts per ticket:
+  `*-subagent-review.{prompt.md, report.md, ledger.json}`. The runner is
+  advisory: it returns findings prose only; the primary agent applies prudent
+  patches with a `[subagent-review]` subject suffix or records `deferred` via
+  `subagent-review record-deferred`. `reconcile-subagent-review` hard-blocks
+  `open-pr` when the ledger would silently disagree with git history. Operator
+  selection is explicit via `--subagent <claude-cli|codex-cli>` (optional
+  `subagentRunner` config default). The CLI refuses to record `clean` when the
+  runner did not actually complete.
 - **Stacked PR model** — each ticket gets its own branch and PR, stacked in
   dependency order. Closeout squash-merges the whole phase onto main cleanly.
 - **Migration runner** — when Son of Anton ships structural changes, `bun run sync`

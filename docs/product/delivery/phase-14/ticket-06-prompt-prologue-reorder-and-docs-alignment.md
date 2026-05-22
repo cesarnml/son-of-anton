@@ -75,8 +75,12 @@ No `[red]` commit.
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [N/A — Red:skip docs ticket]
-Why this path: [why this alignment approach was chosen]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: N/A — `Red: skip` doc-only ticket; `post-red` recorded skip structurally.
+
+Why this path: Reordered the adversarial template prologue in-place (broadening clauses before narrowing anchor) without touching rubric bytes below the opening block. Updated operator-facing surfaces (`delivery-orchestrator.md`, `start-here.md`, `README.md`, `AGENTS.soa.md`, `son-of-anton-ethos`) to describe Phase 14 reconciliation and artifact triplet in one pass. Left historical ticket files under `docs/product/delivery/phase-{10,13,14}/` unchanged — they are delivery archaeology, not consumer discoverability.
+
+Alternative considered: Mass-editing every historical ticket and retrospective to replace `--preferred-runner` / `codex-exec`. Rejected — high churn, low signal; grep confirmed agent-facing paths were already clean after P14.02–P14.04.
+
+Deferred: No `retrospective.template.md` exists in `docs/template/stubs/`; ledger field guidance lives in the Phase 14 retrospective and orchestrator Phase 14 subsection instead.
+
+Contract note: `grill-me` and `pr-review` skills unchanged — they do not describe subagent-review runner selection. `soa` skill already pointed at orchestrator doc as gospel.

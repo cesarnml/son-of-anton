@@ -15,16 +15,28 @@ For every code ticket, these steps must run in this exact sequence:
 5. `post-verify [clean|patched]` — self-audit
 6. `write-subagent-adversarial-review` — primary agent authors the filled adversarial prompt (required for code tickets when `subagentReview` is not `"disabled"`)
 7. `subagent-review` — advisory subagent pass against that exact prompt (programmatic runner with `--subagent`, or recorder mode)
-8. `open-pr` — publish the PR (never before the subagent adversarial review gate completes)
-9. `poll-review` — external AI review window
-10. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
-11. `advance` — move to next ticket
+8. `reconcile-subagent-review` — compare ledger rows to git state since `reviewedHeadSha`; hard-block silent lies before publish (also runs inside `open-pr`)
+9. `open-pr` — publish the PR (never before subagent review and reconciliation gates complete)
+10. `poll-review` — external AI review window
+11. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
+12. `advance` — move to next ticket
 
 Tickets declare `Red: required` or `Red: skip` in their metadata block. Code
 tickets use `Red: required`; tickets with no testable behavior may declare
 `Red: skip`, and doc-only branches also skip `post-red` structurally.
 
-**post-red must precede implementation. write-subagent-adversarial-review must precede subagent-review. subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
+**post-red must precede implementation. write-subagent-adversarial-review must precede subagent-review. subagent-review must precede reconcile-subagent-review. reconcile-subagent-review must precede open-pr. open-pr must precede poll-review.** Skipping or reordering these steps is not supported.
+
+## Phase 14 changes (subagent-review fidelity)
+
+Phase 14 makes the subagent-review ledger semantically honest. Operator-facing docs and skills should describe the same contract:
+
+- **Artifact triplet:** `reviews/<ticket>-subagent-review.{prompt.md, report.md, ledger.json}` — prompt, report, ledger. No dual-name fallback for pre-Phase-14 filenames.
+- **Runner selection:** `--subagent <claude-cli|codex-cli>` at invocation time; optional project default `subagentRunner` in `orchestrator.config.json`. Precedence: flag > config field > hard error (SoA ships no silent default).
+- **Outcome vocabulary:** ledger rows use `clean | patched | deferred | skipped` reflecting what the primary agent actually did after the advisory pass.
+- **Reconciliation:** `reconcile-subagent-review` runs after `subagent-review` and before `open-pr`. It detects silent lies (unlabeled post-review edits, actionable findings with no patch or deferral) and exits non-zero with named resolution paths. `open-pr` invokes the same gate and accepts `--ack-reconciliation <patched|deferred|clean>` as an operator escape valve.
+- **Deferral:** `subagent-review record-deferred --reason "<rationale>"` appends a `deferred` row when findings are consciously not patched.
+- **Adversarial prompt prologue:** broadening clauses (extra surfaces, human-review bucket) appear before the narrowing "not a general code review" anchor in `adversarial-review-template.md`.
 
 ## Stance
 
@@ -379,7 +391,7 @@ When omitted, outcome defaults to `clean`. The `status` command renders the outc
 - Higher-risk areas changed in the diff (data shape, migrations, auth, API contracts) got a second read in post-verify mode.
 - The delivery ticket doc has an updated **Rationale** when behavior or trade-offs changed (repo policy).
 
-Then run `post-verify`, then (if `subagentReview` is enabled) `write-subagent-adversarial-review`, then `subagent-review`, then `open-pr`.
+Then run `post-verify`, then (if `subagentReview` is enabled) `write-subagent-adversarial-review`, then `subagent-review`, then `reconcile-subagent-review`, then `open-pr`.
 
 ## Subagent adversarial review (ticket stacks)
 
@@ -417,9 +429,25 @@ The runner receives the exact bytes from `reviews/<ticket>-subagent-review.promp
 ```bash
 bun run deliver --plan <plan> subagent-review clean    # no primary-agent patches from subagent findings
 bun run deliver --plan <plan> subagent-review patched <sha...>  # primary agent applied subagent-driven fixes
+bun run deliver --plan <plan> subagent-review record-deferred --reason "<rationale>"  # conscious deferral
 ```
 
 Without `--subagent`, the CLI is a state recorder only and does not invoke a runner. With `--subagent`, the CLI invokes the runner against the persisted prompt, enforces the advisory-only contract, writes the runner artifact, and records the detected outcome. Primary-agent patch commits that respond to subagent findings must use a subject suffix of `[subagent-review]`.
+
+**Step 3 — Reconcile ledger vs git (`reconcile-subagent-review`):**
+
+After the primary agent finishes any subagent-driven patches (or records deferral), run reconciliation before publishing:
+
+```bash
+bun run deliver --plan <plan> reconcile-subagent-review
+```
+
+The command compares commits since the row's `reviewedHeadSha` against the reviewed file set and the report's actionable-findings section. It **hard-blocks** when the ledger would silently lie:
+
+- **Condition A** — reviewed paths changed without a `[subagent-review]`-labeled commit touching them and no `deferred` row exists.
+- **Condition B** — the report lists actionable findings but no qualifying patch commit or `deferred` row exists.
+
+Resolution paths are named in the error text: amend the patch subject, `subagent-review record-deferred --reason "..."`, or `open-pr --ack-reconciliation <patched|deferred|clean> [--commit <sha>] [--reason "<text>"]`. `open-pr` runs the same gate internally; use the explicit step for diagnostics.
 
 **Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 
@@ -524,7 +552,9 @@ Available commands:
 - `post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]`
 - `write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]`
 - `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli>]`
-- `open-pr [ticket-id]`
+- `subagent-review record-deferred --reason "<rationale>" [ticket-id]`
+- `reconcile-subagent-review [ticket-id]`
+- `open-pr [ticket-id] [--ack-reconciliation <patched|deferred|clean>] [--commit <sha>] [--reason "<text>"]`
 - `poll-review [ticket-id]`
 - `triage-ticket <ticket-id>`
 - `record-review <ticket-id> <clean|patched|operator_input_needed> [note]`
@@ -587,6 +617,7 @@ bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md pos
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
 # pass --subagent <claude-cli|codex-cli> to run the advisory subagent programmatically, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md reconcile-subagent-review
 # for doc-only tickets under skip_doc_only, subagent-review auto-records skipped (no prompt step)
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
@@ -605,6 +636,7 @@ bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md pos
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
 # execution agent passes --subagent <its-identity>; runner returns findings prose only; primary agent patches if prudent, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
+bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md reconcile-subagent-review
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md advance

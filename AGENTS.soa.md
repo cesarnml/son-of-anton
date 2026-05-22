@@ -15,7 +15,8 @@ via `git subtree add --prefix .son-of-anton`.
 
 When invoking a review subagent during orchestrated delivery:
 
-- **Preferred-runner:** pass `--subagent <claude-cli|codex-cli>` to `subagent-review`. The CLI tries the preferred runner first, then the other, then records an honest `skipped` if neither is available. No config changes needed when switching agent platforms.
+- **Subagent selection:** pass `--subagent <claude-cli|codex-cli>` to `subagent-review`, or set `subagentRunner` in `orchestrator.config.json`. The CLI tries the preferred runner first, then the other, then records an honest `skipped` if neither is available. Missing both is a hard error — SoA ships no silent default.
+- **Reconciliation:** run `reconcile-subagent-review` after subagent patches and before `open-pr`. Ledger outcomes are `clean | patched | deferred | skipped`. Use `record-deferred` or `open-pr --ack-reconciliation` when consciously not patching actionable findings.
 - **Adversarial prompt required:** the subagent prompt must assume the implementation has holes and find them. Do not rationalize away anything you notice — flag it and let the human decide. A checklist of "did the ticket spec land?" is not a review.
 - **No rationalizing away findings:** the subagent must not suppress or downplay what it finds. Flag everything; the human decides what to act on.
 

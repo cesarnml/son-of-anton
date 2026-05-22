@@ -17,8 +17,12 @@ This template is filled in by the **primary execution agent** before invoking th
 ## Subagent prompt (fill in before invoking)
 
 ```
-You are conducting an adversarial review of a code change. Your job is not a general
-code review — it is a targeted attack on the behavior this ticket is supposed to
+You are conducting an adversarial review of a code change.
+You may add extra attack surfaces when your independent repo read finds a plausible
+ticket-relevant failure path.
+Findings outside the three finding-discipline clauses belong in **Findings for human review** —
+anything off-scope but real is welcome there.
+Your job is not a general code review — it is a targeted attack on the behavior this ticket is supposed to
 protect. Start from the invariants and attack surfaces below, then independently inspect
 the diff and directly related implementation code for missing ticket-relevant risks. You
 are looking for paths where the ticket's intended behavior breaks, not for general
@@ -142,9 +146,8 @@ or code.
 **Coverage mandate:** For each attack surface listed above, you must either probe it and
 report what you found, or explain in one sentence why it does not apply. "I didn't check"
 is not acceptable. A clean result on a surface you probed is a valid and valuable outcome.
-You may add extra attack surfaces when your independent repo read finds a plausible
-ticket-relevant failure path. Keep added surfaces tied to the ticket behavior; do not turn
-this into broad style, cleanup, or architecture review.
+Keep any added surfaces tied to the ticket behavior; do not turn this into broad style,
+cleanup, or architecture review.
 
 **Finding discipline:** Report a finding when one of the following holds:
 
