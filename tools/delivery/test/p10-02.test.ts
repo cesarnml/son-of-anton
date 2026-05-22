@@ -367,7 +367,7 @@ describe('P10.02 — subagent runner artifact persistence', () => {
           completedAt: '2026-05-18T00:00:00.000Z',
           outcome: 'clean',
           reviewedHeadSha: 'abc1234',
-          runnerKind: 'codex-exec',
+          runnerKind: 'codex-cli',
         })}\n`,
         'utf8',
       );
@@ -398,7 +398,7 @@ describe('P10.02 — subagent runner artifact persistence', () => {
       expect(
         runProcess(repoRoot, ['git', 'log', '-1', '--pretty=%s']).trim(),
       ).toBe('chore(P10.02): record subagent-review runner artifact');
-      expect(await readFile(artifactPath, 'utf8')).toContain('codex-exec');
+      expect(await readFile(artifactPath, 'utf8')).toContain('codex-cli');
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

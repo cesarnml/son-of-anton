@@ -13,8 +13,8 @@ import type {
 } from '../subagent-runner';
 
 describe('P13.01 — runner spawn command shapes', () => {
-  it('uses codex exec for codex-exec runner invocations', () => {
-    expect(buildRunnerSpawnCommand('codex-exec', 'review prompt')).toEqual({
+  it('uses codex exec for codex-cli runner invocations', () => {
+    expect(buildRunnerSpawnCommand('codex-cli', 'review prompt')).toEqual({
       bin: 'codex',
       args: ['exec', 'review prompt'],
     });
@@ -32,7 +32,7 @@ describe('P13.01 — raw runner response artifact evidence', () => {
   it('persists rawOutput path ref and fallback metadata on invocations', () => {
     const outcomePath =
       'docs/product/delivery/phase-13/reviews/P13.01-subagent-review-outcome.md';
-    const invocation = buildRunnerInvocation('codex-exec', 'abc123', 'clean', {
+    const invocation = buildRunnerInvocation('codex-cli', 'abc123', 'clean', {
       fallbackLevel: 'preferred',
       rawOutput: outcomePath,
     });

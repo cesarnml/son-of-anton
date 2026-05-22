@@ -11,7 +11,7 @@ export const SUBAGENT_LEDGER_SCHEMA_VERSION = 1;
 
 export type SubagentRunnerKind =
   | 'claude-cli'
-  | 'codex-exec'
+  | 'codex-cli'
   | 'skipped'
   | 'operator-recorder';
 
@@ -102,12 +102,190 @@ export type RunnerAttemptResult =
   | { status: 'timeout' };
 
 export function buildRunnerSpawnCommand(
-  runner: Extract<SubagentRunnerKind, 'claude-cli' | 'codex-exec'>,
+  runner: Extract<SubagentRunnerKind, 'claude-cli' | 'codex-cli'>,
   reviewPrompt: string,
 ): { bin: string; args: string[] } {
   return runner === 'claude-cli'
     ? { bin: 'claude', args: ['-p', reviewPrompt] }
     : { bin: 'codex', args: ['exec', reviewPrompt] };
+}
+
+/**
+ * Operator-explicit subagent selection. Flag > config > hard error.
+ * P14.02: SoA ships no silent default; missing both surfaces the contract
+ * up-front rather than letting a runner be picked silently.
+ */
+export function resolveSubagentSelection(input: {
+  flag: 'claude-cli' | 'codex-cli' | undefined;
+  configField: 'claude-cli' | 'codex-cli' | undefined;
+}): { kind: 'claude-cli' | 'codex-cli'; source: 'flag' | 'config' } {
+  if (input.flag) {
+    return { kind: input.flag, source: 'flag' };
+  }
+  if (input.configField) {
+    return { kind: input.configField, source: 'config' };
+  }
+  throw new Error(
+    'No subagent selected. Pass --subagent <claude-cli|codex-cli> or set `subagentRunner` in orchestrator.config.json. See docs/template/delivery/delivery-orchestrator.md for cross-family best-practice guidance.',
+  );
+}
+
+/**
+ * Free-form primary-agent identity. Flag > config > "unknown".
+ * P14.02: values like `cursor`, `composer`, `copilot`, `aider` pass through
+ * without enum validation so the field captures whichever execution agent
+ * actually drove the ticket.
+ */
+export function resolvePrimaryAgent(input: {
+  flag: string | undefined;
+  configField: string | undefined;
+}): string {
+  if (input.flag !== undefined && input.flag.trim() !== '') {
+    return input.flag.trim();
+  }
+  if (input.configField !== undefined && input.configField.trim() !== '') {
+    return input.configField.trim();
+  }
+  return 'unknown';
+}
+
+/**
+ * P14.02 — codex-cli classification fidelity.
+ *
+ * Trusts the model's self-reported `runnerStatus: <value>` trailer when
+ * present. Only escalates to skipped/rate_limit on the runner's authentic
+ * structured signal — not on stderr text that resembles rate-limit prose.
+ * Prevents the "stderr noise → silent skipped" misclassification documented
+ * in the codogotchi P2 subagent-review audit.
+ */
+export function coerceCodexCliClassification(input: {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}): {
+  outcome: 'clean' | 'skipped';
+  terminatedReason: SubagentRunnerTerminatedReason;
+  runnerSelfReport: string | null;
+} {
+  const runnerSelfReport = parseRunnerStatusTrailer(input.stdout);
+
+  if (isCodexCliAuthenticRateLimit(input)) {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'rate_limit',
+      runnerSelfReport,
+    };
+  }
+
+  if (runnerSelfReport === 'completed') {
+    return {
+      outcome: 'clean',
+      terminatedReason: 'completed',
+      runnerSelfReport,
+    };
+  }
+
+  if (input.exitCode !== 0) {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'runner_failed',
+      runnerSelfReport,
+    };
+  }
+  if (`${input.stdout}${input.stderr}`.trim() === '') {
+    return {
+      outcome: 'skipped',
+      terminatedReason: 'runner_failed',
+      runnerSelfReport,
+    };
+  }
+  return {
+    outcome: 'clean',
+    terminatedReason: 'completed',
+    runnerSelfReport,
+  };
+}
+
+function parseRunnerStatusTrailer(stdout: string): string | null {
+  const lines = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const tail = lines.slice(-50);
+  for (let i = tail.length - 1; i >= 0; i -= 1) {
+    const match = /^runnerStatus\s*:\s*(.+)$/i.exec(tail[i]!);
+    if (match) {
+      return match[1]!.trim();
+    }
+  }
+  return null;
+}
+
+// Authentic rate-limit signal for codex-cli — derived from structured tokens
+// (exit code and quoted JSON-shaped values), not from free-text matching.
+function isCodexCliAuthenticRateLimit(input: {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}): boolean {
+  if (input.exitCode === 7) return true;
+  const blob = `${input.stdout}\n${input.stderr}`;
+  return /"(?:error|status|code|type)"\s*:\s*"(?:rate_limited|rate_limit_exceeded|RATE_LIMIT(?:_EXCEEDED)?)"/.test(
+    blob,
+  );
+}
+
+/**
+ * P14.02 — Runner availability fallback.
+ *
+ * Attempts the operator-selected runner first. On `unavailable`/`timeout`,
+ * falls back to the other configured runner. The return value records what
+ * actually ran (`ranKind`), what was originally requested when fallback
+ * fired (`fallbackFrom`), and the bucket (`preferred|fallback|failed_all`).
+ * When both runners are unavailable, `fallbackFrom` preserves the originally
+ * requested kind so the skipped row remains auditable.
+ */
+export function runSubagentWithFallback(
+  requested: 'claude-cli' | 'codex-cli',
+  attempt: (kind: 'claude-cli' | 'codex-cli') => RunnerAttemptResult,
+): {
+  ranKind: 'claude-cli' | 'codex-cli' | 'skipped';
+  fallbackFrom: 'claude-cli' | 'codex-cli' | null;
+  fallbackLevel: 'preferred' | 'fallback' | 'failed_all';
+  result: RunnerAttemptResult;
+  attemptedKinds: ('claude-cli' | 'codex-cli')[];
+} {
+  const other: 'claude-cli' | 'codex-cli' =
+    requested === 'codex-cli' ? 'claude-cli' : 'codex-cli';
+  const order: ('claude-cli' | 'codex-cli')[] = [requested, other];
+  const attemptedKinds: ('claude-cli' | 'codex-cli')[] = [];
+  let lastResult: RunnerAttemptResult = { status: 'unavailable' };
+
+  for (const [index, kind] of order.entries()) {
+    attemptedKinds.push(kind);
+    const result = attempt(kind);
+    lastResult = result;
+    if (result.status === 'ran') {
+      return {
+        ranKind: kind,
+        fallbackFrom: index === 0 ? null : requested,
+        fallbackLevel: index === 0 ? 'preferred' : 'fallback',
+        result,
+        attemptedKinds,
+      };
+    }
+    if (!shouldFallbackToOtherRunner(result)) {
+      break;
+    }
+  }
+
+  return {
+    ranKind: 'skipped',
+    fallbackFrom: requested,
+    fallbackLevel: 'failed_all',
+    result: lastResult,
+    attemptedKinds,
+  };
 }
 
 export const SUBAGENT_REVIEW_OUTCOME_SUFFIX = '-subagent-review-outcome.md';
@@ -300,7 +478,7 @@ export function decideAdvisoryRunnerOutcome(
 
 const VALID_RUNNER_KINDS: SubagentRunnerKind[] = [
   'claude-cli',
-  'codex-exec',
+  'codex-cli',
   'skipped',
   'operator-recorder',
 ];

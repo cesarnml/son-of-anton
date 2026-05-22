@@ -70,7 +70,7 @@ describe('P13.04 — subagent review sidecar artifacts', () => {
     const artifact = {
       ticket: 'P13.legacy',
       invocations: [
-        buildRunnerInvocation('codex-exec', 'abc1234', 'clean', {
+        buildRunnerInvocation('codex-cli', 'abc1234', 'clean', {
           terminatedReason: 'completed',
           filledPrompt: 'inline prompt body with enough text',
           rawOutput: 'inline runner prose',

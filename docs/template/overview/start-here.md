@@ -38,7 +38,7 @@ Execute:
 
 Both the product plan and implementation docs must be committed to `main` **before** the orchestrator creates any branches.
 
-The pre-PR subagent gate is a **two-step** flow: the primary agent authors the filled adversarial prompt (`write-subagent-adversarial-review`); the runner step (`subagent-review --preferred-runner …`) consumes that exact prompt and returns findings prose only. Policy surface names stay `subagentReview`, `--subagent-review-policy`, and `subagent-review`.
+The pre-PR subagent gate is a **two-step** flow: the primary agent authors the filled adversarial prompt (`write-subagent-adversarial-review`); the runner step (`subagent-review --subagent …`) consumes that exact prompt and returns findings prose only. Policy surface names stay `subagentReview`, `--subagent-review-policy`, and `subagent-review`.
 
 ## Resuming in-progress work
 
@@ -61,11 +61,11 @@ bun run deliver --plan <plan-path> \
   --boundary-mode <cook|gated> \
   --subagent-review-policy <required|skip_doc_only|disabled> \
   --pr-review-policy <required|skip_doc_only|disabled> \
-  --preferred-runner <claude-cli|codex-exec> \
+  --subagent <claude-cli|codex-cli> \
   start
 ```
 
-`--preferred-runner` declares the execution agent's own identity. The CLI tries the preferred runner first, then the other, then records an honest `skipped`. No config change needed when switching platforms.
+`--subagent` declares the execution agent's own identity. The CLI tries the preferred runner first, then the other, then records an honest `skipped`. No config change needed when switching platforms.
 
 The resolved policy is persisted in `state.json` as `runPolicy` and governs execution for every invocation that loads it. If `orchestrator.config.json` changes between runs, the orchestrator detects divergence and refuses to continue silently — pass `--baseline orchestrator` to adopt the current config or `--baseline run-policy` to re-apply the persisted runPolicy (it governs execution for the current invocation, not just state):
 

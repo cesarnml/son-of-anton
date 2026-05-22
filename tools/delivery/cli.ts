@@ -22,7 +22,8 @@ export type ParsedCliArgs = {
   boundaryMode?: TicketBoundaryMode;
   subagentReviewPolicy?: ReviewPolicyStageValue;
   prReviewPolicy?: ReviewPolicyStageValue;
-  preferredRunner?: 'claude-cli' | 'codex-exec';
+  subagent?: 'claude-cli' | 'codex-cli';
+  primary?: string;
   baseline?: BaselineValue;
   promptFile?: string;
 };
@@ -105,7 +106,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  post-red [ticket-id]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
     '  write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]',
-    '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]',
+    '  subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli>] [--primary <name>]',
     '  open-pr [ticket-id]',
     '  poll-review [ticket-id]',
     '  triage-ticket <ticket-id>',
@@ -121,7 +122,8 @@ export function getUsage(runDeliverInvocation: string): string {
     '  --boundary-mode <cook|gated>',
     '  --subagent-review-policy <required|skip_doc_only|disabled>',
     '  --pr-review-policy <required|skip_doc_only|disabled>',
-    '  --preferred-runner <claude-cli|codex-exec>',
+    '  --subagent <claude-cli|codex-cli>',
+    '  --primary <free-form name>',
     '  --baseline <orchestrator|run-policy>',
   ].join('\n');
 }
@@ -132,7 +134,8 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let boundaryMode: ParsedCliArgs['boundaryMode'];
   let subagentReviewPolicy: ParsedCliArgs['subagentReviewPolicy'];
   let prReviewPolicy: ParsedCliArgs['prReviewPolicy'];
-  let preferredRunner: ParsedCliArgs['preferredRunner'];
+  let subagent: ParsedCliArgs['subagent'];
+  let primary: ParsedCliArgs['primary'];
   let baseline: ParsedCliArgs['baseline'];
   let promptFile: ParsedCliArgs['promptFile'];
   const flags = new Set<string>();
@@ -217,23 +220,41 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       continue;
     }
 
-    if (value === '--preferred-runner') {
+    if (value === '--subagent') {
       const raw = argv[index + 1];
-      const VALID_RUNNERS = ['claude-cli', 'codex-exec'] as const;
+      const VALID_RUNNERS = ['claude-cli', 'codex-cli'] as const;
 
       if (
         raw === undefined ||
         raw.startsWith('--') ||
         !(VALID_RUNNERS as readonly string[]).includes(raw)
       ) {
+        throw new Error(`Pass --subagent <${VALID_RUNNERS.join('|')}>.`);
+      }
+
+      subagent = raw as 'claude-cli' | 'codex-cli';
+      index += 1;
+      continue;
+    }
+
+    if (value === '--primary') {
+      const raw = argv[index + 1];
+
+      if (raw === undefined || raw.startsWith('--') || raw.trim() === '') {
         throw new Error(
-          `Pass --preferred-runner <${VALID_RUNNERS.join('|')}>.`,
+          'Pass --primary <name> (free-form, e.g. claude, codex, cursor, composer).',
         );
       }
 
-      preferredRunner = raw as 'claude-cli' | 'codex-exec';
+      primary = raw.trim();
       index += 1;
       continue;
+    }
+
+    if (value === '--preferred-runner') {
+      throw new Error(
+        '--preferred-runner has been removed. Pass --subagent <claude-cli|codex-cli> or set `subagentRunner` in orchestrator.config.json.',
+      );
     }
 
     if (value === '--red-commit-sha') {
@@ -300,7 +321,8 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     boundaryMode,
     subagentReviewPolicy,
     prReviewPolicy,
-    preferredRunner,
+    subagent,
+    primary,
     baseline,
     promptFile,
   };

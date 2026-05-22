@@ -230,7 +230,8 @@ if [ "$IS_SOURCE_REPO" = false ]; then
   },
   "prReviewAgents": [
     { "login": "coderabbitai", "name": "coderabbit", "resolveThreads": true }
-  ]
+  ],
+  "primaryAgent": "unknown"
 }
 EOF_CONFIG
     echo "  created: orchestrator.config.json (review defaultBranch, runtime, packageManager)"
@@ -251,8 +252,8 @@ EOF_CONFIG
   echo "  Prerequisites:"
   echo "    bun    (global) — required for all delivery commands: https://bun.sh"
   echo "    gh     (global) — required for PR creation and review polling: https://cli.github.com"
-  echo "    claude (global) — optional, enables programmatic subagent review via --preferred-runner claude-cli"
-  echo "    codex  (global) — optional, enables programmatic subagent review via --preferred-runner codex-exec"
+  echo "    claude (global) — optional, enables programmatic subagent review via --subagent claude-cli"
+  echo "    codex  (global) — optional, enables programmatic subagent review via --subagent codex-cli"
   echo ""
   echo "  Add .son-of-anton/ to your lint/format ignore config (e.g. .prettierignore, .eslintignore)"
   echo "  Review orchestrator.config.json, then run: bun run deliver --plan <plan-path> start"

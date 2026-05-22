@@ -483,7 +483,7 @@ describe('EE8.01 — post-verify observability and reviewPolicy config', () => {
             'agents/p3-01-persist-transmission-identity-for-queued-torrents',
           baseBranch: 'main',
           worktreePath: '/tmp/p3_01',
-          subagentReviewAgent: 'codex-exec',
+          subagentReviewAgent: 'codex-cli',
           subagentRunnerArtifactPath:
             'docs/product/delivery/phase-03/reviews/P3.01-subagent-runner.json',
         },
@@ -499,7 +499,7 @@ describe('EE8.01 — post-verify observability and reviewPolicy config', () => {
       existing,
     );
 
-    expect(rebuilt.tickets[0]?.subagentReviewAgent).toBe('codex-exec');
+    expect(rebuilt.tickets[0]?.subagentReviewAgent).toBe('codex-cli');
     expect(rebuilt.tickets[0]?.subagentRunnerArtifactPath).toBe(
       'docs/product/delivery/phase-03/reviews/P3.01-subagent-runner.json',
     );

@@ -14,7 +14,7 @@ For every code ticket, these steps must run in this exact sequence:
 4. Implement + verify (`bun run verify:quiet` inner loop, then `bun run ci:quiet` before open-pr)
 5. `post-verify [clean|patched]` — self-audit
 6. `write-subagent-adversarial-review` — primary agent authors the filled adversarial prompt (required for code tickets when `subagentReview` is not `"disabled"`)
-7. `subagent-review` — advisory subagent pass against that exact prompt (programmatic runner with `--preferred-runner`, or recorder mode)
+7. `subagent-review` — advisory subagent pass against that exact prompt (programmatic runner with `--subagent`, or recorder mode)
 8. `open-pr` — publish the PR (never before the subagent adversarial review gate completes)
 9. `poll-review` — external AI review window
 10. `record-review` — only needed when poll-review leaves ticket in `needs_patch`
@@ -114,9 +114,13 @@ behavior, and review policy are not hardcoded:
   "prReviewAgents": [
     { "login": "coderabbitai", "name": "coderabbit" },
     { "login": "qodo-merge", "name": "qodo" }
-  ]
+  ],
+  "subagentRunner": "codex-cli",
+  "primaryAgent": "claude"
 }
 ```
+
+Subagent selection precedence is **`--subagent` flag > `subagentRunner` config field > hard error**. SoA ships no built-in silent default: a fresh repo with neither flag nor config field set is required to make the choice explicit before any subagent review runs. `primaryAgent` is free-form (e.g. `claude`, `codex`, `cursor`, `composer`, `copilot`, `aider`) and is recorded on every ledger row as `primaryAgent`; absent flag/config defaults to `"unknown"`. Cross-family review (e.g. claude primary + codex-cli subagent) is the documented best practice but not enforced — the operator chooses, the ledger records both fields so cross-family achievement is computable post-hoc.
 
 All fields are optional. When the file is absent, the orchestrator infers sensible defaults:
 
@@ -136,7 +140,7 @@ Valid `reviewPolicy` stage values are:
 
 Invalid values and unknown keys are rejected at config load with a clear error.
 
-`reviewPolicy.subagentReview` governs the pre-PR internal agent review step (`subagent-review` command). `reviewPolicy.prReview` governs the external AI PR review polling window. `prReviewAgents` is a list of `{ login, name }` entries used by the fetcher script to identify external review bots by GitHub login. Runner selection for `subagent-review` is done at invocation time via `--preferred-runner <claude-cli|codex-exec>` — not in config.
+`reviewPolicy.subagentReview` governs the pre-PR internal agent review step (`subagent-review` command). `reviewPolicy.prReview` governs the external AI PR review polling window. `prReviewAgents` is a list of `{ login, name }` entries used by the fetcher script to identify external review bots by GitHub login. Runner selection for `subagent-review` is done at invocation time via `--subagent <claude-cli|codex-cli>` — not in config.
 
 Supported `ticketBoundaryMode` values are:
 
@@ -287,7 +291,7 @@ Pass explicit flags to override delivery policy for a single run without editing
 | `--boundary-mode`          | `cook\|gated`                       | Override ticket-boundary mode                                                             |
 | `--subagent-review-policy` | `required\|skip_doc_only\|disabled` | Override subagent review gate                                                             |
 | `--pr-review-policy`       | `required\|skip_doc_only\|disabled` | Override PR review gate                                                                   |
-| `--preferred-runner`       | `claude-cli\|codex-exec`            | Declare execution agent identity; tries preferred first, then the other, then honest skip |
+| `--subagent`               | `claude-cli\|codex-cli`             | Declare execution agent identity; tries preferred first, then the other, then honest skip |
 | `--baseline`               | `orchestrator\|run-policy`          | Resolve divergence on resume (see below)                                                  |
 
 **Divergence recovery:** If `orchestrator.config.json` changes between runs, resume detects drift on the four bounded policy fields and refuses to continue until the operator resolves it:
@@ -401,7 +405,7 @@ The command persists the prompt under `reviews/<ticket>-subagent-adversarial-pro
 
 **Step 2 — Run advisory review (`subagent-review`):**
 
-**Runner selection:** The execution agent declares its own identity via `--preferred-runner <claude-cli|codex-exec>`. The CLI tries the preferred runner first, falls back to the other, and records an honest `skipped` artifact if neither is available. No config change is needed when switching agent platforms (Claude Code, Codex, Cursor, etc.).
+**Runner selection:** The execution agent declares its own identity via `--subagent <claude-cli|codex-cli>`. The CLI tries the preferred runner first, falls back to the other, and records an honest `skipped` artifact if neither is available. No config change is needed when switching agent platforms (Claude Code, Codex, Cursor, etc.).
 
 The runner receives the exact bytes from `reviews/<ticket>-subagent-adversarial-prompt.md`, invokes verified headless forms (`claude -p` / `codex exec`), persists runner prose to `reviews/<ticket>-subagent-review-outcome.md`, and writes a `SubagentRunnerArtifact` to `reviews/<ticket>-subagent-runner.json` whose `filledPrompt` and `rawOutput` fields are repo-relative paths to those sidecars (not embedded text). The orchestrator stages, commits, and pushes the JSON plus sidecar files from the ticket worktree. `open-pr` fails closed when `subagentReview` is not `"disabled"` and a non-skipped outcome is recorded but the artifact file is missing.
 
@@ -415,7 +419,7 @@ bun run deliver --plan <plan> subagent-review clean    # no primary-agent patche
 bun run deliver --plan <plan> subagent-review patched <sha...>  # primary agent applied subagent-driven fixes
 ```
 
-Without `--preferred-runner`, the CLI is a state recorder only and does not invoke a runner. With `--preferred-runner`, the CLI invokes the runner against the persisted prompt, enforces the advisory-only contract, writes the runner artifact, and records the detected outcome. Primary-agent patch commits that respond to subagent findings must use a subject suffix of `[subagent-review]`.
+Without `--subagent`, the CLI is a state recorder only and does not invoke a runner. With `--subagent`, the CLI invokes the runner against the persisted prompt, enforces the advisory-only contract, writes the runner artifact, and records the detected outcome. Primary-agent patch commits that respond to subagent findings must use a subject suffix of `[subagent-review]`.
 
 **Doc-only tickets** auto-skip subagent review only when `reviewPolicy.subagentReview` is `"skip_doc_only"`.
 
@@ -519,7 +523,7 @@ Available commands:
 - `post-red [ticket-id]`
 - `post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]`
 - `write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]`
-- `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--preferred-runner <claude-cli|codex-exec>]`
+- `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli>]`
 - `open-pr [ticket-id]`
 - `poll-review [ticket-id]`
 - `triage-ticket <ticket-id>`
@@ -581,7 +585,7 @@ bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md pos
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
 # for code tickets when subagentReview is enabled:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
-# pass --preferred-runner <claude-cli|codex-exec> to run the advisory subagent programmatically, then record:
+# pass --subagent <claude-cli|codex-cli> to run the advisory subagent programmatically, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
 # for doc-only tickets under skip_doc_only, subagent-review auto-records skipped (no prompt step)
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
@@ -599,7 +603,7 @@ bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md sta
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-red
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md post-verify [clean|patched] [patch-commit-sha ...]
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md write-subagent-adversarial-review
-# execution agent passes --preferred-runner <its-identity>; runner returns findings prose only; primary agent patches if prudent, then record:
+# execution agent passes --subagent <its-identity>; runner returns findings prose only; primary agent patches if prudent, then record:
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md subagent-review [clean|patched] [patch-commit-sha ...]
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md open-pr
 bun run deliver --plan docs/product/delivery/phase-NN/implementation-plan.md poll-review

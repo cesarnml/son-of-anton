@@ -119,12 +119,17 @@ import {
   appendInvocationToArtifact,
   buildRunnerSpawnCommand,
   buildRunnerInvocation,
+  coerceCodexCliClassification,
   decideAdvisoryRunnerOutcome,
   decideSubagentReviewMode,
   findDeliveryDocPaths,
   parseSubagentReviewArgs,
   readSubagentRunnerArtifact,
+  resolvePrimaryAgent,
+  resolveSubagentSelection,
+  runSubagentWithFallback,
   shouldFallbackToOtherRunner,
+  SUBAGENT_LEDGER_SCHEMA_VERSION,
   tryReadSubagentRunnerArtifact,
   tryRunner,
   writeSubagentReviewOutcome,
@@ -264,7 +269,8 @@ export async function runDeliveryOrchestrator(
         boundaryMode?: TicketBoundaryMode;
         subagentReviewPolicy?: ReviewPolicyStageValue;
         prReviewPolicy?: ReviewPolicyStageValue;
-        preferredRunner?: 'claude-cli' | 'codex-exec';
+        subagent?: 'claude-cli' | 'codex-cli';
+        primary?: string;
         baseline?: 'orchestrator' | 'run-policy';
       }
     | undefined;
@@ -684,6 +690,10 @@ export async function runDeliveryOrchestrator(
             artifactRelPath,
           );
 
+          const recorderPrimaryAgent = resolvePrimaryAgent({
+            flag: parsed.primary,
+            configField: context.config.primaryAgent,
+          });
           const recorderInvocation = buildRunnerInvocation(
             'operator-recorder',
             dispatch.reviewedHeadSha,
@@ -691,6 +701,10 @@ export async function runDeliveryOrchestrator(
             {
               terminatedReason: 'completed',
               patches: recorderPatchCommits?.map((c) => c.sha) ?? [],
+              schemaVersion: SUBAGENT_LEDGER_SCHEMA_VERSION,
+              primaryAgent: recorderPrimaryAgent,
+              runnerSelfReport: null,
+              fallbackFrom: null,
             },
           );
           appendInvocationToArtifact(
@@ -734,12 +748,15 @@ export async function runDeliveryOrchestrator(
           policy,
         });
 
-        // Build runner order: preferred first, other second.
-        const preferredRunner = parsed.preferredRunner;
-        const runnerOrder: Array<'claude-cli' | 'codex-exec'> =
-          preferredRunner === 'codex-exec'
-            ? ['codex-exec', 'claude-cli']
-            : ['claude-cli', 'codex-exec'];
+        // P14.02: operator-explicit subagent selection. Flag > config > error.
+        const subagentSelection = resolveSubagentSelection({
+          flag: parsed.subagent,
+          configField: context.config.subagentRunner,
+        });
+        const primaryAgent = resolvePrimaryAgent({
+          flag: parsed.primary,
+          configField: context.config.primaryAgent,
+        });
 
         const worktreePath = subagentTarget.worktreePath;
         const readHeadSha = () => {
@@ -790,106 +807,114 @@ export async function runDeliveryOrchestrator(
         const RUNNER_TIMEOUT_MS = 10 * 60 * 1000;
 
         let outcome: 'clean' | 'patched' | 'skipped' = 'skipped';
-        let usedRunner: 'claude-cli' | 'codex-exec' | 'skipped' = 'skipped';
         let terminatedReason: SubagentRunnerTerminatedReason =
           'runner_unavailable';
         let runnerOutputText: string | undefined;
-        let fallbackLevel: 'preferred' | 'fallback' | 'failed_all' =
-          'failed_all';
+        let runnerSelfReport: string | null = null;
 
-        for (const [runnerIndex, runner] of runnerOrder.entries()) {
-          const runnerHeadBefore = readHeadSha();
-          const result = tryRunner(
-            () => {
-              const { bin, args } = buildRunnerSpawnCommand(
-                runner,
-                reviewPrompt,
-              );
-              const spawned = spawnSync(bin, args, {
-                cwd: worktreePath,
-                timeout: RUNNER_TIMEOUT_MS,
-                encoding: 'utf-8',
+        const fallbackOutcome = runSubagentWithFallback(
+          subagentSelection.kind,
+          (runner) => {
+            const runnerHeadBefore = readHeadSha();
+            const result = tryRunner(
+              () => {
+                const { bin, args } = buildRunnerSpawnCommand(
+                  runner,
+                  reviewPrompt,
+                );
+                const spawned = spawnSync(bin, args, {
+                  cwd: worktreePath,
+                  timeout: RUNNER_TIMEOUT_MS,
+                  encoding: 'utf-8',
+                });
+                const spawnError = spawned.error as
+                  | (Error & { code?: string })
+                  | undefined;
+                if (spawnError && spawnError.code === 'ENOENT') {
+                  throw spawnError;
+                }
+                const stdout = spawned.stdout ?? '';
+                const stderr = spawned.stderr ?? '';
+                // P14.02: codex-cli classification trusts the model's
+                // self-reported runnerStatus trailer and only escalates to
+                // skipped/rate_limit on authentic structured signals.
+                if (runner === 'codex-cli') {
+                  const classified = coerceCodexCliClassification({
+                    exitCode: spawned.status,
+                    stdout,
+                    stderr,
+                  });
+                  runnerSelfReport = classified.runnerSelfReport;
+                  return {
+                    exitCode: spawned.status,
+                    timedOut:
+                      spawned.signal === 'SIGTERM' ||
+                      spawnError?.message?.includes('timed out') ||
+                      false,
+                    stdout,
+                    stderr,
+                    terminatedReason: classified.terminatedReason,
+                  };
+                }
+                return {
+                  exitCode: spawned.status,
+                  timedOut:
+                    spawned.signal === 'SIGTERM' ||
+                    spawnError?.message?.includes('timed out') ||
+                    false,
+                  stdout,
+                  stderr,
+                };
+              },
+              () => {
+                return (
+                  readHeadSha() !== runnerHeadBefore ||
+                  listDirtyPaths().length > 0
+                );
+              },
+            );
+
+            if (result.status === 'ran') {
+              const runnerHeadAfter = readHeadSha();
+              const runnerWroteFiles =
+                runnerHeadBefore !== runnerHeadAfter ||
+                listDirtyPaths().length > 0;
+
+              const decided = decideAdvisoryRunnerOutcome(result, {
+                runnerWroteFiles,
               });
-              // spawnSync does NOT throw on ENOENT; it sets `spawned.error`
-              // with code 'ENOENT' and leaves status === null. Re-raise so
-              // tryRunner classifies it as `unavailable` and the loop falls
-              // back to the other runner. Timeouts ride a separate path below.
-              const spawnError = spawned.error as
-                | (Error & { code?: string })
-                | undefined;
-              if (spawnError && spawnError.code === 'ENOENT') {
-                throw spawnError;
+              outcome = decided.outcome;
+              terminatedReason = decided.terminatedReason;
+              runnerOutputText = result.rawOutput;
+
+              if (runnerWroteFiles) {
+                const wroteHeadPaths =
+                  runnerHeadBefore !== runnerHeadAfter
+                    ? listDiffPaths(`${runnerHeadBefore}..${runnerHeadAfter}`)
+                    : [];
+                const writePaths = [...wroteHeadPaths, ...listDirtyPaths()];
+                const deliveryDocChanges = findDeliveryDocPaths(writePaths);
+                const detail =
+                  deliveryDocChanges.length > 0
+                    ? ` Delivery-doc paths affected: ${deliveryDocChanges.join(', ')}`
+                    : ` Affected paths: ${writePaths.join(', ')}`;
+                console.log(
+                  `Runner ${runner} attempted file writes — recording as advisory_violation (advisory-only contract).${detail}`,
+                );
               }
-              return {
-                exitCode: spawned.status,
-                timedOut:
-                  spawned.signal === 'SIGTERM' ||
-                  spawnError?.message?.includes('timed out') ||
-                  false,
-                stdout: spawned.stdout ?? '',
-                stderr: spawned.stderr ?? '',
-              };
-            },
-            () => {
-              return (
-                readHeadSha() !== runnerHeadBefore ||
-                listDirtyPaths().length > 0
-              );
-            },
-          );
-
-          if (result.status === 'ran') {
-            const runnerHeadAfter = readHeadSha();
-            const runnerWroteFiles =
-              runnerHeadBefore !== runnerHeadAfter ||
-              listDirtyPaths().length > 0;
-
-            // Advisory-only contract (P13.03): any runner-driven file change is
-            // a contract violation, not a valid `patched` outcome. The decision
-            // helper collapses such cases to `skipped` with
-            // `terminatedReason: 'advisory_violation'` so the artifact records
-            // the violation honestly instead of silently treating runner writes
-            // as accepted patches. Delivery-doc writes are a strict subset of
-            // this general violation; we still surface them in the operator
-            // message to make the offending paths obvious.
-            const decided = decideAdvisoryRunnerOutcome(result, {
-              runnerWroteFiles,
-            });
-            outcome = decided.outcome;
-            terminatedReason = decided.terminatedReason;
-            runnerOutputText = result.rawOutput;
-            usedRunner = runner;
-            fallbackLevel = runnerIndex === 0 ? 'preferred' : 'fallback';
-
-            if (runnerWroteFiles) {
-              const wroteHeadPaths =
-                runnerHeadBefore !== runnerHeadAfter
-                  ? listDiffPaths(`${runnerHeadBefore}..${runnerHeadAfter}`)
-                  : [];
-              const writePaths = [...wroteHeadPaths, ...listDirtyPaths()];
-              const deliveryDocChanges = findDeliveryDocPaths(writePaths);
-              const detail =
-                deliveryDocChanges.length > 0
-                  ? ` Delivery-doc paths affected: ${deliveryDocChanges.join(', ')}`
-                  : ` Affected paths: ${writePaths.join(', ')}`;
+            } else if (shouldFallbackToOtherRunner(result)) {
               console.log(
-                `Runner ${runner} attempted file writes — recording as advisory_violation (advisory-only contract).${detail}`,
+                `Runner ${runner} unavailable${result.status === 'timeout' ? ' (timed out)' : ''}, trying fallback...`,
               );
             }
-            break;
-          }
+            return result;
+          },
+        );
 
-          if (!shouldFallbackToOtherRunner(result)) {
-            // Defensive: tryRunner only emits ran|unavailable|timeout today,
-            // so this branch is unreachable. Keep it as a guard rail so future
-            // result kinds do not silently fall through into the fallback loop.
-            break;
-          }
-
-          console.log(
-            `Runner ${runner} unavailable${result.status === 'timeout' ? ' (timed out)' : ''}, trying fallback...`,
-          );
-        }
+        const usedRunner: 'claude-cli' | 'codex-cli' | 'skipped' =
+          fallbackOutcome.ranKind;
+        const fallbackLevel = fallbackOutcome.fallbackLevel;
+        const fallbackFrom = fallbackOutcome.fallbackFrom;
 
         // Write runner artifact (append-only invocations[] per ticket).
         // Sidecar files hold prompt and outcome prose; JSON stores path refs only.
@@ -917,6 +942,10 @@ export async function runDeliveryOrchestrator(
           rawOutput: outcomeSidecar?.relativePath,
           filledPrompt: promptPath,
           fallbackLevel,
+          schemaVersion: SUBAGENT_LEDGER_SCHEMA_VERSION,
+          primaryAgent,
+          runnerSelfReport,
+          fallbackFrom,
         });
         appendInvocationToArtifact(
           artifactAbsPath,

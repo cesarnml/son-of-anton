@@ -87,8 +87,17 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `coerceCodexCliClassification` / `resolveSubagentSelection` / `resolvePrimaryAgent` / `runSubagentWithFallback` import failures plus the missing `--subagent`/`--primary` flag handling.
+
+Why this path:
+
+- Added pure helpers under `tools/delivery/subagent-runner.ts` so the contract (flag > config > error; free-form primaryAgent; authentic-signal-only rate-limit; explicit fallbackFrom recording) is testable without touching disk, matching the "Public API shape" requirement in Review Focus.
+- Codex-cli authentic-rate-limit predicate is structured-only: exit code 7 OR a quoted JSON-shaped `{"error":"rate_limited"}` / `rate_limit_exceeded` / `RATE_LIMIT(_EXCEEDED)?` token. Stderr prose like "you may have hit your rate limit" no longer triggers `skipped` — that was the codogotchi P2 misclassification.
+- `runSubagentWithFallback` always preserves the originally-requested kind in `fallbackFrom` on the `failed_all` path, so the skipped row remains auditable per the Review Focus item.
+- Scaffold (`scripts/soa-sync.sh`) ships `primaryAgent: "unknown"` but deliberately omits `subagentRunner`, so first `/soa execute` in a fresh repo errors with the documented contract message before any review runs.
+
+Alternative considered: defining authentic rate-limit predicates as inline matchers in the runner loop. Rejected — keeping them as a single per-runner helper (`isCodexCliAuthenticRateLimit`) made the boundary between "completed with stderr noise" and "authentic rate-limit" trivially auditable and isolated future codex-cli signal evolution to one function.
+
+Deferred: per-runner authentic-rate-limit predicate for **claude-cli** (the helper here is codex-cli-specific because that is the misclassification we have evidence for). Claude-cli still uses the existing `classifyRunnerTermination` heuristic for now; P14 didn't surface a claude-cli mislabel to motivate matching changes. Capture as a follow-up if a claude-cli regression appears.
+
+Contract note: `--preferred-runner` is removed (hard error with named resolution). `subagentRunner` is now a config field, but it has no resolved default — `resolveOrchestratorConfig` passes the raw value through and `resolveSubagentSelection` raises when both flag and field are absent.

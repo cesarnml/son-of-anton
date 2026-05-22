@@ -250,12 +250,12 @@ or committing config changes.
 
 ### Supported flags
 
-| Flag                                          | Values                                  | What it overrides                                                                                                 |
-| --------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `--boundary-mode`                             | `cook`, `gated`                         | `ticketBoundaryMode`                                                                                              |
-| `--subagent-review-policy`                    | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.subagentReview`                                                                                     |
-| `--pr-review-policy`                          | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.prReview`                                                                                           |
-| `--preferred-runner <claude-cli\|codex-exec>` | `claude-cli`, `codex-exec`              | declare execution agent identity for programmatic review; tries preferred first, then the other, then honest skip |
+| Flag                                 | Values                                  | What it overrides                                                                                                 |
+| ------------------------------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `--boundary-mode`                    | `cook`, `gated`                         | `ticketBoundaryMode`                                                                                              |
+| `--subagent-review-policy`           | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.subagentReview`                                                                                     |
+| `--pr-review-policy`                 | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.prReview`                                                                                           |
+| `--subagent <claude-cli\|codex-cli>` | `claude-cli`, `codex-cli`               | declare execution agent identity for programmatic review; tries preferred first, then the other, then honest skip |
 
 The resolved policy is written to `state.json` at the start of every run.
 `orchestrator.config.json` is never modified.

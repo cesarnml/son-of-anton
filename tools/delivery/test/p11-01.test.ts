@@ -25,7 +25,7 @@ describe('P11.01 — readSubagentRunnerArtifact legacy adapter', () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'p11-01-legacy-'));
     try {
       const legacy = {
-        runnerKind: 'codex-exec',
+        runnerKind: 'codex-cli',
         reviewedHeadSha: 'abc123',
         outcome: 'clean',
         completedAt: '2026-05-18T15:29:44.213Z',
@@ -38,7 +38,7 @@ describe('P11.01 — readSubagentRunnerArtifact legacy adapter', () => {
       expect(artifact.ticket).toBe('P9.99');
       expect(artifact.invocations.length).toBe(1);
       const inv = artifact.invocations[0]!;
-      expect(inv.runnerKind).toBe('codex-exec');
+      expect(inv.runnerKind).toBe('codex-cli');
       expect(inv.reviewedHeadSha).toBe('abc123');
       expect(inv.outcome).toBe('clean');
       expect(inv.completedAt).toBe('2026-05-18T15:29:44.213Z');
@@ -81,7 +81,7 @@ describe('P11.01 — readSubagentRunnerArtifact legacy adapter', () => {
       await writeFile(
         path,
         JSON.stringify({
-          runnerKind: 'codex-exec',
+          runnerKind: 'codex-cli',
           outcome: 'clean',
           completedAt: '2026-05-18T15:29:44.213Z',
         }),
@@ -173,7 +173,7 @@ describe('P11.01 — readSubagentRunnerArtifact structured round-trip', () => {
         patches: ['abcdef0'],
       };
       const invocation2: SubagentRunnerInvocation = {
-        runnerKind: 'codex-exec',
+        runnerKind: 'codex-cli',
         reviewedHeadSha: 'sha2',
         outcome: 'clean',
         completedAt: '2026-05-19T01:00:00.000Z',
@@ -239,7 +239,7 @@ describe('P11.01 — appendInvocationToArtifact', () => {
     try {
       const path = join(tempDir, 'P11.99-subagent-runner.json');
       const first = buildRunnerInvocation('claude-cli', 'sha-1', 'clean');
-      const second = buildRunnerInvocation('codex-exec', 'sha-2', 'patched');
+      const second = buildRunnerInvocation('codex-cli', 'sha-2', 'patched');
       appendInvocationToArtifact(path, 'P11.99', first);
       appendInvocationToArtifact(path, 'P11.99', second);
 
@@ -261,7 +261,7 @@ describe('P11.01 — appendInvocationToArtifact', () => {
       await writeFile(
         path,
         JSON.stringify({
-          runnerKind: 'codex-exec',
+          runnerKind: 'codex-cli',
           reviewedHeadSha: 'sha-legacy',
           outcome: 'clean',
           completedAt: '2026-05-18T15:29:44.213Z',

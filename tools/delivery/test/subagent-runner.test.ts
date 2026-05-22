@@ -56,7 +56,7 @@ describe('P14.01 — outcome vocabulary expands to include deferred', () => {
 
 describe('P14.01 — identity and provenance fields round-trip', () => {
   it('preserves schemaVersion, primaryAgent, runnerSelfReport, fallbackFrom', () => {
-    const invocation = buildRunnerInvocation('codex-exec', 'sha', 'clean', {
+    const invocation = buildRunnerInvocation('codex-cli', 'sha', 'clean', {
       schemaVersion: 1,
       primaryAgent: 'codex-cli',
       runnerSelfReport: 'completed',
@@ -74,6 +74,7 @@ describe('P14.01 — identity and provenance fields round-trip', () => {
     expect(row.primaryAgent).toBe('codex-cli');
     expect(row.runnerSelfReport).toBe('completed');
     expect(row.fallbackFrom).toBe('claude-cli');
+    expect(row.runnerKind).toBe('codex-cli');
   });
 
   it('accepts runnerSelfReport: null and fallbackFrom: null explicitly', () => {

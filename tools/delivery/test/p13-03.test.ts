@@ -92,7 +92,7 @@ describe('P13.03 — runner invocation records prompt and outcome path refs', ()
     const rawOutput =
       'docs/product/delivery/phase-13/reviews/P13.03-subagent-review-outcome.md';
 
-    const invocation = buildRunnerInvocation('codex-exec', 'abc1234', 'clean', {
+    const invocation = buildRunnerInvocation('codex-cli', 'abc1234', 'clean', {
       terminatedReason: 'completed',
       fallbackLevel: 'preferred',
       rawOutput,
@@ -117,7 +117,7 @@ describe('P13.03 — runner invocation records prompt and outcome path refs', ()
       ticket: 'P13.03',
       invocations: [
         {
-          runnerKind: 'codex-exec',
+          runnerKind: 'codex-cli',
           reviewedHeadSha: 'abc1234',
           outcome: 'clean',
           completedAt: '2026-05-20T00:00:00.000Z',
@@ -138,7 +138,7 @@ describe('P13.03 — runner is advisory-only (no-write contract)', () => {
     const artifact: SubagentRunnerArtifact = {
       ticket: 'P13.03',
       invocations: [
-        buildRunnerInvocation('codex-exec', 'abc1234', 'skipped', {
+        buildRunnerInvocation('codex-cli', 'abc1234', 'skipped', {
           terminatedReason: 'advisory_violation',
           rawOutput:
             'docs/product/delivery/phase-13/reviews/P13.03-subagent-review-outcome.md',
@@ -233,7 +233,7 @@ describe('P13.03 — recorder mode still records primary-agent patches after a r
     const existingArtifact: SubagentRunnerArtifact = {
       ticket: 'P13.03',
       invocations: [
-        buildRunnerInvocation('codex-exec', headSha, 'clean', {
+        buildRunnerInvocation('codex-cli', headSha, 'clean', {
           terminatedReason: 'completed',
           rawOutput: 'no issues',
           filledPrompt: 'prompt body',
@@ -257,7 +257,7 @@ describe('P13.03 — recorder mode still records primary-agent patches after a r
   it('skipped runner invocations never block recorder dispatch', () => {
     const headSha = 'currentHead';
     const skippedInvocation: SubagentRunnerInvocation = buildRunnerInvocation(
-      'codex-exec',
+      'codex-cli',
       headSha,
       'skipped',
       { terminatedReason: 'advisory_violation' },

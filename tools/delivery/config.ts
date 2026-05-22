@@ -31,6 +31,9 @@ export type PrReviewAgent = {
   resolveThreads: boolean;
 };
 
+export const VALID_SUBAGENT_RUNNERS = ['claude-cli', 'codex-cli'] as const;
+export type SubagentRunnerSelection = (typeof VALID_SUBAGENT_RUNNERS)[number];
+
 export type OrchestratorConfig = {
   defaultBranch?: string;
   planRoot?: string;
@@ -39,6 +42,10 @@ export type OrchestratorConfig = {
   ticketBoundaryMode?: TicketBoundaryMode;
   reviewPolicy?: ReviewPolicy;
   prReviewAgents?: PrReviewAgent[];
+  /** Default subagent for `subagent-review` when no `--subagent` flag is passed. */
+  subagentRunner?: SubagentRunnerSelection;
+  /** Default primary-agent identity recorded on every ledger row. Free-form. */
+  primaryAgent?: string;
 };
 
 export type ResolvedOrchestratorConfig = {
@@ -49,6 +56,8 @@ export type ResolvedOrchestratorConfig = {
   ticketBoundaryMode: TicketBoundaryMode;
   reviewPolicy: ResolvedReviewPolicy;
   prReviewAgents?: PrReviewAgent[];
+  subagentRunner?: SubagentRunnerSelection;
+  primaryAgent?: string;
 };
 
 const VALID_RUNTIMES = ['bun', 'node'] as const;
@@ -142,6 +151,34 @@ export async function loadOrchestratorConfig(
     );
   }
 
+  let subagentRunner: SubagentRunnerSelection | undefined;
+  if (raw.subagentRunner !== undefined) {
+    if (
+      typeof raw.subagentRunner !== 'string' ||
+      !VALID_SUBAGENT_RUNNERS.includes(
+        raw.subagentRunner as SubagentRunnerSelection,
+      )
+    ) {
+      throw new Error(
+        `Invalid subagentRunner "${String(raw.subagentRunner)}" in orchestrator.config.json. Expected: ${VALID_SUBAGENT_RUNNERS.join(', ')}`,
+      );
+    }
+    subagentRunner = raw.subagentRunner as SubagentRunnerSelection;
+  }
+
+  let primaryAgent: string | undefined;
+  if (raw.primaryAgent !== undefined) {
+    if (
+      typeof raw.primaryAgent !== 'string' ||
+      raw.primaryAgent.trim() === ''
+    ) {
+      throw new Error(
+        'Invalid primaryAgent in orchestrator.config.json. Expected a non-blank string (e.g. "claude", "codex", "cursor").',
+      );
+    }
+    primaryAgent = raw.primaryAgent.trim();
+  }
+
   return {
     defaultBranch,
     planRoot,
@@ -151,6 +188,8 @@ export async function loadOrchestratorConfig(
       raw.ticketBoundaryMode as OrchestratorConfig['ticketBoundaryMode'],
     reviewPolicy,
     prReviewAgents,
+    subagentRunner,
+    primaryAgent,
   };
 }
 
@@ -179,6 +218,8 @@ export function resolveOrchestratorConfig(
       prReview: raw.reviewPolicy?.prReview ?? 'skip_doc_only',
     },
     prReviewAgents: raw.prReviewAgents,
+    subagentRunner: raw.subagentRunner,
+    primaryAgent: raw.primaryAgent,
   };
 }
 
