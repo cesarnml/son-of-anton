@@ -47,8 +47,7 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: Import of `emitSoaEventsForTransitions` from `cli-runner.ts` failed — function did not exist yet.
+Why this path: Extracted `emitSoaEventsForTransitions(previousState, nextState, config, projectRoot)` as a shared helper covering both `start` and `advance` paths. Both reduce to a state diff: find tickets whose status changed to `done` or `in_progress` and emit the corresponding event. Genuine duplication — the diff logic is identical for both callers.
+Alternative considered: Wiring separate `appendSoaEvent` calls inline in `start` and `advance` without extracting a helper. Rejected because the `advance` case already has the diff logic in `eventsForAdvanceCommand`; extracting to a named helper keeps the contract explicit and testable.
+Deferred: No `.soa/` directory creation path for disabled gate (handled entirely inside `appendSoaEvent` already). No event emission for `triage-ticket` or `triage-standalone` paths (scoped to `start` and `advance` only as specified).
