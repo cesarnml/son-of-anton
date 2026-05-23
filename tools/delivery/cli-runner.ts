@@ -149,6 +149,7 @@ import {
   writeSubagentAdversarialPrompt,
 } from './subagent-prompt';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { appendSoaEvent, buildSoaEventLine } from './soa-event-feed';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 
@@ -459,6 +460,12 @@ export async function runDeliveryOrchestrator(
         );
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
+        await emitSoaEventsForTransitions(
+          stateForStart,
+          nextState,
+          context.config,
+          cwd,
+        );
         await emitNotificationWarnings(
           notifier,
           cwd,
@@ -1261,6 +1268,12 @@ export async function runDeliveryOrchestrator(
           findPrimaryWorktreePath(wt, context.config),
         );
         console.log(formatStatus(nextState, context.config));
+        await emitSoaEventsForTransitions(
+          state,
+          nextState,
+          context.config,
+          cwd,
+        );
         const boundaryGuidance = formatAdvanceBoundaryGuidance(
           state,
           advancedState,
@@ -2202,6 +2215,42 @@ async function restackTicket(
 
 export function derivePlanKey(planPath: string): string {
   return derivePlanKeyImpl(planPath);
+}
+
+export async function emitSoaEventsForTransitions(
+  previousState: DeliveryState,
+  nextState: DeliveryState,
+  config: ResolvedOrchestratorConfig,
+  projectRoot: string,
+): Promise<void> {
+  for (const previousTicket of previousState.tickets) {
+    const nextTicket = nextState.tickets.find(
+      (t) => t.id === previousTicket.id,
+    );
+    if (previousTicket.status !== 'done' && nextTicket?.status === 'done') {
+      await appendSoaEvent(
+        config,
+        projectRoot,
+        buildSoaEventLine('ticket_completed', {
+          plan_key: nextState.planKey,
+          ticket_id: nextTicket.id,
+        }),
+      );
+    }
+    if (
+      previousTicket.status !== 'in_progress' &&
+      nextTicket?.status === 'in_progress'
+    ) {
+      await appendSoaEvent(
+        config,
+        projectRoot,
+        buildSoaEventLine('ticket_started', {
+          plan_key: nextState.planKey,
+          ticket_id: nextTicket.id,
+        }),
+      );
+    }
+  }
 }
 
 function formatError(error: unknown): string {

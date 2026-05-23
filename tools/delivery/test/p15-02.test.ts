@@ -47,10 +47,7 @@ function makeTicket(id: string, status: TicketState['status']): TicketState {
   };
 }
 
-function makeState(
-  planKey: string,
-  tickets: TicketState[],
-): DeliveryState {
+function makeState(planKey: string, tickets: TicketState[]): DeliveryState {
   return {
     planKey,
     planPath: `docs/product/delivery/${planKey}/implementation-plan.md`,
@@ -142,7 +139,9 @@ describe('P15.02 — emitSoaEventsForTransitions (gate disabled)', () => {
     expect(existsSync(join(root, '.soa'))).toBe(false);
 
     // Also verify advance-path transitions are suppressed
-    const previous2 = makeState(PLAN_KEY, [makeTicket('P15.02', 'in_progress')]);
+    const previous2 = makeState(PLAN_KEY, [
+      makeTicket('P15.02', 'in_progress'),
+    ]);
     const next2 = makeState(PLAN_KEY, [makeTicket('P15.02', 'done')]);
 
     await emitSoaEventsForTransitions(previous2, next2, config, root);
