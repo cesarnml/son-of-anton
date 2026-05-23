@@ -3,6 +3,7 @@ import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { ResolvedOrchestratorConfig } from './config';
+import type { DeliveryNotificationEvent } from './types';
 
 export type SoaEventLine = {
   name: string;
@@ -45,5 +46,26 @@ export async function appendSoaEvent(
     }
   } catch {
     // best-effort: write failures never abort a delivery command
+  }
+}
+
+export async function maybeEmitReviewCleanRecorded(
+  events: DeliveryNotificationEvent[],
+  config: ResolvedOrchestratorConfig,
+  projectRoot: string,
+): Promise<void> {
+  const reviewEvent = events.find(
+    (e): e is Extract<DeliveryNotificationEvent, { kind: 'review_recorded' }> =>
+      e.kind === 'review_recorded' && e.outcome === 'clean',
+  );
+  if (reviewEvent) {
+    await appendSoaEvent(
+      config,
+      projectRoot,
+      buildSoaEventLine('review_clean_recorded', {
+        plan_key: reviewEvent.planKey,
+        ticket_id: reviewEvent.ticketId,
+      }),
+    );
   }
 }
