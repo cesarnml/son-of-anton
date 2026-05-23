@@ -1,6 +1,6 @@
 # Phase 15: Codogotchi Gate Event Emission
 
-**Delivery status:** Product plan approved. Ready for `/soa decompose`.
+**Delivery status:** Delivered. PRs [#56](https://github.com/cesarnml/son-of-anton/pull/56), [#58](https://github.com/cesarnml/son-of-anton/pull/58), [#59](https://github.com/cesarnml/son-of-anton/pull/59), [#60](https://github.com/cesarnml/son-of-anton/pull/60), [#61](https://github.com/cesarnml/son-of-anton/pull/61), [#62](https://github.com/cesarnml/son-of-anton/pull/62) — stacked, pending closeout-stack merge. Codogotchi alignment cross-repo draft: [`notes/public/codogotchi-alignment-draft.md`](../../../../notes/public/codogotchi-alignment-draft.md). Retrospective: [`docs/product/retrospectives/phase-15-codogotchi-gate-event-emission-retrospective.md`](../../retrospectives/phase-15-codogotchi-gate-event-emission-retrospective.md).
 
 ## TL;DR
 

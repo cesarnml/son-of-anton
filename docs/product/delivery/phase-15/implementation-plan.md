@@ -4,7 +4,7 @@
 
 ## Epic
 
-Standalone phase. Source product plan: [`docs/product/plans/phase-15-codogotchi-gate-event-emission.md`](../../plans/phase-15-codogotchi-gate-event-emission.md). Codogotchi alignment cross-repo draft: [`notes/public/codogotchi-alignment-draft.md`](../../../../notes/public/codogotchi-alignment-draft.md).
+Standalone phase. Source product plan: [`docs/product/plans/phase-15-codogotchi-gate-event-emission.md`](../../plans/phase-15-codogotchi-gate-event-emission.md). Codogotchi alignment cross-repo draft: [`notes/public/codogotchi-alignment-draft.md`](../../../../notes/public/codogotchi-alignment-draft.md). Retrospective: [`docs/product/retrospectives/phase-15-codogotchi-gate-event-emission-retrospective.md`](../../retrospectives/phase-15-codogotchi-gate-event-emission-retrospective.md).
 
 ## Product contract
 

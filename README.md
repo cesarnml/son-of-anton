@@ -174,6 +174,10 @@ formatter should not touch it.
 exist yet. Review it and adjust `defaultBranch`, `runtime`, and `packageManager` for
 your repo before running the orchestrator.
 
+Add `.soa/` to your repo's `.gitignore` — SoA creates this directory at the project
+root when `codogotchi.enabled` is not `false`, and it is local-only (not committed).
+Set `codogotchi: { enabled: false }` in `orchestrator.config.json` to suppress it entirely.
+
 ### Step 3 — Start
 
 ```bash
