@@ -44,10 +44,12 @@ Red: required
 
 ## Rationale
 
-> Append here (do not edit above) when behavior or trade-offs change during implementation.
+Red first: `maybeEmitReviewCleanRecorded` not exported from `soa-event-feed.ts` — import error caused the test file to fail to load.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Why this path: Extracted `maybeEmitReviewCleanRecorded(events, config, projectRoot)` to `soa-event-feed.ts`. The helper takes the pre-computed `DeliveryNotificationEvent[]` that the CLI already builds for notification dispatch, scans for a `review_recorded` event with `outcome === 'clean'` via `Array.find`, and delegates to `appendSoaEvent` for the actual write and gate check. This keeps the three call sites symmetric and avoids re-deriving state inside the helper.
+
+Alternative considered: Inlining the scan at each of the three call sites. Rejected because three near-identical blocks differ only in event-array source; extraction is the smallest duplication-free form.
+
+Deferred: CLI-level integration test dispatching full handlers and asserting `.soa/events.ndjson` content. The helper is tested via the same notification builders the CLI uses; full dispatch coverage would require a heavier test harness and is deferred.
+
+Contract note: No deviation from ticket metadata contract.
