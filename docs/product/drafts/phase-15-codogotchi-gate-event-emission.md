@@ -40,7 +40,12 @@ to `.soa/events.ndjson` in the format the codogotchi contract expects.
 The contract format is simple — one JSON object per line:
 
 ```json
-{"name":"ticket_started","ts":"2026-05-23T14:00:00.000Z","plan_key":"phase-15","ticket_id":"P15.01"}
+{
+  "name": "ticket_started",
+  "ts": "2026-05-23T14:00:00.000Z",
+  "plan_key": "phase-15",
+  "ticket_id": "P15.01"
+}
 ```
 
 Fields: `name` (string), `ts` (ISO-8601 string), `plan_key` (optional string),
@@ -54,23 +59,23 @@ The codogotchi contract maps 9 SoA event names to animation states. Five of
 them have direct counterparts in the existing SoA notification system with
 clean, tested emit points:
 
-| SoA event name            | Activity state       | SoA command / trigger                              |
-| ------------------------- | -------------------- | -------------------------------------------------- |
+| SoA event name            | Activity state       | SoA command / trigger                                |
+| ------------------------- | -------------------- | ---------------------------------------------------- |
 | `ticket_started`          | `hyped`              | `deliver start` / `advance` → ticket → `in_progress` |
-| `ticket_completed`        | `celebrating`        | `advance` → ticket → `done`                        |
-| `pr_review_window_opened` | `waiting`            | `open-pr` → review window ready                    |
-| `review_clean_recorded`   | `celebrating`        | `record-review clean` / `poll-review` → clean      |
-| `subagent_invoked`        | `calling_for_backup` | subagent runner invocation in `subagent-runner.ts` |
+| `ticket_completed`        | `celebrating`        | `advance` → ticket → `done`                          |
+| `pr_review_window_opened` | `waiting`            | `open-pr` → review window ready                      |
+| `review_clean_recorded`   | `celebrating`        | `record-review clean` / `poll-review` → clean        |
+| `subagent_invoked`        | `calling_for_backup` | subagent runner invocation in `subagent-runner.ts`   |
 
 Four additional events exist in the contract but have no clear SoA-side emit
 point today and are deferred to a later phase:
 
-| SoA event name         | Activity state | Defer rationale                                        |
-| ---------------------- | -------------- | ------------------------------------------------------ |
-| `verification_failed`  | `panicking`    | Verify gate runs outside orchestrator control; detection unclear |
-| `risky_diff_detected`  | `nervous`      | Static-analysis trigger undefined; requires heuristic work |
-| `flow_state_entered`   | `focused`      | No current orchestrator detection of "flow state"      |
-| `stage_advanced`       | `ascended`     | No current SoA stage-advance command or event          |
+| SoA event name        | Activity state | Defer rationale                                                  |
+| --------------------- | -------------- | ---------------------------------------------------------------- |
+| `verification_failed` | `panicking`    | Verify gate runs outside orchestrator control; detection unclear |
+| `risky_diff_detected` | `nervous`      | Static-analysis trigger undefined; requires heuristic work       |
+| `flow_state_entered`  | `focused`      | No current orchestrator detection of "flow state"                |
+| `stage_advanced`      | `ascended`     | No current SoA stage-advance command or event                    |
 
 ---
 
@@ -101,25 +106,30 @@ Emit calls are added at the following CLI command boundaries. All emits are
 abort a delivery command.
 
 **`ticket_started`**
+
 - In `cli.ts` at the `start` command, after the state transition succeeds.
   `plan_key` from `state.planKey`, `ticket_id` from the ticket being started.
 - Also in `advance` when a ticket transitions from non-`in_progress` to
   `in_progress` (mirrors `eventsForAdvanceCommand` in `notifications.ts`).
 
 **`ticket_completed`**
+
 - In `advance` when a ticket transitions to `done` (mirrors
   `eventsForAdvanceCommand`). Same `plan_key` / `ticket_id` sourcing.
 
 **`pr_review_window_opened`**
+
 - In `cli.ts` at the `open-pr` command, after `buildReviewWindowReadyEvent`
   returns a non-undefined event (i.e., PR URL and `prOpenedAt` are both set).
 
 **`review_clean_recorded`**
+
 - In `cli.ts` at the `record-review` command when `outcome === 'clean'`.
 - Also in `poll-review` when the review resolves to `clean` (mirrors
   `eventsForPollReviewCommand`).
 
 **`subagent_invoked`**
+
 - In `subagent-runner.ts`, immediately before the runner subprocess is spawned.
   `payload` can carry `runnerKind` for debugging.
 
@@ -147,7 +157,7 @@ Consumer repos that already have `.soa/` in their gitignore are unaffected.
   formalized as a first-class orchestrator step.
 - **`risky_diff_detected`**: requires diff size / risk heuristics. Out of scope
   for Phase 15.
-- **`flow_state_entered`**: no current orchestrator model of "flow state". 
+- **`flow_state_entered`**: no current orchestrator model of "flow state".
   Deferred.
 - **`stage_advanced`**: no current stage-advance command or concept in SoA.
   Deferred.
@@ -184,8 +194,8 @@ This phase should leave the product in a state where:
 The codogotchi contract doc at
 `docs/contracts/soa-event-feed.md` calls out:
 
-> *"Cross-reference: the SoA-side emit ticket should link back to this doc for
-> traceability."*
+> _"Cross-reference: the SoA-side emit ticket should link back to this doc for
+> traceability."_
 
 The Phase 15 implementation plan and ticket-01 should include a direct link to
 that file. The codogotchi `soa-event-feed.md` does not need to change — the
@@ -195,10 +205,10 @@ contract is already correct; SoA just needs to fulfill it.
 
 ## Suggested ticket breakdown (for `/soa decompose`)
 
-| # | Title | Scope |
-|---|-------|-------|
-| 01 | Add `soa-event-feed.ts` writer module | New file; unit tests for `appendSoaEvent` and `buildSoaEventLine`; path construction |
-| 02 | Emit `ticket_started` and `ticket_completed` | Wire into `cli.ts` `start` and `advance` commands; integration test against tmp dir |
-| 03 | Emit `pr_review_window_opened` and `review_clean_recorded` | Wire into `open-pr` and `record-review` / `poll-review` paths |
-| 04 | Emit `subagent_invoked` | Wire into `subagent-runner.ts` before subprocess spawn |
-| 05 | `.gitignore` doc and AGENTS.soa.md update | One-paragraph note; gitignore example line |
+| #   | Title                                                      | Scope                                                                                |
+| --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 01  | Add `soa-event-feed.ts` writer module                      | New file; unit tests for `appendSoaEvent` and `buildSoaEventLine`; path construction |
+| 02  | Emit `ticket_started` and `ticket_completed`               | Wire into `cli.ts` `start` and `advance` commands; integration test against tmp dir  |
+| 03  | Emit `pr_review_window_opened` and `review_clean_recorded` | Wire into `open-pr` and `record-review` / `poll-review` paths                        |
+| 04  | Emit `subagent_invoked`                                    | Wire into `subagent-runner.ts` before subprocess spawn                               |
+| 05  | `.gitignore` doc and AGENTS.soa.md update                  | One-paragraph note; gitignore example line                                           |

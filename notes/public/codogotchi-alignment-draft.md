@@ -1,4 +1,5 @@
 # Codogotchi Alignment Draft Plan
+
 ## Bring codogotchi into full alignment with SoA Phase 15 gate event emission
 
 _Drafted: 2026-05-23_
@@ -81,6 +82,7 @@ SoA Phase 15 adds an optional `codogotchi: { enabled: boolean }` field to `orche
 Review `docs/contracts/animation-state-vocabulary.md` for any SoA command names or CLI invocations that reference old SoA commands (pre-Phase 12). SoA has evolved significantly (phases 1–15). Stale references in this doc will mislead consumers who look to it for SoA integration guidance.
 
 Specifically check:
+
 - Any mention of SoA CLI commands that no longer exist or have been renamed.
 - Any assumed SoA state machine transitions that no longer match the current `TicketStatus` type.
 - Any animation trigger descriptions that reference codogotchi-internal logic that should now be superseded by the SoA event feed.
@@ -91,11 +93,11 @@ Specifically check:
 
 This plan targets a single focused phase in the codogotchi repo:
 
-| # | Title | Scope |
-|---|---|---|
-| 01 | Path resolution + tail semantics integration tests | Items 1 and 2 above |
-| 02 | Activity state mapping + precedence tests | Items 3 and 4 above |
-| 03 | Config gate doc + stale-reference audit | Items 5 and 6 above |
+| #   | Title                                              | Scope               |
+| --- | -------------------------------------------------- | ------------------- |
+| 01  | Path resolution + tail semantics integration tests | Items 1 and 2 above |
+| 02  | Activity state mapping + precedence tests          | Items 3 and 4 above |
+| 03  | Config gate doc + stale-reference audit            | Items 5 and 6 above |
 
 ---
 

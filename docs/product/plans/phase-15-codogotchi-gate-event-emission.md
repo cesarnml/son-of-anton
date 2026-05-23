@@ -7,6 +7,7 @@
 **Goal:** Connect the unconnected wire — SoA has never written to `.soa/events.ndjson` despite the codogotchi hook binary being built to consume it. This phase adds the writer.
 
 **Ships:**
+
 - `tools/delivery/soa-event-feed.ts` — the NDJSON append writer module
 - Emit calls at five recognized gate points: `ticket_started`, `ticket_completed`, `pr_review_window_opened`, `review_clean_recorded`, `subagent_invoked`
 - `review_clean_recorded` covered on all three paths: `record-review`, `poll-review`, and `triage-ticket` (when outcome is `clean`)
@@ -45,13 +46,13 @@ New module: `appendSoaEvent(projectRoot, event)` appends one NDJSON line to `${p
 
 Emit calls added at recognized gate boundaries, all best-effort:
 
-| Event | Emit site | Trigger |
-|---|---|---|
-| `ticket_started` | `cli-runner.ts` — `start` command and `advance` on `→ in_progress` transition | After state transition succeeds |
-| `ticket_completed` | `cli-runner.ts` — `advance` on `→ done` transition | After state transition succeeds |
-| `pr_review_window_opened` | `cli-runner.ts` — `open-pr` command | When `buildReviewWindowReadyEvent` returns non-undefined |
-| `review_clean_recorded` | `cli-runner.ts` — `record-review`, `poll-review`, and `triage-ticket` paths | When resolved outcome is `clean` |
-| `subagent_invoked` | `cli-runner.ts` — immediately before `spawnSync` at ~line 907 | Before runner subprocess is spawned; `payload` carries `runnerKind` |
+| Event                     | Emit site                                                                     | Trigger                                                             |
+| ------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `ticket_started`          | `cli-runner.ts` — `start` command and `advance` on `→ in_progress` transition | After state transition succeeds                                     |
+| `ticket_completed`        | `cli-runner.ts` — `advance` on `→ done` transition                            | After state transition succeeds                                     |
+| `pr_review_window_opened` | `cli-runner.ts` — `open-pr` command                                           | When `buildReviewWindowReadyEvent` returns non-undefined            |
+| `review_clean_recorded`   | `cli-runner.ts` — `record-review`, `poll-review`, and `triage-ticket` paths   | When resolved outcome is `clean`                                    |
+| `subagent_invoked`        | `cli-runner.ts` — immediately before `spawnSync` at ~line 907                 | Before runner subprocess is spawned; `payload` carries `runnerKind` |
 
 `projectRoot` sourcing: `process.cwd()` for all `cli-runner.ts` emit points except `subagent_invoked`, which uses `worktreePath` (already available at the spawn site).
 
