@@ -889,6 +889,7 @@ export async function runDeliveryOrchestrator(
           subagentSelection.kind,
           (runner) => {
             const runnerHeadBefore = readHeadSha();
+            const preRunDirtyPaths = new Set(listDirtyPaths());
             const result = tryRunner(
               () => {
                 const outputLastMessageDir =
@@ -967,7 +968,7 @@ export async function runDeliveryOrchestrator(
               () => {
                 return (
                   readHeadSha() !== runnerHeadBefore ||
-                  listDirtyPaths().length > 0
+                  listDirtyPaths().some((p) => !preRunDirtyPaths.has(p))
                 );
               },
             );
@@ -976,7 +977,7 @@ export async function runDeliveryOrchestrator(
               const runnerHeadAfter = readHeadSha();
               const runnerWroteFiles =
                 runnerHeadBefore !== runnerHeadAfter ||
-                listDirtyPaths().length > 0;
+                listDirtyPaths().some((p) => !preRunDirtyPaths.has(p));
 
               const decided = decideAdvisoryRunnerOutcome(result, {
                 runnerWroteFiles,
