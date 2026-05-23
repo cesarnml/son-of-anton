@@ -33,10 +33,7 @@ function makeTmpDir(): string {
   return dir;
 }
 
-function makeTicket(
-  id: string,
-  overrides?: Partial<TicketState>,
-): TicketState {
+function makeTicket(id: string, overrides?: Partial<TicketState>): TicketState {
   return {
     id,
     title: `Ticket ${id}`,
