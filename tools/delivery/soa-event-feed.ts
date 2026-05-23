@@ -49,6 +49,24 @@ export async function appendSoaEvent(
   }
 }
 
+export async function emitSubagentInvoked(
+  config: ResolvedOrchestratorConfig,
+  worktreePath: string,
+  planKey: string,
+  ticketId: string,
+  runnerKind: 'claude-cli' | 'codex-cli',
+): Promise<void> {
+  await appendSoaEvent(
+    config,
+    worktreePath,
+    buildSoaEventLine('subagent_invoked', {
+      plan_key: planKey,
+      ticket_id: ticketId,
+      payload: { runnerKind },
+    }),
+  );
+}
+
 export async function maybeEmitReviewCleanRecorded(
   events: DeliveryNotificationEvent[],
   config: ResolvedOrchestratorConfig,

@@ -152,6 +152,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import {
   appendSoaEvent,
   buildSoaEventLine,
+  emitSubagentInvoked,
   maybeEmitReviewCleanRecorded,
 } from './soa-event-feed';
 
@@ -915,6 +916,13 @@ export async function runDeliveryOrchestrator(
                   { outputLastMessagePath },
                 );
                 try {
+                  void emitSubagentInvoked(
+                    context.config,
+                    worktreePath,
+                    state.planKey,
+                    subagentTarget.id,
+                    runner,
+                  );
                   const spawned = spawnSync(bin, args, {
                     cwd: worktreePath,
                     timeout: RUNNER_TIMEOUT_MS,
