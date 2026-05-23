@@ -32,9 +32,8 @@ export async function appendSoaEvent(
   projectRoot: string,
   event: SoaEventLine,
 ): Promise<void> {
-  if (config.codogotchi?.enabled === false) return;
-
   try {
+    if (config.codogotchi?.enabled === false) return;
     const soaDir = join(projectRoot, '.soa');
     mkdirSync(soaDir, { recursive: true });
     const filePath = join(soaDir, 'events.ndjson');
