@@ -34,6 +34,10 @@ export type PrReviewAgent = {
 export const VALID_SUBAGENT_RUNNERS = ['claude-cli', 'codex-cli'] as const;
 export type SubagentRunnerSelection = (typeof VALID_SUBAGENT_RUNNERS)[number];
 
+export type CodogotchiConfig = {
+  enabled: boolean;
+};
+
 export type OrchestratorConfig = {
   defaultBranch?: string;
   planRoot?: string;
@@ -46,6 +50,7 @@ export type OrchestratorConfig = {
   subagentRunner?: SubagentRunnerSelection;
   /** Default primary-agent identity recorded on every ledger row. Free-form. */
   primaryAgent?: string;
+  codogotchi?: CodogotchiConfig;
 };
 
 export type ResolvedOrchestratorConfig = {
@@ -58,6 +63,7 @@ export type ResolvedOrchestratorConfig = {
   prReviewAgents?: PrReviewAgent[];
   subagentRunner?: SubagentRunnerSelection;
   primaryAgent?: string;
+  codogotchi?: CodogotchiConfig;
 };
 
 const VALID_RUNTIMES = ['bun', 'node'] as const;
@@ -179,6 +185,11 @@ export async function loadOrchestratorConfig(
     primaryAgent = raw.primaryAgent.trim();
   }
 
+  let codogotchi: CodogotchiConfig | undefined;
+  if (raw.codogotchi !== undefined) {
+    codogotchi = parseCodogotchiConfig(raw.codogotchi);
+  }
+
   return {
     defaultBranch,
     planRoot,
@@ -190,6 +201,7 @@ export async function loadOrchestratorConfig(
     prReviewAgents,
     subagentRunner,
     primaryAgent,
+    codogotchi,
   };
 }
 
@@ -220,6 +232,7 @@ export function resolveOrchestratorConfig(
     prReviewAgents: raw.prReviewAgents,
     subagentRunner: raw.subagentRunner,
     primaryAgent: raw.primaryAgent,
+    codogotchi: raw.codogotchi ?? { enabled: true },
   };
 }
 
@@ -323,6 +336,21 @@ function parsePrReviewAgents(raw: unknown): PrReviewAgent[] {
       resolveThreads: obj['resolveThreads'] === true,
     };
   });
+}
+
+function parseCodogotchiConfig(raw: unknown): CodogotchiConfig {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      'Invalid codogotchi in orchestrator.config.json. Expected an object.',
+    );
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj['enabled'] !== undefined && typeof obj['enabled'] !== 'boolean') {
+    throw new Error(
+      'Invalid codogotchi.enabled in orchestrator.config.json. Expected a boolean.',
+    );
+  }
+  return { enabled: obj['enabled'] !== false };
 }
 
 function optionalNonBlankString(

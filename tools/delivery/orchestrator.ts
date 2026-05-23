@@ -102,6 +102,8 @@ export type {
   PlatformAdapters as DeliveryPlatformAdapters,
 } from './platform-adapters';
 export { parseDotEnv } from './env';
+export { appendSoaEvent, buildSoaEventLine } from './soa-event-feed';
+export type { SoaEventLine } from './soa-event-feed';
 export {
   appendInvocationToArtifact,
   buildRunnerArtifact,

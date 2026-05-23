@@ -52,8 +52,7 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `Cannot find module '../soa-event-feed'` — all 6 tests failed immediately on the missing module.
+Why this path: `appendSoaEvent(config, projectRoot, event)` puts the gate check inside the writer, avoiding scattered `if (config.codogotchi?.enabled !== false)` guards at every call site. `node:fs/promises open(..., 'a')` is the minimal append-mode write that doesn't require reading the file first.
+Alternative considered: Passing only a boolean `enabled` flag instead of full config — rejected because future fields (e.g. custom path) would require a new signature change; passing the resolved config is the same pattern as other helpers in this codebase.
+Deferred: No emit-point call sites in this ticket — the writer is exercised only by its own tests. CI Baseline: pre-existing `p6-02` test failure (notes/public/codogotchi-alignment-draft.md) does not block this ticket.

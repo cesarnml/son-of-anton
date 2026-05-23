@@ -4,10 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
-import {
-  appendSoaEvent,
-  buildSoaEventLine,
-} from '../soa-event-feed';
+import { appendSoaEvent, buildSoaEventLine } from '../soa-event-feed';
 import type { ResolvedOrchestratorConfig } from '../config';
 
 function enabledConfig(): ResolvedOrchestratorConfig {
@@ -27,7 +24,10 @@ function disabledConfig(): ResolvedOrchestratorConfig {
 }
 
 function makeTmpDir(): string {
-  const dir = join(tmpdir(), `p15-01-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = join(
+    tmpdir(),
+    `p15-01-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -80,8 +80,16 @@ describe('P15.01 — appendSoaEvent with gate enabled', () => {
     const root = makeTmpDir();
     const config = enabledConfig();
 
-    await appendSoaEvent(config, root, buildSoaEventLine('ticket_started', { ticket_id: 'P15.01' }));
-    await appendSoaEvent(config, root, buildSoaEventLine('ticket_completed', { ticket_id: 'P15.01' }));
+    await appendSoaEvent(
+      config,
+      root,
+      buildSoaEventLine('ticket_started', { ticket_id: 'P15.01' }),
+    );
+    await appendSoaEvent(
+      config,
+      root,
+      buildSoaEventLine('ticket_completed', { ticket_id: 'P15.01' }),
+    );
 
     const content = await readFile(join(root, '.soa', 'events.ndjson'), 'utf8');
     const lines = content.trim().split('\n');
@@ -113,7 +121,11 @@ describe('P15.01 — appendSoaEvent error swallowing', () => {
 
     try {
       await expect(
-        appendSoaEvent(enabledConfig(), root, buildSoaEventLine('ticket_started')),
+        appendSoaEvent(
+          enabledConfig(),
+          root,
+          buildSoaEventLine('ticket_started'),
+        ),
       ).resolves.toBeUndefined();
     } finally {
       chmodSync(root, 0o755);

@@ -21,19 +21,19 @@ All emits are best-effort: a write failure never aborts a delivery command. Sett
 
 ## Grill-Me decisions locked
 
-| Decision | Rationale |
-|---|---|
-| `subagent_invoked` emits in `cli-runner.ts` (not `subagent-runner.ts`), using `worktreePath` as project root | Spawn site lives in `cli-runner.ts` ~line 907; `subagent-runner.ts` is a pure utilities module with no I/O |
-| `review_clean_recorded` emits on all three paths (`record-review`, `poll-review`, `triage-ticket`) | A late clean review is semantically identical to a direct clean record; skipping triage path creates a dead spot |
-| Exit scoped to SoA write-path verification only | End-to-end animation verification belongs in a codogotchi-side phase, not Phase 15 |
-| `orchestrator.config.json` gains `codogotchi: { enabled: boolean }`, default enabled | Operator escape hatch; opt-out default preserves happy path for existing users |
-| Writer module + config gate land together in P15.01 | Foundation must be atomic — writer is meaningless without the gate it consults |
-| All three `review_clean_recorded` paths in one ticket (P15.04) | Parallel code; splitting triples ceremony for negligible incremental value |
-| Dedicated final docs ticket (P15.06) | Clean separation; correct `skip_doc_only` subagent-review flow; retrospective slot |
-| Filesystem-level integration tests against tmp dirs | Proves the actual contract codogotchi consumes; matches existing `pN-NN.test.ts` pattern |
-| No dedicated e2e smoke ticket | Per-ticket coverage is sufficient; no realistic inter-command propagation bug surface |
-| Strict linear stack | Cleaner orchestrator state machine; simpler `closeout-stack` |
-| `orchestrator.config.json` in this repo untouched | Respects default-enabled semantics; avoids implying the field is required |
+| Decision                                                                                                     | Rationale                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `subagent_invoked` emits in `cli-runner.ts` (not `subagent-runner.ts`), using `worktreePath` as project root | Spawn site lives in `cli-runner.ts` ~line 907; `subagent-runner.ts` is a pure utilities module with no I/O       |
+| `review_clean_recorded` emits on all three paths (`record-review`, `poll-review`, `triage-ticket`)           | A late clean review is semantically identical to a direct clean record; skipping triage path creates a dead spot |
+| Exit scoped to SoA write-path verification only                                                              | End-to-end animation verification belongs in a codogotchi-side phase, not Phase 15                               |
+| `orchestrator.config.json` gains `codogotchi: { enabled: boolean }`, default enabled                         | Operator escape hatch; opt-out default preserves happy path for existing users                                   |
+| Writer module + config gate land together in P15.01                                                          | Foundation must be atomic — writer is meaningless without the gate it consults                                   |
+| All three `review_clean_recorded` paths in one ticket (P15.04)                                               | Parallel code; splitting triples ceremony for negligible incremental value                                       |
+| Dedicated final docs ticket (P15.06)                                                                         | Clean separation; correct `skip_doc_only` subagent-review flow; retrospective slot                               |
+| Filesystem-level integration tests against tmp dirs                                                          | Proves the actual contract codogotchi consumes; matches existing `pN-NN.test.ts` pattern                         |
+| No dedicated e2e smoke ticket                                                                                | Per-ticket coverage is sufficient; no realistic inter-command propagation bug surface                            |
+| Strict linear stack                                                                                          | Cleaner orchestrator state machine; simpler `closeout-stack`                                                     |
+| `orchestrator.config.json` in this repo untouched                                                            | Respects default-enabled semantics; avoids implying the field is required                                        |
 
 ## Ticket Order
 
@@ -59,7 +59,7 @@ Phase 15 is done when running the SoA delivery commands in a consumer repo with 
 
 ## CI Baseline
 
-> Baseline recorded: [TBD at start of P15.01] — capture `bun run ci:quiet` output on main before the first ticket starts.
+> Baseline recorded at P15.01 start. Pre-existing failure on main: `tools/delivery/test/p6-02.test.ts` — "notes/public/ contains no .md files" fails because `notes/public/codogotchi-alignment-draft.md` was committed in the P15 docs commit (134521a). This failure does not block any P15 ticket.
 
 ## Review Rules
 
