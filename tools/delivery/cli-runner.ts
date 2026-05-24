@@ -106,6 +106,10 @@ import {
   type TicketReviewDependencies,
 } from './review';
 import {
+  readAdvisoryObservationDispositionInput,
+  runAdvisoryObservationTriage,
+} from './advisory-observation-command';
+import {
   advanceToNextTicket,
   createWorkflowContractError,
   materializeTicketContext,
@@ -286,6 +290,7 @@ export async function runDeliveryOrchestrator(
         subagent?: 'claude-cli' | 'codex-cli';
         primary?: string;
         baseline?: 'orchestrator' | 'run-policy';
+        dispositionsPath?: string;
       }
     | undefined;
 
@@ -435,6 +440,29 @@ export async function runDeliveryOrchestrator(
       }
       case 'status': {
         console.log(formatStatus(state, context.config));
+        return 0;
+      }
+      case 'triage-advisory-observations': {
+        if (!parsed.dispositionsPath) {
+          throw new Error(
+            'triage-advisory-observations requires --dispositions <path>.',
+          );
+        }
+        const dispositions = await readAdvisoryObservationDispositionInput(
+          resolve(cwd, parsed.dispositionsPath),
+        );
+        const result = await runAdvisoryObservationTriage({
+          repoRoot: cwd,
+          state,
+          dispositions,
+        });
+        console.log(
+          [
+            `Advisory observation triage artifact: ${result.artifactPath}`,
+            `Observation groups: ${result.groups.length}`,
+            `Observations recorded: ${result.observationsWritten}`,
+          ].join('\n'),
+        );
         return 0;
       }
       case 'start': {

@@ -1,6 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import { getUsage, parseCliArgs } from '../cli';
@@ -34,8 +34,7 @@ function makeState(repoRoot: string): DeliveryState {
         scope: 'delivery',
         redPolicy: 'required',
         status: 'done',
-        branch:
-          'agents/p16-01-parse-advisory-observations-and-report-evidence',
+        branch: 'agents/p16-01-parse-advisory-observations-and-report-evidence',
         baseBranch: 'main',
         worktreePath: repoRoot,
         subagentRunnerArtifactPath: `${REVIEWS_DIR}/P16.01-subagent-review.ledger.json`,
@@ -157,12 +156,12 @@ describe('P16.03 advisory observation triage command', () => {
       const artifact = JSON.parse(
         await readFile(join(repoRoot, TRIAGE_ARTIFACT), 'utf8'),
       ) as { observations: Array<{ observationText: string }> };
-      expect(artifact.observations.map((entry) => entry.observationText)).toEqual(
-        [
-          'Consider documenting the closeout operator decision.',
-          'Keep this flow post-phase only.',
-        ],
-      );
+      expect(
+        artifact.observations.map((entry) => entry.observationText),
+      ).toEqual([
+        'Consider documenting the closeout operator decision.',
+        'Keep this flow post-phase only.',
+      ]);
     });
   });
 

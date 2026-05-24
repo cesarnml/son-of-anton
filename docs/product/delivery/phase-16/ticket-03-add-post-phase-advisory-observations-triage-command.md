@@ -47,8 +47,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Red first: `bun test ./tools/delivery/test/p16-03.test.ts` failed because `../advisory-observation-command` did not exist.
+Why this path: add a focused command helper that scans subagent-review ledger/report sidecars, matches parsed `Advisory Observations` to explicit disposition input, and writes the phase-level triage artifact without touching source files.
+Alternative considered: extending the existing PR review triage flow was rejected because Phase 16 explicitly scopes this to post-phase subagent-review advisory observations, not external AI review findings.
+Deferred: warning on untriaged or suspicious advisory-observation evidence remains in P16.04.
 Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.

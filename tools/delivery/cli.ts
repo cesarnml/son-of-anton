@@ -29,6 +29,7 @@ export type ParsedCliArgs = {
   ackReconciliation?: 'patched' | 'deferred' | 'clean';
   commitSha?: string;
   reason?: string;
+  dispositionsPath?: string;
 };
 
 export const STANDALONE_TRIAGE_COMMAND = 'triage-standalone';
@@ -105,6 +106,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  sync',
     '  status',
     '  repair-state',
+    '  triage-advisory-observations --dispositions <path>',
     '  start [ticket-id]',
     '  post-red [ticket-id]',
     '  post-verify [ticket-id] [clean|patched] [patch-commit-sha ...]',
@@ -132,6 +134,7 @@ export function getUsage(runDeliverInvocation: string): string {
     '  --ack-reconciliation <patched|deferred|clean>',
     '  --commit <sha>',
     '  --reason "<text>"',
+    '  --dispositions <path>',
     '  --baseline <orchestrator|run-policy>',
   ].join('\n');
 }
@@ -149,6 +152,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
   let ackReconciliation: ParsedCliArgs['ackReconciliation'];
   let commitSha: ParsedCliArgs['commitSha'];
   let reason: ParsedCliArgs['reason'];
+  let dispositionsPath: ParsedCliArgs['dispositionsPath'];
   const flags = new Set<string>();
   const positionals: string[] = [];
 
@@ -340,6 +344,16 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
       continue;
     }
 
+    if (value === '--dispositions') {
+      const raw = argv[index + 1];
+      if (raw === undefined || raw.startsWith('--') || raw.trim() === '') {
+        throw new Error('Pass --dispositions <path>.');
+      }
+      dispositionsPath = raw;
+      index += 1;
+      continue;
+    }
+
     if (value === '--phase') {
       throw new Error(
         '--phase has been removed. Pass --plan <plan-path> instead.',
@@ -376,6 +390,7 @@ export function parseCliArgs(argv: string[], usage: string): ParsedCliArgs {
     ackReconciliation,
     commitSha,
     reason,
+    dispositionsPath,
   };
 }
 

@@ -138,6 +138,16 @@ export type {
   AdvisoryObservationTriageEntry,
 } from './advisory-observation-triage';
 export {
+  deriveAdvisoryObservationTriageArtifactPath,
+  readAdvisoryObservationDispositionInput,
+  runAdvisoryObservationTriage,
+} from './advisory-observation-command';
+export type {
+  AdvisoryObservationDispositionInput,
+  AdvisoryObservationGroup,
+  AdvisoryObservationTriageResult,
+} from './advisory-observation-command';
+export {
   applyAdvanceBoundaryMode,
   copyLocalBootstrapFilesIfPresent,
   copyLocalEnvIfPresent,
