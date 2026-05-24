@@ -38,4 +38,4 @@ Phase 16 achieved its goal. Operators now have a post-phase lane for reviewing n
 - Add a future cleanup ticket to migrate or explicitly annotate historical `Findings for human review` report sections if older phases ever need advisory-observation backfill.
 - Before the next phase starts, run `/soa triage-advisory-observations phase-16` after closeout lands on `main` and commit the generated disposition artifact if there are advisory observations to record.
 
-_Created: 2026-05-24. PRs #63-#66 open; final docs PR pending from `agents/p16-05-docs-soa-wrapper-guidance-and-retrospective`._
+_Created: 2026-05-24. PRs #63-#67 open._
