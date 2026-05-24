@@ -459,8 +459,24 @@ export async function runCloseoutStack(
     }
 
     await saveState(cwd, state);
-    const advisoryObservationWarnings =
-      await computeAdvisoryObservationWarnings({ repoRoot: cwd, state });
+    const advisoryObservationWarnings = await (async () => {
+      try {
+        return await computeAdvisoryObservationWarnings({
+          repoRoot: cwd,
+          state,
+        });
+      } catch (warningError) {
+        return [
+          {
+            kind: 'warning_error' as const,
+            message:
+              warningError instanceof Error
+                ? warningError.message
+                : String(warningError),
+          },
+        ];
+      }
+    })();
     console.log(
       formatCloseoutSummary(
         summary,

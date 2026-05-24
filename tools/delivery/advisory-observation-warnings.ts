@@ -28,6 +28,10 @@ export type AdvisoryObservationWarning =
       kind: 'suspicious_evidence';
       rawOutput?: string;
       ticketId: string;
+    }
+  | {
+      kind: 'warning_error';
+      message: string;
     };
 
 type SubagentLedgerInvocation = {
@@ -244,6 +248,11 @@ export function formatAdvisoryObservationWarnings(
       continue;
     }
 
+    if (warning.kind === 'warning_error') {
+      lines.push(`- warning computation failed: ${warning.message}`);
+      continue;
+    }
+
     lines.push(
       `- suspicious evidence ${warning.ticketId}: ${warning.evidenceKind}${warning.rawOutput ? ` (${warning.rawOutput})` : ''}`,
     );
@@ -255,6 +264,10 @@ export function formatAdvisoryObservationWarnings(
 function formatWarningSortKey(warning: AdvisoryObservationWarning): string {
   if (warning.kind === 'untriaged_observation') {
     return `${warning.ticketId}\u0000${warning.sourceReportPath}\u0000${warning.observationText}`;
+  }
+
+  if (warning.kind === 'warning_error') {
+    return `zzzz\u0000${warning.message}`;
   }
 
   return `${warning.ticketId}\u0000${warning.evidenceKind}\u0000${warning.rawOutput ?? ''}`;

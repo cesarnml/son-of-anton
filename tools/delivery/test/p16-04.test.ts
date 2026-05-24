@@ -248,4 +248,15 @@ describe('P16.04 advisory observation warnings', () => {
       ]),
     ).toContain('empty_report');
   });
+
+  it('formats advisory warning computation failures as non-blocking warnings', () => {
+    expect(
+      formatAdvisoryObservationWarnings([
+        {
+          kind: 'warning_error',
+          message: 'Malformed advisory-observation triage artifact.',
+        },
+      ]),
+    ).toContain('warning computation failed');
+  });
 });
