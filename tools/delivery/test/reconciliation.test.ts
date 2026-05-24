@@ -180,6 +180,19 @@ describe('P14.03 — parseActionableFindings', () => {
       false,
     );
   });
+
+  it('accepts ATX heading drift for actionable findings', () => {
+    expect(RM.parseActionableFindings).toBeDefined();
+    const md = `## Actionable findings\n\n- src/foo.ts: bug here\n\n## Advisory Observations\nNone.`;
+    expect(RM.parseActionableFindings!(md)).toBe(true);
+  });
+
+  it('does not treat inline bold prose as an actionable findings section', () => {
+    expect(RM.parseActionableFindings).toBeDefined();
+    const md =
+      'The phrase **Actionable findings** appears inline, but this is not a report section.';
+    expect(RM.parseActionableFindings!(md)).toBe(false);
+  });
 });
 
 describe('P16.01 — parseAdvisoryObservations', () => {
@@ -220,6 +233,14 @@ describe('P16.01 — parseAdvisoryObservations', () => {
     expect(RM.parseActionableFindings!(md)).toBe(false);
     expect(RM.parseAdvisoryObservations!(md)).toEqual([
       'This is triageable later, but not blocking.',
+    ]);
+  });
+
+  it('accepts ATX heading drift for advisory observations', () => {
+    expect(RM.parseAdvisoryObservations).toBeDefined();
+    const md = `## Actionable findings\nNone.\n\n## Advisory Observations\n\n- Keep this note triageable.\n\n## Runner status\ncompleted`;
+    expect(RM.parseAdvisoryObservations!(md)).toEqual([
+      'Keep this note triageable.',
     ]);
   });
 });

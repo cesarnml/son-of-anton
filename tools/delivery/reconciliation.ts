@@ -78,7 +78,7 @@ export function detectLabeledCommits(input: {
  * and slight heading-format drift.
  */
 export function parseActionableFindings(markdown: string): boolean {
-  const body = extractBoldSection(markdown, 'Actionable findings');
+  const body = extractReportSection(markdown, 'Actionable findings');
   if (body === undefined) return false;
   const normalized = normalizeSectionBody(body);
   if (normalized === '') return false;
@@ -87,7 +87,7 @@ export function parseActionableFindings(markdown: string): boolean {
 }
 
 export function parseAdvisoryObservations(markdown: string): string[] {
-  const body = extractBoldSection(markdown, 'Advisory Observations');
+  const body = extractReportSection(markdown, 'Advisory Observations');
   if (body === undefined) return [];
   const normalized = normalizeSectionBody(body);
   if (normalized === '') return [];
@@ -144,20 +144,19 @@ export function inspectSubagentReviewEvidence(input: {
   return warnings;
 }
 
-function extractBoldSection(
+function extractReportSection(
   markdown: string,
   heading: string,
 ): string | undefined {
-  const escapedHeading = heading
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('\\s+');
-  const sectionMatch = new RegExp(
-    `\\*\\*\\s*${escapedHeading}\\s*\\*\\*\\s*([\\s\\S]*?)(?=\\n\\s*\\*\\*[A-Za-z]|$)`,
-    'i',
-  ).exec(markdown);
-  return sectionMatch?.[1];
+  const lines = markdown.split('\n');
+  const startIndex = lines.findIndex((line) => isHeadingFor(line, heading));
+  if (startIndex === -1) return undefined;
+  const bodyLines: string[] = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    if (isSectionHeadingLine(line)) break;
+    bodyLines.push(line);
+  }
+  return bodyLines.join('\n');
 }
 
 function normalizeSectionBody(body: string): string {
@@ -167,6 +166,29 @@ function normalizeSectionBody(body: string): string {
     .filter((line) => line.length > 0)
     .join('\n')
     .trim();
+}
+
+function isHeadingFor(line: string, heading: string): boolean {
+  const escapedHeading = heading
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  return (
+    new RegExp(`^\\s*\\*\\*\\s*${escapedHeading}\\s*\\*\\*\\s*$`, 'i').test(
+      line,
+    ) ||
+    new RegExp(`^\\s{0,3}#{1,6}\\s+${escapedHeading}\\s*#*\\s*$`, 'i').test(
+      line,
+    )
+  );
+}
+
+function isSectionHeadingLine(line: string): boolean {
+  return (
+    /^\s*\*\*\s*[^*]+\s*\*\*\s*$/.test(line) ||
+    /^\s{0,3}#{1,6}\s+\S.*#*\s*$/.test(line)
+  );
 }
 
 type ArtifactRow = { outcome: string; reviewedHeadSha?: string };
