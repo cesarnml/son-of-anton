@@ -43,10 +43,8 @@ Red: required
 
 ## Rationale
 
-> Append here (do not edit above) when behavior or trade-offs change during implementation.
-
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `bun test ./tools/delivery/test/p16-02.test.ts` failed because `../advisory-observation-triage` did not exist.
+Why this path: added a dedicated delivery-tool artifact module with typed dispositions, strict validation, deterministic JSON read/write helpers, and stable merge semantics keyed by source report, ticket id, and observation text.
+Alternative considered: extending the subagent-review ledger was rejected because Phase 16 explicitly keeps runner outcome and operator disposition as separate artifacts.
+Deferred: the CLI command that discovers reports and writes this artifact remains in P16.03.
+Contract note: ticket metadata was usable as written.

@@ -125,6 +125,19 @@ export type {
   SubagentRunnerTerminatedReason,
 } from './subagent-runner';
 export {
+  ADVISORY_OBSERVATION_DISPOSITIONS,
+  mergeAdvisoryObservationTriageEntries,
+  readAdvisoryObservationTriageArtifact,
+  sortAdvisoryObservationTriageArtifact,
+  validateAdvisoryObservationTriageArtifact,
+  writeAdvisoryObservationTriageArtifact,
+} from './advisory-observation-triage';
+export type {
+  AdvisoryObservationDisposition,
+  AdvisoryObservationTriageArtifact,
+  AdvisoryObservationTriageEntry,
+} from './advisory-observation-triage';
+export {
   applyAdvanceBoundaryMode,
   copyLocalBootstrapFilesIfPresent,
   copyLocalEnvIfPresent,

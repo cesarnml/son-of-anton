@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import {
+  mergeAdvisoryObservationTriageEntries,
   readAdvisoryObservationTriageArtifact,
   validateAdvisoryObservationTriageArtifact,
   writeAdvisoryObservationTriageArtifact,
@@ -29,9 +30,7 @@ function makeArtifact(): AdvisoryObservationTriageArtifact {
       observationText: `Observation ${index + 1}`,
       disposition,
       rationale:
-        disposition === 'patched'
-          ? undefined
-          : `Rationale for ${disposition}`,
+        disposition === 'patched' ? undefined : `Rationale for ${disposition}`,
       patchCommitSha:
         disposition === 'patched'
           ? '0123456789abcdef0123456789abcdef01234567'
@@ -128,5 +127,29 @@ describe('P16.02 advisory observation triage artifact', () => {
     } finally {
       await rm(dir, { force: true, recursive: true });
     }
+  });
+
+  it('updates matching observations without duplicating decisions', () => {
+    const artifact = makeArtifact();
+    const updated = {
+      ...artifact.observations[1]!,
+      disposition: 'deferred' as const,
+      rationale: 'Needs a product decision after closeout.',
+    };
+
+    const merged = mergeAdvisoryObservationTriageEntries(
+      artifact.observations,
+      [updated],
+    );
+
+    expect(merged).toHaveLength(5);
+    expect(
+      merged.find(
+        (entry) =>
+          entry.sourceReportPath === updated.sourceReportPath &&
+          entry.ticketId === updated.ticketId &&
+          entry.observationText === updated.observationText,
+      ),
+    ).toEqual(updated);
   });
 });
