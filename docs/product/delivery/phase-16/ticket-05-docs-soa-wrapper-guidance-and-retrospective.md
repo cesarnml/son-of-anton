@@ -40,8 +40,8 @@ Red: skip
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: skipped structurally because this ticket declares `Red: skip` and is docs-only.
+Why this path: update the canonical `/soa` skill, delivery orchestrator docs, start-here overview, README command surface, adversarial review template terminology, and the required retrospective without changing delivery behavior.
+Alternative considered: adding a second command alias inside the delivery CLI was rejected because P16.03 already added the underlying command and this ticket only needed wrapper/operator guidance.
+Deferred: no historical review artifacts were rewritten; old `Findings for human review` sections remain legacy evidence while new templates and docs use `Advisory Observations`.
+Contract note: no deviation from the ticket metadata contract.

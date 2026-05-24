@@ -94,6 +94,17 @@ For late external AI review triage after a PR already exists, use the matching
 /soa triage-standalone PR#19  # standalone non-ticket PRs
 ```
 
+After a phase closeout lands on `main`, run the supported post-phase advisory
+triage lane before starting the next phase:
+
+```bash
+/soa triage-advisory-observations phase-16
+```
+
+This scans completed subagent-review reports for non-blocking **Advisory
+Observations** and records explicit operator dispositions in the phase artifact.
+It does not patch source files, and it is not a per-ticket pre-PR gate.
+
 ## Key files
 
 | File                                                      | Purpose                                                                             |

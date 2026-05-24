@@ -36,7 +36,8 @@ Phase 14 makes the subagent-review ledger semantically honest. Operator-facing d
 - **Outcome vocabulary:** ledger rows use `clean | patched | deferred | skipped` reflecting what the primary agent actually did after the advisory pass.
 - **Reconciliation:** `reconcile-subagent-review` runs after `subagent-review` and before `open-pr`. It detects silent lies (unlabeled post-review edits, actionable findings with no patch or deferral) and exits non-zero with named resolution paths. `open-pr` invokes the same gate and accepts `--ack-reconciliation <patched|deferred|clean>` as an operator escape valve.
 - **Deferral:** `subagent-review record-deferred --reason "<rationale>"` appends a `deferred` row when findings are consciously not patched.
-- **Adversarial prompt prologue:** broadening clauses (extra surfaces, human-review bucket) appear before the narrowing "not a general code review" anchor in `adversarial-review-template.md`.
+- **Advisory observations:** non-blocking off-scope-but-real notes belong under the `Advisory Observations` report section, not the blocking `Actionable findings` section. The old `Findings for human review` wording is legacy terminology for this same non-blocking lane.
+- **Adversarial prompt prologue:** broadening clauses (extra surfaces, advisory-observation bucket) appear before the narrowing "not a general code review" anchor in `adversarial-review-template.md`.
 
 ## Stance
 
@@ -257,6 +258,37 @@ At this point in the repo, `poll-review`, `record-review`, `triage-ticket`, and 
 `poll-review` only targets tickets in **`in_review`**. After a ticket is **`done`**, use **`triage-ticket <ticket-id>`** when external AI review comments arrived late and you want to re-fetch, re-run the repo triager, persist updated artifacts under the plan reviews directory, refresh delivery state (while keeping the ticket **`done`**), and refresh the PR body (best-effort). The old `reconcile-late-review` command remains a backwards-compatible alias.
 
 Run it from a worktree where `.agents/delivery/<plan-key>/state.json` for that plan is authoritative (this repo does not discover state across worktrees for you). The ticket must still have a stored **`prNumber`**. The command uses a short single-interval poll so the first check runs immediately; re-run if vendors are still in flight.
+
+### Post-phase advisory-observation triage
+
+After the full stacked phase is closed out onto `main`, run advisory-observation
+triage before starting the next phase. The `/soa` wrapper is the user-facing
+entrypoint:
+
+```bash
+/soa triage-advisory-observations phase-16
+```
+
+The underlying orchestrator command is:
+
+```bash
+bun run deliver --plan docs/product/delivery/phase-16/implementation-plan.md \
+  triage-advisory-observations --dispositions <path>
+```
+
+The command scans completed subagent-review report sidecars for the
+`Advisory Observations` section, excludes `Actionable findings`, and writes
+operator dispositions to
+`docs/product/delivery/<phase>/advisory-observation-triage.json`. Dispositions
+are explicit input; the command does not infer or apply them, and it never
+patches source code. This is a post-phase audit lane, not an additional
+per-ticket pre-PR gate.
+
+Closeout/status summaries may warn when advisory observations are untriaged or
+when clean/completed subagent-review evidence is suspiciously missing or empty.
+Those warnings preserve the boundary: `Actionable findings` still govern
+pre-PR reconciliation blockers, while `Advisory Observations` require later
+operator disposition.
 
 ## Ticket Context Reset
 
@@ -557,6 +589,7 @@ Available commands:
 - `open-pr [ticket-id] [--ack-reconciliation <patched|deferred|clean>] [--commit <sha>] [--reason "<text>"]`
 - `poll-review [ticket-id]`
 - `triage-ticket <ticket-id>`
+- `triage-advisory-observations --dispositions <path>`
 - `record-review <ticket-id> <clean|patched|operator_input_needed> [note]`
 - `advance`
 - `restack [ticket-id]`
