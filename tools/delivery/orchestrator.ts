@@ -148,6 +148,11 @@ export type {
   AdvisoryObservationTriageResult,
 } from './advisory-observation-command';
 export {
+  computeAdvisoryObservationWarnings,
+  formatAdvisoryObservationWarnings,
+} from './advisory-observation-warnings';
+export type { AdvisoryObservationWarning } from './advisory-observation-warnings';
+export {
   applyAdvanceBoundaryMode,
   copyLocalBootstrapFilesIfPresent,
   copyLocalEnvIfPresent,

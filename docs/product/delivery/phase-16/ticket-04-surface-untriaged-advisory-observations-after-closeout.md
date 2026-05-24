@@ -43,8 +43,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
+Red first: `bun test ./tools/delivery/test/p16-04.test.ts` failed because `../advisory-observation-warnings` did not exist.
+Why this path: add a focused advisory-observation warning helper that reads subagent-review ledgers/reports plus the P16.02 disposition artifact, then surface those warnings through closeout summary output without changing pre-PR reconciliation semantics.
+Alternative considered: adding warnings to `reconcile-subagent-review` was rejected because the product contract explicitly keeps advisory observations non-blocking and post-phase.
+Deferred: documentation and `/soa` wrapper guidance remain in P16.05.
 Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
