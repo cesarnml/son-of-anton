@@ -11,7 +11,7 @@
  * promised by the Phase 14 product contract.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 
 const SUBAGENT_REVIEW_SUBJECT_PATTERN = /\[subagent-review\]/i;
 
@@ -78,23 +78,95 @@ export function detectLabeledCommits(input: {
  * and slight heading-format drift.
  */
 export function parseActionableFindings(markdown: string): boolean {
-  // Match a section heading like `**Actionable findings**` (optionally with
-  // surrounding whitespace) up to the next bold section heading.
-  const sectionMatch =
-    /\*\*\s*Actionable\s+findings\s*\*\*\s*([\s\S]*?)(?=\n\s*\*\*[A-Za-z]|$)/i.exec(
-      markdown,
-    );
-  if (!sectionMatch) return false;
-  const body = sectionMatch[1] ?? '';
-  const normalized = body
+  const body = extractBoldSection(markdown, 'Actionable findings');
+  if (body === undefined) return false;
+  const normalized = normalizeSectionBody(body);
+  if (normalized === '') return false;
+  if (/^none\.?$/i.test(normalized)) return false;
+  return true;
+}
+
+export function parseAdvisoryObservations(markdown: string): string[] {
+  const body = extractBoldSection(markdown, 'Advisory Observations');
+  if (body === undefined) return [];
+  const normalized = normalizeSectionBody(body);
+  if (normalized === '') return [];
+  if (/^none\.?$/i.test(normalized)) return [];
+
+  const nonEmptyLines = normalized.split('\n');
+  const bulletLines = nonEmptyLines.filter((line) => /^[-*]\s+/.test(line));
+  if (bulletLines.length > 0 && bulletLines.length === nonEmptyLines.length) {
+    return bulletLines.map((line) => line.replace(/^[-*]\s+/, '').trim());
+  }
+
+  return body
+    .trim()
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\n/g, ' ').trim())
+    .filter((paragraph) => paragraph.length > 0);
+}
+
+export type SuspiciousSubagentReviewEvidence = {
+  kind: 'missing_report' | 'empty_report';
+  rawOutput?: string;
+};
+
+export function inspectSubagentReviewEvidence(input: {
+  repoRoot: string;
+  rows: Array<{
+    outcome: string;
+    terminatedReason?: string;
+    rawOutput?: string;
+  }>;
+}): SuspiciousSubagentReviewEvidence[] {
+  const warnings: SuspiciousSubagentReviewEvidence[] = [];
+  for (const row of input.rows) {
+    if (row.outcome !== 'clean' || row.terminatedReason !== 'completed') {
+      continue;
+    }
+    const rawOutput = row.rawOutput;
+    if (!rawOutput || rawOutput.trim() === '') {
+      warnings.push({ kind: 'missing_report', rawOutput });
+      continue;
+    }
+    const reportPath = isAbsolute(rawOutput)
+      ? rawOutput
+      : join(input.repoRoot, rawOutput);
+    if (!existsSync(reportPath)) {
+      warnings.push({ kind: 'missing_report', rawOutput });
+      continue;
+    }
+    const report = readFileSync(reportPath, 'utf-8');
+    if (report.trim() === '') {
+      warnings.push({ kind: 'empty_report', rawOutput });
+    }
+  }
+  return warnings;
+}
+
+function extractBoldSection(
+  markdown: string,
+  heading: string,
+): string | undefined {
+  const escapedHeading = heading
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  const sectionMatch = new RegExp(
+    `\\*\\*\\s*${escapedHeading}\\s*\\*\\*\\s*([\\s\\S]*?)(?=\\n\\s*\\*\\*[A-Za-z]|$)`,
+    'i',
+  ).exec(markdown);
+  return sectionMatch?.[1];
+}
+
+function normalizeSectionBody(body: string): string {
+  return body
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .join('\n')
     .trim();
-  if (normalized === '') return false;
-  if (/^none\.?$/i.test(normalized)) return false;
-  return true;
 }
 
 type ArtifactRow = { outcome: string; reviewedHeadSha?: string };

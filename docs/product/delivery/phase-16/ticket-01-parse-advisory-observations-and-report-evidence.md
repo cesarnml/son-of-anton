@@ -46,8 +46,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `bun test tools/delivery/test/reconciliation.test.ts` failed because `parseAdvisoryObservations` and `inspectSubagentReviewEvidence` were not exported.
+Why this path: extended the existing reconciliation parser module because it already owns subagent report section parsing and reconciliation warning inputs.
+Alternative considered: creating a new triage module now was rejected because the ticket only needs pure parsing/evidence helpers; later tickets can compose these helpers into CLI/artifact behavior.
+Deferred: no command rendering, persistent disposition artifact, or closeout surfacing was added in this ticket.
+Contract note: ticket metadata was followed; `Red: required` was satisfied before implementation.
