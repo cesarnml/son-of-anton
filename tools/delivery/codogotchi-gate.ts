@@ -7,6 +7,19 @@ import type { ResolvedOrchestratorConfig } from './config';
 /** Flat TTL for all gate events: 3 minutes */
 const GATE_TTL_MS = 180_000;
 
+/** Canonical gate-name strings matching the codogotchi schema-v4 ActivityState contract */
+export const GATE_NAMES = {
+  TICKET_STARTED: 'ticket_started',
+  TICKET_COMPLETED: 'ticket_completed',
+  RED_TDD: 'red_tdd',
+  GREEN_TDD: 'green_tdd',
+  ADVERSARIAL_REVIEW: 'adversarial_review',
+  OPEN_PR: 'open_pr',
+  POLL_REVIEW: 'poll_review',
+  RECORD_REVIEW: 'record_review',
+  REVIEW_CLEAN: 'review_clean',
+} as const;
+
 export type GateEvent = {
   gate: string;
   planKey: string;

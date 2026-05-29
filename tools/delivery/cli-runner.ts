@@ -160,6 +160,7 @@ import {
   emitSubagentInvoked,
   maybeEmitReviewCleanRecorded,
 } from './soa-event-feed';
+import { GATE_NAMES, writeGateEvent } from './codogotchi-gate';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
 
@@ -489,6 +490,20 @@ export async function runDeliveryOrchestrator(
         if (hasExplicitPolicyFlags) {
           context = { ...context, config: resolvedConfig };
         }
+        // Determine target ticket before start so ticket_started is emitted at entry
+        const startTargetId =
+          parsed.positionals[0] ??
+          (
+            stateForStart.tickets.find((t) => t.status === 'in_progress') ??
+            stateForStart.tickets.find((t) => t.status === 'pending')
+          )?.id;
+        if (startTargetId) {
+          await writeGateEvent(context.config, {
+            gate: GATE_NAMES.TICKET_STARTED,
+            planKey: stateForStart.planKey,
+            ticketId: startTargetId,
+          });
+        }
         const nextState = await startTicket(
           stateForStart,
           cwd,
@@ -497,12 +512,17 @@ export async function runDeliveryOrchestrator(
         );
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
-        await emitSoaEventsForTransitions(
-          stateForStart,
-          nextState,
-          context.config,
-          eventRoot,
-        );
+        // Emit start exit gate: red_tdd for Red: required, green_tdd for Red: skip
+        const startedTicket = startTargetId
+          ? nextState.tickets.find((t) => t.id === startTargetId)
+          : nextState.tickets.find((t) => t.status === 'in_progress');
+        if (startedTicket) {
+          await emitStartExitGate(
+            startedTicket,
+            context.config,
+            nextState.planKey,
+          );
+        }
         await emitNotificationWarnings(
           notifier,
           cwd,
@@ -559,6 +579,21 @@ export async function runDeliveryOrchestrator(
         );
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
+        // Emit green_tdd: Red: required ticket has passed its failing test gate
+        const postRedTicket =
+          nextState.tickets.find(
+            (t) =>
+              t.status === 'red_complete' &&
+              state.tickets.find((s) => s.id === t.id)?.status !==
+                'red_complete',
+          ) ?? nextState.tickets.find((t) => t.status === 'red_complete');
+        if (postRedTicket) {
+          await emitPostRedGate(
+            postRedTicket,
+            context.config,
+            nextState.planKey,
+          );
+        }
         return 0;
       }
       case 'write-subagent-adversarial-review': {
@@ -1344,12 +1379,7 @@ export async function runDeliveryOrchestrator(
           findPrimaryWorktreePath(wt, context.config),
         );
         console.log(formatStatus(nextState, context.config));
-        await emitSoaEventsForTransitions(
-          state,
-          nextState,
-          context.config,
-          eventRoot,
-        );
+        await emitGateForTransitions(state, nextState, context.config);
         const boundaryGuidance = formatAdvanceBoundaryGuidance(
           state,
           advancedState,
@@ -2314,39 +2344,69 @@ export async function emitSoaEventForOpenPr(
 }
 
 export async function emitSoaEventsForTransitions(
+  _previousState: DeliveryState,
+  _nextState: DeliveryState,
+  _config: ResolvedOrchestratorConfig,
+  _projectRoot: string,
+): Promise<void> {
+  // ticket_started and ticket_completed now emit to gate.json via emitGateForTransitions.
+  // This function is retained for backwards-compatible call sites and will be removed in P17.04.
+}
+
+export async function emitGateForTransitions(
   previousState: DeliveryState,
   nextState: DeliveryState,
   config: ResolvedOrchestratorConfig,
-  projectRoot: string,
 ): Promise<void> {
   for (const previousTicket of previousState.tickets) {
     const nextTicket = nextState.tickets.find(
       (t) => t.id === previousTicket.id,
     );
     if (previousTicket.status !== 'done' && nextTicket?.status === 'done') {
-      await appendSoaEvent(
-        config,
-        projectRoot,
-        buildSoaEventLine('ticket_completed', {
-          plan_key: nextState.planKey,
-          ticket_id: nextTicket.id,
-        }),
-      );
+      await writeGateEvent(config, {
+        gate: GATE_NAMES.TICKET_COMPLETED,
+        planKey: nextState.planKey,
+        ticketId: nextTicket.id,
+      });
     }
     if (
       previousTicket.status !== 'in_progress' &&
       nextTicket?.status === 'in_progress'
     ) {
-      await appendSoaEvent(
-        config,
-        projectRoot,
-        buildSoaEventLine('ticket_started', {
-          plan_key: nextState.planKey,
-          ticket_id: nextTicket.id,
-        }),
-      );
+      await writeGateEvent(config, {
+        gate: GATE_NAMES.TICKET_STARTED,
+        planKey: nextState.planKey,
+        ticketId: nextTicket.id,
+      });
     }
   }
+}
+
+export async function emitStartExitGate(
+  ticket: TicketState,
+  config: ResolvedOrchestratorConfig,
+  planKey: string,
+): Promise<void> {
+  await writeGateEvent(config, {
+    gate:
+      ticket.redPolicy === 'required'
+        ? GATE_NAMES.RED_TDD
+        : GATE_NAMES.GREEN_TDD,
+    planKey,
+    ticketId: ticket.id,
+  });
+}
+
+export async function emitPostRedGate(
+  ticket: TicketState,
+  config: ResolvedOrchestratorConfig,
+  planKey: string,
+): Promise<void> {
+  await writeGateEvent(config, {
+    gate: GATE_NAMES.GREEN_TDD,
+    planKey,
+    ticketId: ticket.id,
+  });
 }
 
 function formatError(error: unknown): string {

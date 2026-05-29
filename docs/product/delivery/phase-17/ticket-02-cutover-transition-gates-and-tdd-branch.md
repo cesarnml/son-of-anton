@@ -49,8 +49,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `Export named 'emitGateForTransitions' not found in module '../cli-runner.ts'` — all 6 tests failed at module resolution.
+Why this path: Three exported functions (`emitGateForTransitions`, `emitStartExitGate`, `emitPostRedGate`) added to `cli-runner.ts` so handlers and tests share the same well-typed gate-emit helpers. `emitSoaEventsForTransitions` becomes a no-op stub so existing call sites compile without change while the retired NDJSON behavior is cleanly removed.
+Alternative considered: Deleting `emitSoaEventsForTransitions` immediately — rejected because that would require updating all call sites in this ticket; leaving the stub defers that cleanup to P17.04 as planned.
+Deferred: Review-flow gates (`adversarial_review`, `open_pr`, `poll_review`, `record_review`, `review_clean`) remain on the old `soa-event-feed.ts` writer; those are cut over in P17.03/P17.04.
+Contract note: `ticket_started` at `start` entry is emitted before `startTicket` executes, satisfying the "emit-then-action" requirement. Tests verify the gate name is correct; ordering is a code-structure guarantee reviewed here rather than a timing assertion.
