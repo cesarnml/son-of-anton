@@ -48,8 +48,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `Export named 'emitRecordReviewGate' not found in module '../cli-runner.ts'` — all test groups failed at module resolution.
+Why this path: Four symmetric exported functions (`emit*Gate`) follow the same pattern as P17.02 helpers; each handler resolves the target ticket from existing state and emits before its action. `emitSoaEventForOpenPr` becomes a no-op stub parallel to `emitSoaEventsForTransitions`.
+Alternative considered: Inlining `writeGateEvent` directly in each handler — rejected because exported functions are testable in isolation and consistent with P17.02 pattern.
+Deferred: `review_clean` and `subagent_invoked` emissions remain on the old `soa-event-feed.ts` writer; retired in P17.04.
+Contract note: `appendSoaEvent` and `buildSoaEventLine` imports removed from `cli-runner.ts` since all their callers are now no-op stubs; no other files were affected.
