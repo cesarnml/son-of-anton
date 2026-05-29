@@ -172,6 +172,31 @@ describe('P17.02 — emitGateForTransitions (replaces emitSoaEventsForTransition
     }
   });
 
+  it('cook-mode: ticket_started is resident even when pending ticket is first in array', async () => {
+    const home = makeTmpDir();
+    process.env['CODOGOTCHI_HOME'] = home;
+    try {
+      // Reversed array order: pending first, in_progress second
+      const prev = makeState(PLAN_KEY, [
+        makeTicket('P17.02', 'pending'),
+        makeTicket('P17.01', 'in_progress'),
+      ]);
+      const next = makeState(PLAN_KEY, [
+        makeTicket('P17.02', 'in_progress'),
+        makeTicket('P17.01', 'done'),
+      ]);
+
+      await emitGateForTransitions(prev, next, enabledConfig());
+
+      // Two-pass emission guarantees ticket_started is last regardless of array order
+      const gate = await readGate(home);
+      expect(gate['gate']).toBe('ticket_started');
+      expect(gate['ticket_id']).toBe('P17.02');
+    } finally {
+      delete process.env['CODOGOTCHI_HOME'];
+    }
+  });
+
   it('writes ticket_started when a ticket transitions pending → in_progress', async () => {
     const home = makeTmpDir();
     process.env['CODOGOTCHI_HOME'] = home;

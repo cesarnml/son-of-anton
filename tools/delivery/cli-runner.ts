@@ -2358,6 +2358,9 @@ export async function emitGateForTransitions(
   nextState: DeliveryState,
   config: ResolvedOrchestratorConfig,
 ): Promise<void> {
+  // Two-pass emission: completions first, starts second.
+  // This makes ticket_started the resident last-write-wins value in cook mode
+  // regardless of ticket array order.
   for (const previousTicket of previousState.tickets) {
     const nextTicket = nextState.tickets.find(
       (t) => t.id === previousTicket.id,
@@ -2369,6 +2372,11 @@ export async function emitGateForTransitions(
         ticketId: nextTicket.id,
       });
     }
+  }
+  for (const previousTicket of previousState.tickets) {
+    const nextTicket = nextState.tickets.find(
+      (t) => t.id === previousTicket.id,
+    );
     if (
       previousTicket.status !== 'in_progress' &&
       nextTicket?.status === 'in_progress'
@@ -2387,11 +2395,16 @@ export async function emitStartExitGate(
   config: ResolvedOrchestratorConfig,
   planKey: string,
 ): Promise<void> {
+  // Conservative fallback: unknown/undefined redPolicy defaults to red_tdd
+  // (stricter gate) rather than silently treating it as skipped.
+  const gate =
+    ticket.redPolicy === 'required'
+      ? GATE_NAMES.RED_TDD
+      : ticket.redPolicy === 'skip'
+        ? GATE_NAMES.GREEN_TDD
+        : GATE_NAMES.RED_TDD;
   await writeGateEvent(config, {
-    gate:
-      ticket.redPolicy === 'required'
-        ? GATE_NAMES.RED_TDD
-        : GATE_NAMES.GREEN_TDD,
+    gate,
     planKey,
     ticketId: ticket.id,
   });
