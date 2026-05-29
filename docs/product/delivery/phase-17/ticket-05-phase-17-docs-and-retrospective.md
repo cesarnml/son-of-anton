@@ -37,7 +37,7 @@ Red: skip
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
 Red first: n/a (doc-only)
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Why this path: AGENTS.soa.md update is a single section replacement — the old NDJSON guidance was fully retired and the new gate.json section covers all consumer-facing details. No broader doc rewrite was needed.
+Alternative considered: Keeping the old NDJSON section as a "deprecated" note — rejected because the writer is gone, not just deprecated. A retired note would mislead a new consumer.
+Deferred: Per-gate TTL documentation awaits codogotchi Phase 07 field data. Consumer repo migration guide is a follow-up note in the retrospective.
+Contract note: No deviation from ticket metadata contract.

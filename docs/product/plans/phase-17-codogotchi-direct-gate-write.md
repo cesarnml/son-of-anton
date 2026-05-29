@@ -1,6 +1,6 @@
 # Phase 17: Codogotchi Direct Gate Write
 
-**Delivery status:** Product plan approved. Pending decomposition.
+**Delivery status:** Delivered — Phase 17 complete (2026-05-29). All 5 tickets merged to stacked PRs #71–#75. NDJSON writer retired; `gate.json` sidecar live.
 
 ## TL;DR
 
