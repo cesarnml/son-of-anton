@@ -1211,13 +1211,16 @@ export async function runDeliveryOrchestrator(
         }
         // Hard-block silent-lie conditions before publish.
         runReconciliationGate(state, cwd, context, parsed.positionals[0]);
-        // Emit open_pr gate before publishing the PR (emit-then-action)
+        // Emit open_pr gate before publishing the PR (emit-then-action).
+        // Mirror openPullRequest's internal resolution: subagent_review_complete
+        // first, then verified (subagentReview=disabled path).
         const openPrTarget =
           (parsed.positionals[0]
             ? state.tickets.find((t) => t.id === parsed.positionals[0])
-            : state.tickets.find(
+            : (state.tickets.find(
                 (t) => t.status === 'subagent_review_complete',
-              )) ?? undefined;
+              ) ?? state.tickets.find((t) => t.status === 'verified'))) ??
+          undefined;
         if (openPrTarget) {
           await emitOpenPrGate(openPrTarget, context.config, state.planKey);
         }
