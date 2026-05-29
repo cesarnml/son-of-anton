@@ -154,10 +154,6 @@ import {
   writeSubagentAdversarialPrompt,
 } from './subagent-prompt';
 import { readFileSync, writeFileSync } from 'node:fs';
-import {
-  emitSubagentInvoked,
-  maybeEmitReviewCleanRecorded,
-} from './soa-event-feed';
 import { GATE_NAMES, writeGateEvent } from './codogotchi-gate';
 
 export const WORKTREE_EXEMPT = new Set(['status', 'sync', 'start']);
@@ -313,7 +309,6 @@ export async function runDeliveryOrchestrator(
     const notifier = resolveNotifier();
     // Always emit SoA events into the primary worktree's .soa/, regardless of
     // which worktree directory bun was invoked from.
-    const eventRoot = findPrimaryWorktreePath(cwd, context.config) ?? cwd;
     if (isStandaloneTriageCommand(parsed.command)) {
       const result = await runStandaloneAiReview(
         cwd,
@@ -992,14 +987,6 @@ export async function runDeliveryOrchestrator(
                   },
                 );
                 try {
-                  void emitSubagentInvoked(
-                    context.config,
-                    findPrimaryWorktreePath(worktreePath, context.config) ??
-                      worktreePath,
-                    state.planKey,
-                    subagentTarget.id,
-                    runner,
-                  );
                   const spawned = spawnSync(bin, args, {
                     cwd: worktreePath,
                     timeout: RUNNER_TIMEOUT_MS,
@@ -1294,10 +1281,10 @@ export async function runDeliveryOrchestrator(
             pollTicketId,
           );
           await emitNotificationWarnings(notifier, cwd, docOnlyEvents);
-          await maybeEmitReviewCleanRecorded(
+          await emitReviewCleanGate(
             docOnlyEvents,
             context.config,
-            eventRoot,
+            state.planKey,
           );
           return 0;
         }
@@ -1309,11 +1296,7 @@ export async function runDeliveryOrchestrator(
         );
         const pollEvents = eventsForPollReviewCommand(nextState, pollTicketId);
         await emitNotificationWarnings(notifier, cwd, pollEvents);
-        await maybeEmitReviewCleanRecorded(
-          pollEvents,
-          context.config,
-          eventRoot,
-        );
+        await emitReviewCleanGate(pollEvents, context.config, state.planKey);
         return 0;
       }
       case TICKET_TRIAGE_COMMAND: {
@@ -1338,11 +1321,7 @@ export async function runDeliveryOrchestrator(
           ticketId,
         );
         await emitNotificationWarnings(notifier, cwd, triageEvents);
-        await maybeEmitReviewCleanRecorded(
-          triageEvents,
-          context.config,
-          eventRoot,
-        );
+        await emitReviewCleanGate(triageEvents, context.config, state.planKey);
         return 0;
       }
       case 'record-review': {
@@ -1382,11 +1361,7 @@ export async function runDeliveryOrchestrator(
         console.log(formatStatus(nextState, context.config));
         const recordEvents = eventsForRecordReviewCommand(nextState, ticketId);
         await emitNotificationWarnings(notifier, cwd, recordEvents);
-        await maybeEmitReviewCleanRecorded(
-          recordEvents,
-          context.config,
-          eventRoot,
-        );
+        await emitReviewCleanGate(recordEvents, context.config, state.planKey);
         return 0;
       }
       case 'advance': {
@@ -2486,6 +2461,24 @@ export async function emitRecordReviewGate(
     planKey,
     ticketId: ticket.id,
   });
+}
+
+export async function emitReviewCleanGate(
+  events: DeliveryNotificationEvent[],
+  config: ResolvedOrchestratorConfig,
+  planKey: string,
+): Promise<void> {
+  const reviewEvent = events.find(
+    (e): e is Extract<DeliveryNotificationEvent, { kind: 'review_recorded' }> =>
+      e.kind === 'review_recorded' && e.outcome === 'clean',
+  );
+  if (reviewEvent) {
+    await writeGateEvent(config, {
+      gate: GATE_NAMES.REVIEW_CLEAN,
+      planKey,
+      ticketId: reviewEvent.ticketId,
+    });
+  }
 }
 
 function formatError(error: unknown): string {

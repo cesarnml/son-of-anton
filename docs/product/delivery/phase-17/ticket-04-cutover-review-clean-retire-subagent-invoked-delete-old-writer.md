@@ -46,8 +46,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `Export named 'emitReviewCleanGate' not found in module '../cli-runner.ts'` — all test groups failed at module resolution.
+Why this path: `emitReviewCleanGate(events, config, planKey)` mirrors `maybeEmitReviewCleanRecorded`'s event-detection pattern but writes to `gate.json` via `writeGateEvent`. This shared detection pattern means all three clean-outcome paths (poll-review, record-review, triage-ticket) get coverage from one function. `eventRoot` removed because all remaining emit calls now use CODOGOTCHI_HOME, not project-local paths.
+Alternative considered: Keeping `soa-event-feed.ts` as a stub like `emitSoaEventsForTransitions` — rejected because no other caller remains; a dead module stub is confusing. Clean deletion is more honest.
+Deferred: None — all gates and all retiring listed in the ticket outcome are complete.
+Contract note: p15-01.test.ts, p15-04.test.ts, p15-05.test.ts deleted (they tested the retired NDJSON writer). Exports removed from orchestrator.ts barrel (AppendSoaEvent, buildSoaEventLine, maybeEmitReviewCleanRecorded, SoaEventLine).
