@@ -17,6 +17,23 @@
       "findings": [],
       "probedSurfaces": [],
       "patches": []
+    },
+    {
+      "runnerKind": "claude-cli",
+      "reviewedHeadSha": "812564e526d2cd20e29fd0d8f19f05b0c8ecc631",
+      "outcome": "clean",
+      "completedAt": "2026-05-29T11:50:42.708Z",
+      "terminatedReason": "completed",
+      "rawOutput": "docs/product/delivery/phase-17/reviews/P17.03-subagent-review.report.md",
+      "filledPrompt": "docs/product/delivery/phase-17/reviews/P17.03-subagent-review.prompt.md",
+      "fallbackLevel": "preferred",
+      "schemaVersion": 1,
+      "primaryAgent": "claude",
+      "runnerSelfReport": null,
+      "fallbackFrom": null,
+      "findings": [],
+      "probedSurfaces": [],
+      "patches": []
     }
   ]
 }
