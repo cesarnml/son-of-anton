@@ -122,3 +122,49 @@ describe('P17.01 — writeGateEvent error swallowing', () => {
     }
   });
 });
+
+describe('P17.01 — CODOGOTCHI_HOME edge cases', () => {
+  it('falls back to ~/.codogotchi when CODOGOTCHI_HOME is empty string', async () => {
+    // We test the || fallback by verifying empty string does NOT resolve to cwd/gate.json
+    const savedHome = process.env['CODOGOTCHI_HOME'];
+    process.env['CODOGOTCHI_HOME'] = '';
+    try {
+      // If the empty-string guard works, resolveCodogotchiHome() returns the homedir default,
+      // not ''. We verify via the exported helper directly.
+      const { resolveCodogotchiHome } = await import('../codogotchi-gate');
+      const resolved = resolveCodogotchiHome();
+      expect(resolved).not.toBe('');
+      expect(resolved.length).toBeGreaterThan(0);
+    } finally {
+      if (savedHome === undefined) {
+        delete process.env['CODOGOTCHI_HOME'];
+      } else {
+        process.env['CODOGOTCHI_HOME'] = savedHome;
+      }
+    }
+  });
+
+  it('writes gate.json when config.codogotchi is absent (absent = enabled)', async () => {
+    const home = makeTmpDir();
+    process.env['CODOGOTCHI_HOME'] = home;
+    const configWithoutCodogotchi: ResolvedOrchestratorConfig = {
+      defaultBranch: 'main',
+      planRoot: 'docs',
+      runtime: 'bun',
+      packageManager: 'bun',
+      ticketBoundaryMode: 'cook',
+      reviewPolicy: { subagentReview: 'skip_doc_only', prReview: 'disabled' },
+      // codogotchi field intentionally absent
+    };
+    try {
+      await writeGateEvent(configWithoutCodogotchi, {
+        gate: 'ticket_started',
+        planKey: 'phase-17',
+        ticketId: 'P17.01',
+      });
+      expect(existsSync(join(home, 'gate.json'))).toBe(true);
+    } finally {
+      delete process.env['CODOGOTCHI_HOME'];
+    }
+  });
+});

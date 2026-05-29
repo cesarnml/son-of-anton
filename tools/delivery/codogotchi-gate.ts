@@ -22,7 +22,7 @@ export type GateJsonPayload = {
 };
 
 export function resolveCodogotchiHome(): string {
-  return process.env['CODOGOTCHI_HOME'] ?? join(homedir(), '.codogotchi');
+  return process.env['CODOGOTCHI_HOME'] || join(homedir(), '.codogotchi');
 }
 
 export async function writeGateEvent(
