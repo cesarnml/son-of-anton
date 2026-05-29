@@ -135,6 +135,25 @@ describe('P17.04 — emitReviewCleanGate (poll-review path)', () => {
       delete process.env['CODOGOTCHI_HOME'];
     }
   });
+
+  it('does not write gate.json when poll-review outcome is skipped (doc-only fast path)', async () => {
+    const home = makeTmpDir();
+    process.env['CODOGOTCHI_HOME'] = home;
+    try {
+      const ticket = makeTicket(TICKET_ID, {
+        status: 'reviewed',
+        reviewOutcome: 'skipped',
+      });
+      const state = makeState(PLAN_KEY, [ticket]);
+      const events = eventsForPollReviewCommand(state, TICKET_ID);
+
+      await emitReviewCleanGate(events, enabledConfig(), PLAN_KEY);
+
+      expect(existsSync(join(home, 'gate.json'))).toBe(false);
+    } finally {
+      delete process.env['CODOGOTCHI_HOME'];
+    }
+  });
 });
 
 describe('P17.04 — emitReviewCleanGate (triage-ticket path)', () => {
