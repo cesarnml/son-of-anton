@@ -47,8 +47,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here.
+Red first: `Cannot find module '../codogotchi-gate'` — all 4 tests failed at module resolution before any implementation existed.
+Why this path: `writeFileSync` (sync) inside an async wrapper mirrors the Phase 15 `appendSoaEvent` best-effort pattern; the async surface is needed for callers that await the result. No queue or batching needed — gate writes are last-write-wins overwrites.
+Alternative considered: Async `writeFile` — rejected because the sync path is simpler and the function is already best-effort; there is no benefit to buffering the write.
+Deferred: Call-site wiring — no delivery commands call this module yet; that is P17.02–P17.04. No enum import from codogotchi; `gate` is an untyped string at this layer.
+Contract note: No deviation from the ticket metadata contract.
