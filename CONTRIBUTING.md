@@ -2,6 +2,8 @@
 
 Thanks for your interest. Son of Anton is a delivery orchestrator — the codebase is the same tool it uses to ship itself, so the best way to understand a contribution is to run the workflow end to end at least once before changing it.
 
+**New here?** Read [How Son of Anton Works — A Newcomer's Mental Model](docs/how-son-of-anton-works.md) first. It builds the mental model (no prior knowledge assumed) and maps every concept to where it lives in the code, so the rest of this guide makes sense.
+
 ## Prerequisites
 
 - [Bun](https://bun.sh) ≥ 1.0
