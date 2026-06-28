@@ -685,6 +685,7 @@ export function openPullRequest(
       target.worktreePath,
       existingPullRequest.number,
       {
+        base: target.baseBranch,
         body,
         title,
       },
