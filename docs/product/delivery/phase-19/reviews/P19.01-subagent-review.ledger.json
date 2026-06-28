@@ -33,6 +33,21 @@
       "outcome": "clean",
       "acknowledgment": "operator-confirmed-clean",
       "reason": "Subagent report states Actionable findings: None; reconciliation tripped on runner report format drift, not an actual finding."
+    },
+    {
+      "runnerKind": "operator-recorder",
+      "reviewedHeadSha": "308baded018ebdb0fd19dad39991b6859f43f74d",
+      "outcome": "deferred",
+      "completedAt": "2026-06-28T07:57:56.843Z",
+      "terminatedReason": "completed",
+      "findings": [],
+      "probedSurfaces": [],
+      "patches": [],
+      "reason": "Subagent report's Actionable findings section says None; reconciliation parsed runner format drift/preamble as findings, so there is no code patch to apply.",
+      "schemaVersion": 1,
+      "primaryAgent": "claude",
+      "runnerSelfReport": null,
+      "fallbackFrom": null
     }
   ]
 }
