@@ -34,7 +34,7 @@ function runSync(tmp: string): ReturnType<typeof spawnSync> {
 }
 
 describe('P6.01 soa-sync migration runner', () => {
-  it('migrates .agents/delivery/*/reviews to docs/product/delivery/*/reviews and writes .soa-sync-version=1', () => {
+  it('migrates .agents/delivery/*/reviews to docs/product/delivery/*/reviews and writes the target sync version', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'p6-01-'));
     try {
       initConsumerFixture(tmp);
@@ -57,10 +57,10 @@ describe('P6.01 soa-sync migration runner', () => {
       const result = runSync(tmp);
       expect(result.status).toBe(0);
 
-      // .soa-sync-version must be written and contain 1
+      // .soa-sync-version must be written and contain the current target.
       const versionFile = join(tmp, '.soa-sync-version');
       expect(existsSync(versionFile)).toBe(true);
-      expect(readFileSync(versionFile, 'utf8').trim()).toBe('1');
+      expect(readFileSync(versionFile, 'utf8').trim()).toBe('2');
 
       // Stub file must be at new location
       expect(
@@ -125,7 +125,7 @@ describe('P6.01 soa-sync migration runner', () => {
     }
   });
 
-  it('skips git mv and writes .soa-sync-version=1 when .agents is a symlink', () => {
+  it('skips git mv and writes the target sync version when .agents is a symlink', () => {
     // This is the topology every consumer repo has: soa-sync.sh itself creates
     // .agents as a symlink → .son-of-anton/.agents. Delivery files there are
     // git-ignored, so git mv would abort with "source directory is empty".
@@ -167,7 +167,7 @@ describe('P6.01 soa-sync migration runner', () => {
       // Version file must be written — migration is considered complete.
       const versionFile = join(tmp, '.soa-sync-version');
       expect(existsSync(versionFile)).toBe(true);
-      expect(readFileSync(versionFile, 'utf8').trim()).toBe('1');
+      expect(readFileSync(versionFile, 'utf8').trim()).toBe('2');
 
       // No docs/product/delivery path should have been created by the migration
       // (the guard returned early; nothing was moved).

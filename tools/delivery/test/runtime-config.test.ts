@@ -39,12 +39,19 @@ describe('orchestrator config', () => {
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ defaultBranch: 'develop', runtime: 'node' }),
+        JSON.stringify({
+          defaultBranch: 'develop',
+          deliveryBaseBranch: 'integration',
+          closeoutBranch: 'release',
+          runtime: 'node',
+        }),
       );
 
       const config = await loadOrchestratorConfig(tempDir);
       expect(config).toEqual({
         defaultBranch: 'develop',
+        deliveryBaseBranch: 'integration',
+        closeoutBranch: 'release',
         planRoot: undefined,
         runtime: 'node',
         packageManager: undefined,
@@ -384,7 +391,11 @@ describe('P2.01 — subagentReview schema, prReview, and prReviewAgents validati
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ reviewPolicy: { selfAudit: 'disabled' } }),
+        JSON.stringify({
+          deliveryBaseBranch: 'main',
+          closeoutBranch: 'main',
+          reviewPolicy: { selfAudit: 'disabled' },
+        }),
       );
       await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
         /selfAudit/,
@@ -399,7 +410,11 @@ describe('P2.01 — subagentReview schema, prReview, and prReviewAgents validati
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ reviewPolicy: { codexPreflight: 'disabled' } }),
+        JSON.stringify({
+          deliveryBaseBranch: 'main',
+          closeoutBranch: 'main',
+          reviewPolicy: { codexPreflight: 'disabled' },
+        }),
       );
       await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
         /codexPreflight/,
@@ -414,7 +429,11 @@ describe('P2.01 — subagentReview schema, prReview, and prReviewAgents validati
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ reviewPolicy: { prReview: 'required' } }),
+        JSON.stringify({
+          deliveryBaseBranch: 'main',
+          closeoutBranch: 'main',
+          reviewPolicy: { prReview: 'required' },
+        }),
       );
       await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
         /prReviewAgents/,
@@ -429,7 +448,11 @@ describe('P2.01 — subagentReview schema, prReview, and prReviewAgents validati
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ reviewPolicy: { prReview: 'disabled' } }),
+        JSON.stringify({
+          deliveryBaseBranch: 'main',
+          closeoutBranch: 'main',
+          reviewPolicy: { prReview: 'disabled' },
+        }),
       );
       const config = await loadOrchestratorConfig(tempDir);
       expect(config.reviewPolicy?.prReview).toBe('disabled');

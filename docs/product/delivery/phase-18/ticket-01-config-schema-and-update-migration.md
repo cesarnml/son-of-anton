@@ -52,3 +52,5 @@ Why this path: required fields make branch roles explicit while migration preser
 Alternative considered: defaulting `deliveryBaseBranch` or `closeoutBranch` at runtime was rejected because it would preserve ambiguous branch-role semantics.
 Deferred: no per-phase branch override migration.
 Contract note: none.
+
+Implementation note: sync migration v2 uses Node to parse and rewrite `orchestrator.config.json` structurally, preserving existing explicit `deliveryBaseBranch` / `closeoutBranch` values and deriving missing branch roles from `defaultBranch` or `main`. Existing config-validation tests now include valid branch-role fields when targeting unrelated validation so missing-field errors stay intentional.
