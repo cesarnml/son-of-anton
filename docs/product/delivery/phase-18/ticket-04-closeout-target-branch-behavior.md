@@ -50,3 +50,8 @@ Why this path: closeout mutates branches and pushes, so it needs a separate high
 Alternative considered: sharing delivery-base as implicit closeout fallback was rejected because `closeoutBranch` is required.
 Deferred: automated promotion after closeout is outside Phase 18.
 Contract note: none.
+
+Implementation note: closeout-owned branch guard text, fetch/reset/push command
+construction, merge-conflict reset recovery, and PR close comments now consume
+`closeoutBranch`; repo-primary `defaultBranch` remains out of closeout landing
+behavior.
