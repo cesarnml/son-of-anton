@@ -1,0 +1,22 @@
+{
+  "ticket": "P19.02",
+  "invocations": [
+    {
+      "runnerKind": "codex-cli",
+      "reviewedHeadSha": "1b15059e51c9429831a8e735dfda514b0ca6788e",
+      "outcome": "clean",
+      "completedAt": "2026-06-28T08:19:16.007Z",
+      "terminatedReason": "completed",
+      "rawOutput": "docs/product/delivery/phase-19/reviews/P19.02-subagent-review.report.md",
+      "filledPrompt": "docs/product/delivery/phase-19/reviews/P19.02-subagent-review.prompt.md",
+      "fallbackLevel": "preferred",
+      "schemaVersion": 1,
+      "primaryAgent": "claude",
+      "runnerSelfReport": null,
+      "fallbackFrom": null,
+      "findings": [],
+      "probedSurfaces": [],
+      "patches": []
+    }
+  ]
+}
