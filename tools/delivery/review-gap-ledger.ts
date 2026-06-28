@@ -176,18 +176,27 @@ function assertValidReachability(
 export function validateReviewGapRecord(
   input: ReviewGapRecordInput,
 ): ReviewGapRecord {
+  const kind = assertOneOf(
+    assertNonEmptyString(input.kind, 'kind'),
+    'kind',
+    REVIEW_GAP_KINDS,
+  );
+  const reachability = assertValidReachability(input.reachability);
+
+  if (kind !== reachability.classification) {
+    throw new Error(
+      "Review-gap ledger fields 'kind' and 'reachability.classification' must match.",
+    );
+  }
+
   const record: ReviewGapRecord = {
     phase: assertValidPhase(input.phase),
     date: assertValidDate(input.date),
-    kind: assertOneOf(
-      assertNonEmptyString(input.kind, 'kind'),
-      'kind',
-      REVIEW_GAP_KINDS,
-    ),
+    kind,
     summary: assertNonEmptyString(input.summary, 'summary'),
     fixCommit: assertValidCommit(input.fixCommit),
     detectionRounds: assertPositiveInteger(input.detectionRounds),
-    reachability: assertValidReachability(input.reachability),
+    reachability,
   };
 
   return record;

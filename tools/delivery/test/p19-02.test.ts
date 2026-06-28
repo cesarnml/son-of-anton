@@ -59,10 +59,33 @@ describe('P19.02 review-gap ledger record helper', () => {
     }
   });
 
+  it('appends on a new line when the existing ledger lacks a trailing newline', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'p19-02-ledger-boundary-'));
+    try {
+      const ledgerPath = join(tmp, 'ledger.jsonl');
+      const existing = '{"phase":"phase-18","summary":"keep me"}';
+      writeFileSync(ledgerPath, existing);
+
+      appendReviewGapRecord(ledgerPath, validRecord());
+
+      const next = readFileSync(ledgerPath, 'utf8');
+      expect(next.startsWith(`${existing}\n`)).toBe(true);
+      expect(next.trimEnd().split('\n')).toHaveLength(2);
+    } finally {
+      rmSync(tmp, { force: true, recursive: true });
+    }
+  });
+
   it('rejects malformed phase attribution', () => {
     expect(() =>
       validateReviewGapRecord(validRecord({ phase: 'p19' })),
     ).toThrow(/phase-NN/);
+  });
+
+  it('rejects impossible calendar dates', () => {
+    expect(() =>
+      validateReviewGapRecord(validRecord({ date: '2026-02-31' })),
+    ).toThrow(/calendar date/);
   });
 
   it('rejects missing commit provenance', () => {
@@ -84,6 +107,19 @@ describe('P19.02 review-gap ledger record helper', () => {
         }),
       ),
     ).toThrow(/reachability/i);
+  });
+
+  it('rejects kind and reachability mismatches', () => {
+    expect(() =>
+      validateReviewGapRecord(
+        validRecord({
+          kind: 'review-reachable',
+          reachability: {
+            classification: 'spec-gap',
+          },
+        }),
+      ),
+    ).toThrow(/must match/);
   });
 
   it('rejects zero or negative detection rounds', () => {
