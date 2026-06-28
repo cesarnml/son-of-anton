@@ -105,6 +105,8 @@ describe('P18.03 PR metadata and state repair branch roles', () => {
         }),
       },
     ]);
+    expect(editCalls[0]?.options.body).toContain('/blob/main/');
+    expect(editCalls[0]?.options.body).not.toContain('/blob/release-next/');
     expect(next.tickets[0]?.prNumber).toBe(42);
   });
 
