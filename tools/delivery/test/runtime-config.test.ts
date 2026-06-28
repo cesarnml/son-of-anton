@@ -358,10 +358,11 @@ describe('orchestrator config', () => {
     }
   });
 
-  it('syncStateFromScratch uses configured defaultBranch for first ticket baseBranch', () => {
+  it('syncStateFromScratch uses configured deliveryBaseBranch for first ticket baseBranch', () => {
     const config: ResolvedOrchestratorConfig = {
       ...baseConfig,
       defaultBranch: 'develop',
+      deliveryBaseBranch: 'release-next',
     };
     const options = createOptions({
       planPath: 'docs/product/delivery/phase-03/implementation-plan.md',
@@ -382,7 +383,7 @@ describe('orchestrator config', () => {
       config,
     );
 
-    expect(synced.tickets[0]?.baseBranch).toBe('develop');
+    expect(synced.tickets[0]?.baseBranch).toBe('release-next');
   });
 });
 

@@ -918,6 +918,7 @@ export function restackTicket(
       },
     ) => string;
     defaultBranch: string;
+    deliveryBaseBranch: string;
     editPullRequest: (
       cwd: string,
       prNumber: number,
@@ -975,8 +976,8 @@ export function restackTicket(
   );
   const previous = targetIndex > 0 ? state.tickets[targetIndex - 1] : undefined;
 
-  let nextBaseBranch = dependencies.defaultBranch;
-  let rebaseTarget = `origin/${dependencies.defaultBranch}`;
+  let nextBaseBranch = dependencies.deliveryBaseBranch;
+  let rebaseTarget = `origin/${dependencies.deliveryBaseBranch}`;
 
   if (previous) {
     const oldBase = dependencies.readMergeBase(
@@ -998,7 +999,7 @@ export function restackTicket(
 
     dependencies.rebaseOnto(cwd, rebaseTarget, oldBase);
   } else {
-    dependencies.rebaseOntoDefaultBranch(cwd, dependencies.defaultBranch);
+    dependencies.rebaseOntoDefaultBranch(cwd, dependencies.deliveryBaseBranch);
   }
 
   const nextState: DeliveryState = {

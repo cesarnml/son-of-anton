@@ -50,3 +50,5 @@ Why this path: delivery behavior is the largest branch-role surface and needs a 
 Alternative considered: patching all branch roles in one ticket was rejected as too broad for review.
 Deferred: closeout target behavior remains in `P18.04`.
 Contract note: none.
+
+Implementation note: first-ticket state sync, primary worktree discovery, and first-ticket restack now consume `deliveryBaseBranch`; `defaultBranch` remains available for repo-primary references such as ticket-file links and later metadata work.
