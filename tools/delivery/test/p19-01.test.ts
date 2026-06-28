@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const SCRIPT_PATH = resolve(import.meta.dir, '../../../scripts/soa-sync.sh');
+const REPO_ROOT = resolve(import.meta.dir, '../../..');
 
 function initConsumerFixture(tmp: string): void {
   spawnSync('git', ['init'], { cwd: tmp });
@@ -20,6 +22,14 @@ function initConsumerFixture(tmp: string): void {
   mkdirSync(join(tmp, '.son-of-anton', '.agents', 'skills', 'dummy'), {
     recursive: true,
   });
+  mkdirSync(join(tmp, '.son-of-anton', 'docs', 'template'), {
+    recursive: true,
+  });
+  cpSync(
+    join(REPO_ROOT, 'docs', 'template', 'review-gaps'),
+    join(tmp, '.son-of-anton', 'docs', 'template', 'review-gaps'),
+    { recursive: true },
+  );
 }
 
 function runSync(tmp: string): ReturnType<typeof spawnSync> {
