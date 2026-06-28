@@ -47,3 +47,5 @@ Why this path: metadata and repair are easy to regress after delivery-base plumb
 Alternative considered: folding this into `P18.02` was rejected because PR metadata has a different branch-role contract than delivery-base execution.
 Deferred: closeout output and branch guards remain in `P18.04`.
 Contract note: none.
+
+Implementation note: existing PR refresh now sends the ticket `baseBranch` to GitHub alongside the refreshed title/body so GitHub PR metadata, stacked-base body metadata, and delivery state cannot drift when repo-primary `defaultBranch` differs from the delivery base.
