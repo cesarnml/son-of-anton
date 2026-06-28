@@ -50,3 +50,4 @@ Why this path: the ledger contract is important enough to test independently of 
 Alternative considered: leave ledger writing entirely to agent instructions; rejected because the phase depends on durable structured records.
 Deferred: command invocation and promotion queue guidance belong to later tickets.
 Contract note: none.
+Implementation note: the helper uses runtime validation with centralized vocabularies, returns the normalized record for callers, and appends bytes only. If an existing ledger is non-empty but lacks a trailing newline, the helper appends a newline boundary before the new JSON line without rewriting prior bytes.
