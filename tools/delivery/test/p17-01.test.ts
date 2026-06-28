@@ -11,6 +11,8 @@ import { writeGateEvent } from '../codogotchi-gate';
 function enabledConfig(): ResolvedOrchestratorConfig {
   return {
     defaultBranch: 'main',
+    deliveryBaseBranch: 'main',
+    closeoutBranch: 'main',
     planRoot: 'docs',
     runtime: 'bun',
     packageManager: 'bun',

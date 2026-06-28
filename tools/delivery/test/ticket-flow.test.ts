@@ -39,6 +39,8 @@ function git(repo: string, args: string[]) {
 
 const baseConfig: ResolvedOrchestratorConfig = {
   defaultBranch: 'main',
+  deliveryBaseBranch: 'main',
+  closeoutBranch: 'main',
   planRoot: 'docs',
   runtime: 'bun',
   packageManager: 'bun',

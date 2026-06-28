@@ -13,6 +13,8 @@ import {
 
 const baseConfig: ResolvedOrchestratorConfig = {
   defaultBranch: 'main',
+  deliveryBaseBranch: 'main',
+  closeoutBranch: 'main',
   planRoot: 'docs',
   runtime: 'bun',
   packageManager: 'bun',
@@ -232,7 +234,11 @@ describe('orchestrator config', () => {
     try {
       await writeFile(
         join(tempDir, 'orchestrator.config.json'),
-        JSON.stringify({ planRoot: '   ' }),
+        JSON.stringify({
+          deliveryBaseBranch: 'main',
+          closeoutBranch: 'main',
+          planRoot: '   ',
+        }),
       );
 
       await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
@@ -279,13 +285,8 @@ describe('orchestrator config', () => {
         tempDir,
       );
       expect(resolved.defaultBranch).toBe('develop');
-      expect(
-        (resolved as never as { deliveryBaseBranch: string })
-          .deliveryBaseBranch,
-      ).toBe('integration');
-      expect(
-        (resolved as never as { closeoutBranch: string }).closeoutBranch,
-      ).toBe('release');
+      expect(resolved.deliveryBaseBranch).toBe('integration');
+      expect(resolved.closeoutBranch).toBe('release');
       expect(resolved.planRoot).toBe('specifications');
       expect(resolved.runtime).toBe('bun');
       expect(resolved.packageManager).toBe('npm');

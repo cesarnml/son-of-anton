@@ -24,6 +24,8 @@ import type { RunPolicy } from '../types';
 
 const baseResolvedConfig: ResolvedOrchestratorConfig = {
   defaultBranch: 'main',
+  deliveryBaseBranch: 'main',
+  closeoutBranch: 'main',
   planRoot: 'docs',
   runtime: 'bun',
   packageManager: 'bun',
