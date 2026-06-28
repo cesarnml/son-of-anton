@@ -148,6 +148,78 @@ describe('orchestrator config', () => {
     }
   });
 
+  it('throws when deliveryBaseBranch is missing', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-'));
+    try {
+      await writeFile(
+        join(tempDir, 'orchestrator.config.json'),
+        JSON.stringify({ defaultBranch: 'main', closeoutBranch: 'main' }),
+      );
+
+      await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
+        /deliveryBaseBranch/,
+      );
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+
+  it('throws when closeoutBranch is missing', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-'));
+    try {
+      await writeFile(
+        join(tempDir, 'orchestrator.config.json'),
+        JSON.stringify({ defaultBranch: 'main', deliveryBaseBranch: 'main' }),
+      );
+
+      await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
+        /closeoutBranch/,
+      );
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+
+  it('throws on blank deliveryBaseBranch', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-'));
+    try {
+      await writeFile(
+        join(tempDir, 'orchestrator.config.json'),
+        JSON.stringify({
+          defaultBranch: 'main',
+          deliveryBaseBranch: '   ',
+          closeoutBranch: 'main',
+        }),
+      );
+
+      await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
+        /deliveryBaseBranch/,
+      );
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+
+  it('throws on blank closeoutBranch', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-'));
+    try {
+      await writeFile(
+        join(tempDir, 'orchestrator.config.json'),
+        JSON.stringify({
+          defaultBranch: 'main',
+          deliveryBaseBranch: 'main',
+          closeoutBranch: '   ',
+        }),
+      );
+
+      await expect(loadOrchestratorConfig(tempDir)).rejects.toThrow(
+        /closeoutBranch/,
+      );
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+
   it('throws on blank planRoot', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-'));
     try {
@@ -170,6 +242,8 @@ describe('orchestrator config', () => {
       const resolved = resolveOrchestratorConfig({}, tempDir);
       expect(resolved).toMatchObject({
         defaultBranch: 'main',
+        deliveryBaseBranch: 'main',
+        closeoutBranch: 'main',
         planRoot: 'docs',
         runtime: 'bun',
         packageManager: 'npm',
@@ -189,10 +263,22 @@ describe('orchestrator config', () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'orch-cfg-resolve-'));
     try {
       const resolved = resolveOrchestratorConfig(
-        { defaultBranch: 'develop', planRoot: 'specifications' },
+        {
+          defaultBranch: 'develop',
+          deliveryBaseBranch: 'integration',
+          closeoutBranch: 'release',
+          planRoot: 'specifications',
+        } as never,
         tempDir,
       );
       expect(resolved.defaultBranch).toBe('develop');
+      expect(
+        (resolved as never as { deliveryBaseBranch: string })
+          .deliveryBaseBranch,
+      ).toBe('integration');
+      expect(
+        (resolved as never as { closeoutBranch: string }).closeoutBranch,
+      ).toBe('release');
       expect(resolved.planRoot).toBe('specifications');
       expect(resolved.runtime).toBe('bun');
       expect(resolved.packageManager).toBe('npm');

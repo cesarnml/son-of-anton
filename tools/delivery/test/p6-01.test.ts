@@ -15,6 +15,10 @@ import { spawnSync } from 'node:child_process';
 
 const SCRIPT_PATH = resolve(import.meta.dir, '../../../scripts/soa-sync.sh');
 
+function readJson(path: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+}
+
 function initConsumerFixture(tmp: string): void {
   spawnSync('git', ['init'], { cwd: tmp });
   spawnSync('git', ['config', 'user.email', 'test@test.com'], { cwd: tmp });
@@ -172,6 +176,86 @@ describe('P6.01 soa-sync migration runner', () => {
           join(tmp, 'docs', 'product', 'delivery', 'phase-aa', 'reviews'),
         ),
       ).toBe(false);
+    } finally {
+      rmSync(tmp, { force: true, recursive: true });
+    }
+  });
+
+  it('adds deliveryBaseBranch and closeoutBranch from an existing defaultBranch', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'p18-01-master-'));
+    try {
+      initConsumerFixture(tmp);
+      writeFileSync(join(tmp, '.soa-sync-version'), '1');
+      writeFileSync(
+        join(tmp, 'orchestrator.config.json'),
+        JSON.stringify({ defaultBranch: 'master' }, null, 2),
+      );
+
+      const result = runSync(tmp);
+      expect(result.status).toBe(0);
+
+      expect(readFileSync(join(tmp, '.soa-sync-version'), 'utf8').trim()).toBe(
+        '2',
+      );
+      expect(readJson(join(tmp, 'orchestrator.config.json'))).toMatchObject({
+        defaultBranch: 'master',
+        deliveryBaseBranch: 'master',
+        closeoutBranch: 'master',
+      });
+    } finally {
+      rmSync(tmp, { force: true, recursive: true });
+    }
+  });
+
+  it('adds branch role fields as main when defaultBranch is missing', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'p18-01-main-'));
+    try {
+      initConsumerFixture(tmp);
+      writeFileSync(join(tmp, '.soa-sync-version'), '1');
+      writeFileSync(
+        join(tmp, 'orchestrator.config.json'),
+        JSON.stringify({ planRoot: 'docs' }, null, 2),
+      );
+
+      const result = runSync(tmp);
+      expect(result.status).toBe(0);
+
+      expect(readJson(join(tmp, 'orchestrator.config.json'))).toMatchObject({
+        planRoot: 'docs',
+        deliveryBaseBranch: 'main',
+        closeoutBranch: 'main',
+      });
+    } finally {
+      rmSync(tmp, { force: true, recursive: true });
+    }
+  });
+
+  it('preserves explicit branch role fields during migration', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'p18-01-preserve-'));
+    try {
+      initConsumerFixture(tmp);
+      writeFileSync(join(tmp, '.soa-sync-version'), '1');
+      writeFileSync(
+        join(tmp, 'orchestrator.config.json'),
+        JSON.stringify(
+          {
+            defaultBranch: 'main',
+            deliveryBaseBranch: 'develop',
+            closeoutBranch: 'stable',
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = runSync(tmp);
+      expect(result.status).toBe(0);
+
+      expect(readJson(join(tmp, 'orchestrator.config.json'))).toMatchObject({
+        defaultBranch: 'main',
+        deliveryBaseBranch: 'develop',
+        closeoutBranch: 'stable',
+      });
     } finally {
       rmSync(tmp, { force: true, recursive: true });
     }
