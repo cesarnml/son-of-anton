@@ -55,3 +55,7 @@ Implementation note: closeout-owned branch guard text, fetch/reset/push command
 construction, merge-conflict reset recovery, and PR close comments now consume
 `closeoutBranch`; repo-primary `defaultBranch` remains out of closeout landing
 behavior.
+
+Subagent-review patch: closeout summaries now include
+`closeout_target=<closeoutBranch>` so operator-facing completion output names
+the resolved closeout target branch.

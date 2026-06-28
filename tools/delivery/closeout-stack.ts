@@ -342,6 +342,8 @@ export function formatCloseoutSummary(
 ): string {
   const lines = [formatStatus(state, config), '', 'Stacked Closeout Summary'];
 
+  lines.push(`closeout_target=${config.closeoutBranch}`);
+
   for (const merged of summary.merged) {
     const via =
       merged.landedVia === 'cherry-pick' ? ' [cherry-pick fallback]' : '';
