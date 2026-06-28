@@ -29,8 +29,8 @@ Use it when:
 - the learning belongs in `docs/product/review-gaps/ledger.jsonl`
 
 Route larger or unclear work toward standalone PR triage or `/soa plan` with a
-short explanation. Do not hard-gate solely on size when the operator is already
-asking for quality-control capture.
+one-line explanation. Do not hard-gate solely on size when the operator is
+already asking for quality-control capture.
 
 ## Workflow
 
@@ -59,13 +59,19 @@ asking for quality-control capture.
 - Use the landed fix commit SHA and subject for `fixCommit`.
 - Count how many detection or review rounds were needed before the issue was
   found.
-- Keep classification honest. `review-reachable` requires concrete evidence
-  that the per-ticket reviewer could see the issue from the ticket spec and diff
-  at review time, plus a prompt lesson.
-- Use `spec-gap`, `qa-gap`, or `completeness-gap` when the issue was outside
-  normal per-ticket review reach.
+- Bias against `review-reachable`. Use it only when the ticket spec, diff, or
+  persisted review artifacts show the reviewer had enough evidence at review
+  time to catch the issue and the lesson maps to adversarial-review prompt
+  vocabulary.
+- Use `spec-gap` when the expected behavior was missing or underspecified in
+  the plan, ticket, or acceptance criteria.
+- Use `qa-gap` when the issue required experiential, manual, or dogfood
+  verification outside the normal code-review surface.
+- Use `completeness-gap` when delivered scope was valid but missed adjacent
+  work that should be shaped in future planning.
 - Do not edit `docs/template/delivery/adversarial-review-template.md` from this
-  lane. Capture promotion candidates only.
+  lane. Capture promotion candidates only, and promote later only after
+  recurrence or a clear high-severity single instance.
 
 ## Stop Conditions
 
