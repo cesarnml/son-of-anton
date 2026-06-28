@@ -48,3 +48,9 @@ Why this path: documentation lands after behavior so examples match the shipped 
 Alternative considered: spreading docs across behavior tickets was rejected because the final terminology should reflect all branch-role changes together.
 Deferred: release-promotion docs beyond the manual boundary.
 Contract note: `Red: skip` is intentional for doc-only work.
+
+Implementation note: operator docs now describe separate repo-primary,
+delivery-base, and closeout-target branch roles, including all-`main`, staging,
+and `release-next` examples. Closeout documentation no longer says the stack
+always lands on `main`; it names the configured `closeoutBranch` and keeps
+branch promotion outside SoA.
