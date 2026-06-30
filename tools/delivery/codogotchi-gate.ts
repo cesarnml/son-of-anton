@@ -1,9 +1,8 @@
 import {
   appendFileSync,
   mkdirSync,
-  writeFileSync,
-  existsSync,
   readFileSync,
+  writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -87,6 +86,31 @@ function resolveCanonicalGitRoot(cwd: string): string {
   }
 }
 
+type ActiveSession = {
+  origin: string | undefined;
+  sessionId: string | undefined;
+};
+
+function readActiveSession(repoRoot: string): ActiveSession {
+  try {
+    const raw = readFileSync(
+      join(repoRoot, '.soa', 'active-session.json'),
+      'utf8',
+    );
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        origin: typeof parsed.origin === 'string' ? parsed.origin : undefined,
+        sessionId:
+          typeof parsed.session_id === 'string' ? parsed.session_id : undefined,
+      };
+    }
+  } catch {
+    // File absent or malformed — fall back to legacy single-file mode
+  }
+  return { origin: undefined, sessionId: undefined };
+}
+
 export async function writeGateEvent(
   config: ResolvedOrchestratorConfig,
   event: GateEvent,
@@ -100,25 +124,7 @@ export async function writeGateEvent(
       resolve(event.repoRoot ?? process.cwd()),
     );
 
-    let origin: string | undefined;
-    let sessionId: string | undefined;
-    try {
-      const activeSessionPath = join(repoRoot, '.soa', 'active-session.json');
-      if (
-        (process.env.NODE_ENV !== 'test' ||
-          process.env.FORCE_ACTIVE_SESSION === '1') &&
-        existsSync(activeSessionPath)
-      ) {
-        const content = readFileSync(activeSessionPath, 'utf8');
-        const parsed = JSON.parse(content);
-        if (parsed && typeof parsed === 'object') {
-          origin = parsed.origin;
-          sessionId = parsed.session_id;
-        }
-      }
-    } catch {
-      // Best-effort: ignore read/parse failures
-    }
+    const { origin, sessionId } = readActiveSession(repoRoot);
 
     const payload: GateJsonPayload = {
       gate: event.gate,
@@ -128,22 +134,21 @@ export async function writeGateEvent(
       ticket_id: event.ticketId,
     };
 
-    const targetDir = origin && sessionId ? join(home, 'state.d') : home;
+    const stateDir = join(home, 'state.d');
     const gateFile =
       origin && sessionId
-        ? join(targetDir, `${origin}:${sessionId}.gate.json`)
+        ? join(stateDir, `${origin}:${sessionId}.gate.json`)
         : join(home, GATE_JSON_FILENAME);
     const contextFile =
       origin && sessionId
-        ? join(targetDir, `${origin}:${sessionId}.context.json`)
+        ? join(stateDir, `${origin}:${sessionId}.context.json`)
         : join(home, DELIVERY_CONTEXT_JSON_FILENAME);
 
-    mkdirSync(targetDir, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    if (origin && sessionId) mkdirSync(stateDir, { recursive: true });
     const serialized = JSON.stringify(payload);
     writeFileSync(gateFile, serialized, 'utf8');
 
-    // Always log to the global transitions log
-    mkdirSync(home, { recursive: true });
     appendFileSync(
       join(home, GATE_TRANSITIONS_LOG_FILENAME),
       `${serialized}\n`,
