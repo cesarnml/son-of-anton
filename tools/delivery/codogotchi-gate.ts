@@ -1,9 +1,8 @@
 import {
   appendFileSync,
   mkdirSync,
-  writeFileSync,
-  existsSync,
   readFileSync,
+  writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -87,6 +86,52 @@ function resolveCanonicalGitRoot(cwd: string): string {
   }
 }
 
+type ActiveSession = {
+  origin: string | undefined;
+  sessionId: string | undefined;
+};
+
+/**
+ * `.soa/active-session.json` is a shared, mutable pointer that any origin's
+ * hook (Claude Code, Codex, Cursor, ...) can overwrite at any time. A single
+ * ticket's gate sequence fires many `writeGateEvent` calls in succession
+ * (ticket_started, red_tdd, green_tdd, ...); re-reading the file fresh on
+ * every call let a concurrent, unrelated writer steal the routing mid-ticket
+ * and silently misdirect a gate event into the wrong origin/session's file.
+ * Cache the first *resolved* session per repoRoot for this process's
+ * lifetime so the whole sequence stays pinned to whichever session actually
+ * started the ticket. Deliberately do not cache an unresolved read (file
+ * missing/malformed) so we keep retrying until the session becomes known.
+ */
+const resolvedSessionCache = new Map<string, ActiveSession>();
+
+function readActiveSession(repoRoot: string): ActiveSession {
+  const cached = resolvedSessionCache.get(repoRoot);
+  if (cached) return cached;
+
+  try {
+    const raw = readFileSync(
+      join(repoRoot, '.soa', 'active-session.json'),
+      'utf8',
+    );
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      const session: ActiveSession = {
+        origin: typeof parsed.origin === 'string' ? parsed.origin : undefined,
+        sessionId:
+          typeof parsed.session_id === 'string' ? parsed.session_id : undefined,
+      };
+      if (session.origin && session.sessionId) {
+        resolvedSessionCache.set(repoRoot, session);
+      }
+      return session;
+    }
+  } catch {
+    // File absent or malformed — fall back to legacy single-file mode
+  }
+  return { origin: undefined, sessionId: undefined };
+}
+
 export async function writeGateEvent(
   config: ResolvedOrchestratorConfig,
   event: GateEvent,
@@ -100,25 +145,7 @@ export async function writeGateEvent(
       resolve(event.repoRoot ?? process.cwd()),
     );
 
-    let origin: string | undefined;
-    let sessionId: string | undefined;
-    try {
-      const activeSessionPath = join(repoRoot, '.soa', 'active-session.json');
-      if (
-        (process.env.NODE_ENV !== 'test' ||
-          process.env.FORCE_ACTIVE_SESSION === '1') &&
-        existsSync(activeSessionPath)
-      ) {
-        const content = readFileSync(activeSessionPath, 'utf8');
-        const parsed = JSON.parse(content);
-        if (parsed && typeof parsed === 'object') {
-          origin = parsed.origin;
-          sessionId = parsed.session_id;
-        }
-      }
-    } catch {
-      // Best-effort: ignore read/parse failures
-    }
+    const { origin, sessionId } = readActiveSession(repoRoot);
 
     const payload: GateJsonPayload = {
       gate: event.gate,
@@ -128,22 +155,21 @@ export async function writeGateEvent(
       ticket_id: event.ticketId,
     };
 
-    const targetDir = origin && sessionId ? join(home, 'state.d') : home;
+    const stateDir = join(home, 'state.d');
     const gateFile =
       origin && sessionId
-        ? join(targetDir, `${origin}:${sessionId}.gate.json`)
+        ? join(stateDir, `${origin}:${sessionId}.gate.json`)
         : join(home, GATE_JSON_FILENAME);
     const contextFile =
       origin && sessionId
-        ? join(targetDir, `${origin}:${sessionId}.context.json`)
+        ? join(stateDir, `${origin}:${sessionId}.context.json`)
         : join(home, DELIVERY_CONTEXT_JSON_FILENAME);
 
-    mkdirSync(targetDir, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    if (origin && sessionId) mkdirSync(stateDir, { recursive: true });
     const serialized = JSON.stringify(payload);
     writeFileSync(gateFile, serialized, 'utf8');
 
-    // Always log to the global transitions log
-    mkdirSync(home, { recursive: true });
     appendFileSync(
       join(home, GATE_TRANSITIONS_LOG_FILENAME),
       `${serialized}\n`,
