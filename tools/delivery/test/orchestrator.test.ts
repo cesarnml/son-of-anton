@@ -4174,6 +4174,17 @@ describe('delivery orchestrator', () => {
     expect(buildDiscordContent({ text: '#nospace and 1.0 release' })).toBe(
       '#nospace and 1.0 release',
     );
+
+    // Markdown-link injection: `[text](url)` in free-form prose (e.g. a review
+    // note derived from AI review comments) must not render as a live masked
+    // link — brackets and parens are escaped. Only entity-driven links splice.
+    expect(
+      buildDiscordContent({
+        text: 'Reason: see [click me](https://evil.example.com) for details',
+      }),
+    ).toBe(
+      'Reason: see \\[click me\\]\\(https://evil.example.com\\) for details',
+    );
   });
 
   it('prefers an explicit review fetcher environment variable', () => {

@@ -555,10 +555,14 @@ async function sendTelegramMessage(
 // branches read literally on Discord, matching Telegram. The intentional
 // `[label](url)` link spans are emitted unescaped by buildDiscordContent.
 //
+// Brackets and parens are escaped too: free-form text (e.g. a review note
+// derived from lower-trust AI review comments) containing `[text](url)` must
+// not render as a live masked link in the channel.
+//
 // Inline markers can fire anywhere on a line; block markers (headings,
 // blockquotes, bullet/ordered lists, subtext) only fire at the start of a
 // line, so escaping is applied per line.
-const DISCORD_INLINE_METACHARACTERS = /[\\`*_~|]/g;
+const DISCORD_INLINE_METACHARACTERS = /[\\`*_~|[\]()]/g;
 const DISCORD_LINE_START_MARKER = /^(\s*)(-#|#{1,3}|>{1,3}|[-+]|\d+\.)(?=\s)/;
 
 function escapeDiscordMarkdown(text: string): string {
