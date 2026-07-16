@@ -557,7 +557,7 @@ post-verify
 
 **Bypass conditions** (structural, not a runtime check the agent has to remember): `refactorReview: "disabled"`, `Red: skip`, and doc-only tickets all skip steps 6–8 entirely — no prompt, no runner invocation, no reconciliation attempt.
 
-**Enforcement is soft.** Under `runner_on_red`, the happy-path sequence always runs the gate, but a missing refactor-review artifact does **not** hard-block `open-pr` the way a missing adversarial artifact does under `subagentReview: "required"`. Fail-closed enforcement is `runner_on_red_strict` — named as a future policy value in this repo's config validation, but not implemented or wired into any guard. Do not read the absence of a hard `open-pr` block as an oversight; it is the documented `runner_on_red` contract.
+**Enforcement is soft.** Under `runner_on_red`, the happy-path sequence always runs the gate, but a missing refactor-review artifact does **not** hard-block `open-pr` the way a missing adversarial artifact does under `subagentReview: "required"`. Fail-closed enforcement is `runner_on_red_strict` — a planned, currently **unsupported** value: config validation rejects it (only `"disabled"` and `"runner_on_red"` are accepted), and it is not implemented or wired into any guard. Do not read the absence of a hard `open-pr` block as an oversight; it is the documented `runner_on_red` contract.
 
 **Commands:**
 

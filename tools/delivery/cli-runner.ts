@@ -164,6 +164,7 @@ import {
   deriveRefactorReviewLedgerPath,
   deriveRefactorReviewOutcomePath,
   deriveRefactorReviewTracePath,
+  isRefactorGateEligible,
   isValidRefactorReviewPromptContent,
   reconcileRefactorReview,
   recordRefactorReviewOutcome,
@@ -654,6 +655,22 @@ export async function runDeliveryOrchestrator(
             `Ticket ${writeTarget.id} requires the refactor-review gate before write-subagent-adversarial-review under refactorReview: "runner_on_red". ` +
               `Run write-subagent-refactor-review -> subagent-refactor-review -> reconcile-subagent-refactor-review first.`,
           );
+        }
+
+        // An outcome was recorded (or the ticket is ineligible for the
+        // refactor gate) — if eligible, auto-reconcile before proceeding,
+        // mirroring how open-pr auto-reconciles the adversarial ledger
+        // rather than requiring a manually-sequenced separate step. Missing
+        // artifact/reviewedHeadSha is soft (the gate returns early); a
+        // genuine Condition A/B silent-lie still hard-blocks.
+        if (
+          isRefactorGateEligible({
+            refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+            redPolicy: writeTarget.redPolicy,
+            isDocOnly: writeIsDocOnly,
+          })
+        ) {
+          runRefactorReconciliationGate(state, cwd, context, writeTarget.id);
         }
 
         const writePolicy = context.config.reviewPolicy.subagentReview;
@@ -1244,9 +1261,19 @@ export async function runDeliveryOrchestrator(
               : 'No ticket at verified status found.',
           );
         }
-        if (context.config.reviewPolicy.refactorReview === 'disabled') {
+        if (
+          !isRefactorGateEligible({
+            refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+            redPolicy: writeTarget.redPolicy,
+            isDocOnly: isPlatformLocalBranchDocOnly(
+              writeTarget.worktreePath,
+              writeTarget.baseBranch,
+              context.config.runtime,
+            ),
+          })
+        ) {
           throw new Error(
-            'refactorReview is disabled — write-subagent-refactor-review is not applicable.',
+            `Ticket ${writeTarget.id} bypasses the refactor gate structurally (refactorReview disabled, Red: skip, or doc-only) — write-subagent-refactor-review is not applicable.`,
           );
         }
 
@@ -1316,6 +1343,21 @@ export async function runDeliveryOrchestrator(
           if (!deferTarget) {
             throw new Error(
               'record-deferred requires a ticket at verified status (or pass an explicit ticket id).',
+            );
+          }
+          if (
+            !isRefactorGateEligible({
+              refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+              redPolicy: deferTarget.redPolicy,
+              isDocOnly: isPlatformLocalBranchDocOnly(
+                deferTarget.worktreePath,
+                deferTarget.baseBranch,
+                context.config.runtime,
+              ),
+            })
+          ) {
+            throw new Error(
+              `Ticket ${deferTarget.id} bypasses the refactor gate structurally (refactorReview disabled, Red: skip, or doc-only) — record-deferred is not applicable.`,
             );
           }
           if (!parsed.reason || parsed.reason.trim() === '') {
@@ -1412,6 +1454,21 @@ export async function runDeliveryOrchestrator(
             refactorTicketId
               ? `Unknown ticket ${refactorTicketId}.`
               : 'No ticket at verified status found.',
+          );
+        }
+        if (
+          !isRefactorGateEligible({
+            refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+            redPolicy: refactorTarget.redPolicy,
+            isDocOnly: isPlatformLocalBranchDocOnly(
+              refactorTarget.worktreePath,
+              refactorTarget.baseBranch,
+              context.config.runtime,
+            ),
+          })
+        ) {
+          throw new Error(
+            `Ticket ${refactorTarget.id} bypasses the refactor gate structurally (refactorReview disabled, Red: skip, or doc-only) — subagent-refactor-review is not applicable.`,
           );
         }
 
@@ -1690,6 +1747,29 @@ export async function runDeliveryOrchestrator(
         return 0;
       }
       case 'reconcile-subagent-refactor-review': {
+        const reconcileTicketId = parsed.positionals[0];
+        const reconcileTarget =
+          (reconcileTicketId
+            ? state.tickets.find((t) => t.id === reconcileTicketId)
+            : (state.tickets.find((t) => t.status === 'verified') ??
+              state.tickets.find((t) => t.status === 'in_review'))) ??
+          undefined;
+        if (
+          reconcileTarget &&
+          !isRefactorGateEligible({
+            refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+            redPolicy: reconcileTarget.redPolicy,
+            isDocOnly: isPlatformLocalBranchDocOnly(
+              reconcileTarget.worktreePath,
+              reconcileTarget.baseBranch,
+              context.config.runtime,
+            ),
+          })
+        ) {
+          throw new Error(
+            `Ticket ${reconcileTarget.id} bypasses the refactor gate structurally (refactorReview disabled, Red: skip, or doc-only) — reconcile-subagent-refactor-review is not applicable.`,
+          );
+        }
         runRefactorReconciliationGate(
           state,
           cwd,
