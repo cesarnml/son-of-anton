@@ -151,6 +151,7 @@ import {
   parseSubagentReviewArgs,
   readSubagentRunnerArtifact,
   resolvePrimaryAgent,
+  resolveRunnerOptions,
   resolveSubagentSelection,
   runProgrammaticSubagentReview,
   runSubagentWithFallback,
@@ -311,6 +312,8 @@ export async function runDeliveryOrchestrator(
         prReviewPolicy?: ReviewPolicyStageValue;
         subagent?: 'claude-cli' | 'codex-cli' | 'cursor-cli';
         primary?: string;
+        subagentModel?: string;
+        subagentEffort?: string;
         baseline?: 'orchestrator' | 'run-policy';
         dispositionsPath?: string;
       }
@@ -1037,12 +1040,27 @@ export async function runDeliveryOrchestrator(
           | undefined;
         let runnerStderr: string | undefined;
         let runnerSelfReport: string | null = null;
+        // P21.04 — resolved per the attempt actually spawned; overwritten
+        // each loop iteration so it reflects whichever kind's iteration ran
+        // last (the winning kind on success, or the final failed attempt).
+        let resolvedRunnerOptionsForAttempt: {
+          model?: string;
+          effort?: string;
+        } = {};
 
         const fallbackOutcome = runSubagentWithFallback(
           subagentSelection.kind,
           (runner) => {
             const runnerHeadBefore = readHeadSha();
             const preRunDirtyPaths = new Set(listDirtyPaths());
+            const resolvedOptions = resolveRunnerOptions({
+              runner,
+              requestedRunner: subagentSelection.kind,
+              flagModel: parsed.subagentModel,
+              flagEffort: parsed.subagentEffort,
+              configOptions: context.config.subagentRunnerOptions,
+            });
+            resolvedRunnerOptionsForAttempt = resolvedOptions;
             const result = tryRunner(
               () => {
                 const outputLastMessageDir =
@@ -1059,6 +1077,8 @@ export async function runDeliveryOrchestrator(
                     outputLastMessagePath,
                     workspacePath:
                       runner === 'cursor-cli' ? worktreePath : undefined,
+                    model: resolvedOptions.model,
+                    effort: resolvedOptions.effort,
                   },
                 );
                 try {
@@ -1263,6 +1283,8 @@ export async function runDeliveryOrchestrator(
           primaryAgent,
           runnerSelfReport,
           fallbackFrom,
+          runnerModel: resolvedRunnerOptionsForAttempt.model ?? null,
+          runnerEffort: resolvedRunnerOptionsForAttempt.effort ?? null,
         });
         appendInvocationToArtifact(
           artifactAbsPath,

@@ -87,6 +87,28 @@ Fallback order: try the operator-selected runner first, then each other programm
 
 Fallback triggers on: the runner being unavailable or timing out, and — as of P21.03 — a runner that spawned but produced no usable review (`ran` with `terminatedReason` of `runner_failed`, `rate_limit`, or `sandbox_denied`). It does **not** trigger on `advisory_violation` (the runner reviewed but broke the no-writes contract) or a genuinely completed `ran` result — those record honestly and stop the chain. Each runner in the chain is attempted at most once; when every runner fails, the row records `skipped` with `fallbackLevel: 'failed_all'` and preserves the originally-requested kind in `fallbackFrom`, with the full attempt chain in `attemptedKinds`.
 
+### Per-platform model and effort selection (P21.04)
+
+`orchestrator.config.json` accepts an optional `subagentRunnerOptions` map, keyed by platform:
+
+```json
+{
+  "subagentRunnerOptions": {
+    "claude-cli": { "model": "claude-opus-4-8", "effort": "high" },
+    "codex-cli": { "model": "gpt-5-codex", "effort": "high" },
+    "cursor-cli": { "model": "composer-1" }
+  }
+}
+```
+
+Unknown platform keys or unknown option keys inside an entry fail config validation with an actionable error. `effort` is rejected for `cursor-cli` — it has no effort flag; effort rides the model slug there. `effort` on `claude-cli` must be one of the known tiers (`low`, `medium`, `high`, `xhigh`, `max`); `model` values are never validated against a catalog — platforms own their own model namespaces.
+
+`subagent-review` also accepts flat `--subagent-model <value>` and `--subagent-effort <value>` flags. These apply **only to the explicitly requested runner** (the one named by `--subagent` or `subagentRunner`) — a fallback attempt resolves its own model/effort purely from `subagentRunnerOptions` for that platform, never inheriting the requested runner's flag values. Precedence per platform: flag (requested runner only) > `subagentRunnerOptions` entry > platform default.
+
+Resolved values are forwarded into each platform's documented flags: `claude --model <m> --effort <e>`, `codex exec -m <m> -c model_reasoning_effort=<e>`, `agent --model <m>` (no effort flag). A resolved `effort` for `cursor-cli` (from either the flag or a fallback's config entry) fails fast with an actionable error before any runner spawns — never silently dropped.
+
+Ledger rows gain optional `runnerModel`/`runnerEffort` fields recording what actually ran for that attempt (absent/`null` when the platform default was used), including for fallback attempts.
+
 ## Stance
 
 The orchestrator is repo tooling, not app runtime code.
@@ -467,13 +489,15 @@ Pass explicit flags to override delivery policy for a single run without editing
 
 **Available flags:**
 
-| Flag                       | Values                              | Effect                                                                                                     |
-| -------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `--boundary-mode`          | `cook\|gated`                       | Override ticket-boundary mode                                                                              |
-| `--subagent-review-policy` | `required\|skip_doc_only\|disabled` | Override subagent review gate                                                                              |
-| `--pr-review-policy`       | `required\|skip_doc_only\|disabled` | Override PR review gate                                                                                    |
-| `--subagent`               | `claude-cli\|codex-cli\|cursor-cli` | Declare execution agent identity; tries preferred first, then other programmatic runners, then honest skip |
-| `--baseline`               | `orchestrator\|run-policy`          | Resolve divergence on resume (see below)                                                                   |
+| Flag                       | Values                                                        | Effect                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--boundary-mode`          | `cook\|gated`                                                 | Override ticket-boundary mode                                                                                            |
+| `--subagent-review-policy` | `required\|skip_doc_only\|disabled`                           | Override subagent review gate                                                                                            |
+| `--pr-review-policy`       | `required\|skip_doc_only\|disabled`                           | Override PR review gate                                                                                                  |
+| `--subagent`               | `claude-cli\|codex-cli\|cursor-cli`                           | Declare execution agent identity; tries preferred first, then other programmatic runners, then honest skip               |
+| `--subagent-model`         | free-form string                                              | Model override for the explicitly requested runner only (P21.04); fallback attempts resolve from `subagentRunnerOptions` |
+| `--subagent-effort`        | free-form string (`claude-cli` validated against known tiers) | Effort override for the explicitly requested runner only; rejected for `cursor-cli`                                      |
+| `--baseline`               | `orchestrator\|run-policy`                                    | Resolve divergence on resume (see below)                                                                                 |
 
 **Divergence recovery:** If `orchestrator.config.json` changes between runs, resume detects drift on the four bounded policy fields and refuses to continue until the operator resolves it:
 
@@ -767,7 +791,7 @@ Available commands:
 - `subagent-refactor-review record-deferred --reason "<rationale>" [ticket-id]`
 - `reconcile-subagent-refactor-review [ticket-id]`
 - `write-subagent-adversarial-review [ticket-id] [--prompt-file <path>]`
-- `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli|cursor-cli>]`
+- `subagent-review [ticket-id] [clean|patched <sha>] [--force] [--subagent <claude-cli|codex-cli|cursor-cli>] [--subagent-model <value>] [--subagent-effort <value>]`
 - `subagent-review record-deferred --reason "<rationale>" [ticket-id]`
 - `reconcile-subagent-review [ticket-id]`
 - `open-pr [ticket-id] [--ack-reconciliation <patched|deferred|clean>] [--commit <sha>] [--reason "<text>"]`

@@ -343,6 +343,8 @@ or committing config changes.
 | `--subagent-review-policy`                       | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.subagentReview`                                                                                                      |
 | `--pr-review-policy`                             | `required`, `skip_doc_only`, `disabled` | `reviewPolicy.prReview`                                                                                                            |
 | `--subagent <claude-cli\|codex-cli\|cursor-cli>` | `claude-cli`, `codex-cli`, `cursor-cli` | declare execution agent identity for programmatic review; tries preferred first, then other programmatic runners, then honest skip |
+| `--subagent-model <value>`                       | free-form string                        | model override for the explicitly requested runner only; fallback attempts resolve from `subagentRunnerOptions` in config          |
+| `--subagent-effort <value>`                      | free-form string                        | effort override for the explicitly requested runner only; rejected for `cursor-cli` (no effort flag)                               |
 
 The resolved policy is written to `state.json` at the start of every run.
 `orchestrator.config.json` is never modified.
