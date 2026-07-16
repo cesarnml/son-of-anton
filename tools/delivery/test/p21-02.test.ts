@@ -54,6 +54,26 @@ describe('P21.02 — completed_with_findings cross-check', () => {
     expect(decided.outcome).toBe('clean');
   });
 
+  it('records completed_with_findings for an unclosed tag that still yields bullets (parsed to EOF)', () => {
+    // Found via subagent-review adversarial pass: a malformed report (missing
+    // close tag) must never be misrecorded as `clean` just because `closed`
+    // is false — the findings are still real and extractable.
+    const report = [
+      '<actionable-findings>',
+      '- unchecked null deref in handler',
+    ].join('\n');
+    const parsed = parseActionableFindings(report);
+    expect(parsed.closed).toBe(false);
+    expect(parsed.findings.length).toBeGreaterThan(0);
+
+    const decided = decideAdvisoryRunnerOutcome(ranResult(), {
+      runnerWroteFiles: false,
+      actionableFindings: parsed,
+    });
+
+    expect(decided.outcome).toBe('completed_with_findings');
+  });
+
   it('collapses a non-completed termination to skipped regardless of findings', () => {
     const report = [
       '<actionable-findings>',
