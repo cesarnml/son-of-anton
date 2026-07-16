@@ -15,7 +15,19 @@
  * `notes/public/subagent-report-parser-contract.md`: a balanced tag block
  * the subagent copies verbatim, extracted with no heading-recognition
  * machinery.
+ *
+ * P20.02 — CLI-facing helpers (prompt path derivation, prompt validity, and
+ * ticket-state recording) live here too, reusing the generic runner core in
+ * `subagent-runner.ts` (spawn/fallback/ledger primitives) rather than
+ * duplicating it. These helpers do not transition `TicketState.status` — gate
+ * placement into the main ticket-status machine is ticket 20.03's job.
  */
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+import type { DeliveryState, InternalReviewPatchCommit } from './types';
+import type { SubagentRunnerOutcome } from './subagent-runner';
 
 const REFACTOR_REVIEW_SUBJECT_PATTERN = /\[refactor-review\]/i;
 
@@ -300,4 +312,140 @@ export function reconcileRefactorReview(input: {
   }
 
   return { kind: 'clean' };
+}
+
+export const REFACTOR_REVIEW_PROMPT_SUFFIX = '-refactor-review.prompt.md';
+export const REFACTOR_REVIEW_OUTCOME_SUFFIX = '-refactor-review.report.md';
+export const REFACTOR_REVIEW_TRACE_SUFFIX = '-refactor-review.trace.log';
+export const REFACTOR_REVIEW_LEDGER_SUFFIX = '-refactor-review.ledger.json';
+
+export function deriveRefactorReviewPromptPath(
+  reviewsDirPath: string,
+  ticketId: string,
+): string {
+  return `${reviewsDirPath}/${ticketId}${REFACTOR_REVIEW_PROMPT_SUFFIX}`;
+}
+
+export function deriveRefactorReviewOutcomePath(
+  reviewsDirPath: string,
+  ticketId: string,
+): string {
+  return `${reviewsDirPath}/${ticketId}${REFACTOR_REVIEW_OUTCOME_SUFFIX}`;
+}
+
+export function deriveRefactorReviewTracePath(
+  reviewsDirPath: string,
+  ticketId: string,
+): string {
+  return `${reviewsDirPath}/${ticketId}${REFACTOR_REVIEW_TRACE_SUFFIX}`;
+}
+
+export function deriveRefactorReviewLedgerPath(
+  reviewsDirPath: string,
+  ticketId: string,
+): string {
+  return `${reviewsDirPath}/${ticketId}${REFACTOR_REVIEW_LEDGER_SUFFIX}`;
+}
+
+/**
+ * Reject stub/placeholder prompt content, same discipline as the adversarial
+ * gate's `isValidSubagentAdversarialPromptContent` — a one-line prompt or an
+ * uncustomized template skeleton must not silently pass as a real brief.
+ */
+export function isValidRefactorReviewPromptContent(content: string): boolean {
+  if (typeof content !== 'string') return false;
+  const trimmed = content.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.length < 80) return false;
+  if (/<paste\b|<list each|<file\/function/i.test(content)) return false;
+  return true;
+}
+
+export type RefactorReviewPromptWriteResult = {
+  absolutePath: string;
+  relativePath: string;
+  writtenAt: string;
+};
+
+export function writeRefactorReviewPrompt(input: {
+  repoRoot: string;
+  reviewsDirPath: string;
+  ticketId: string;
+  content: string;
+  now?: () => string;
+}): RefactorReviewPromptWriteResult {
+  if (!isValidRefactorReviewPromptContent(input.content)) {
+    throw new Error(
+      `Refusing to write empty or placeholder-like refactor-review prompt for ticket ${input.ticketId}. ` +
+        `Fill in the local-quality-signal brief and diff context before recording.`,
+    );
+  }
+  const relativePath = deriveRefactorReviewPromptPath(
+    input.reviewsDirPath,
+    input.ticketId,
+  );
+  const absolutePath = join(input.repoRoot, relativePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  const body = input.content.endsWith('\n')
+    ? input.content
+    : `${input.content}\n`;
+  writeFileSync(absolutePath, body, 'utf-8');
+  const writtenAt = (input.now ?? (() => new Date().toISOString()))();
+  return { absolutePath, relativePath, writtenAt };
+}
+
+/**
+ * Updates the P20.01 refactor-review ticket-state fields only. Deliberately
+ * does not touch `TicketState.status` — the refactor gate is not yet wired
+ * into the main ticket-status machine (that lands in ticket 20.03), so these
+ * commands must remain independently invocable without perturbing the
+ * existing `verified` -> `subagent_review_complete` transition owned by the
+ * adversarial gate.
+ */
+export function recordRefactorReviewOutcome(input: {
+  state: DeliveryState;
+  ticketId?: string;
+  outcome: SubagentRunnerOutcome;
+  reviewedHeadSha: string;
+  patchCommits?: InternalReviewPatchCommit[];
+  agentName?: string;
+  artifactPath?: string;
+  now?: () => string;
+}): DeliveryState {
+  const target =
+    (input.ticketId
+      ? input.state.tickets.find((t) => t.id === input.ticketId)
+      : input.state.tickets.find((t) => t.status === 'verified')) ?? undefined;
+  if (!target) {
+    throw new Error(
+      input.ticketId
+        ? `Unknown ticket ${input.ticketId}.`
+        : 'No ticket at verified status found to record refactor review.',
+    );
+  }
+  if (
+    input.outcome === 'patched' &&
+    (!input.patchCommits || input.patchCommits.length === 0)
+  ) {
+    throw new Error(
+      `Refactor review outcome "patched" for ${target.id} requires at least one patch commit.`,
+    );
+  }
+  const completedAt = (input.now ?? (() => new Date().toISOString()))();
+  return {
+    ...input.state,
+    tickets: input.state.tickets.map((t) =>
+      t.id === target.id
+        ? {
+            ...t,
+            refactorReviewOutcome: input.outcome,
+            refactorReviewCompletedAt: completedAt,
+            refactorReviewPatchCommits: input.patchCommits,
+            refactorReviewAgent: input.agentName,
+            refactorRunnerArtifactPath: input.artifactPath,
+            refactorReviewedHeadSha: input.reviewedHeadSha,
+          }
+        : t,
+    ),
+  };
 }
