@@ -851,6 +851,16 @@ export async function runDeliveryOrchestrator(
           console.log('Doc-only ticket — subagent review auto-skipped.');
           await saveState(cwd, nextState);
           console.log(formatStatus(nextState, context.config));
+          await emitNotificationWarnings(
+            notifier,
+            cwd,
+            eventsForSubagentReviewCommand(
+              nextState,
+              subagentTarget.id,
+              'skipped',
+              { terminatedReason: 'doc_only_auto_skip' },
+            ),
+          );
           return 0;
         }
 

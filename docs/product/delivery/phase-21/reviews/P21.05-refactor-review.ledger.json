@@ -28,9 +28,7 @@
       "primaryAgent": "claude",
       "findings": [],
       "probedSurfaces": [],
-      "patches": [
-        "b83b4c613601342f8a963f363e4a9171d20277ab"
-      ]
+      "patches": ["b83b4c613601342f8a963f363e4a9171d20277ab"]
     },
     {
       "runnerKind": "operator-recorder",
