@@ -9,6 +9,7 @@ import {
   emitOpenPrGate,
   emitPollReviewGate,
   emitRecordReviewGate,
+  emitRefactorReviewGate,
   emitSoaEventForOpenPr,
 } from '../cli-runner';
 import type { ResolvedOrchestratorConfig } from '../config';
@@ -98,6 +99,24 @@ describe('P17.03 — emitAdversarialReviewGate', () => {
 
       const gate = await readGate(home);
       expect(gate['gate']).toBe('adversarial_review');
+      expect(gate['plan_key']).toBe(PLAN_KEY);
+      expect(gate['ticket_id']).toBe('P17.03');
+    } finally {
+      delete process.env['CODOGOTCHI_HOME'];
+    }
+  });
+});
+
+describe('P17.03 — emitRefactorReviewGate', () => {
+  it('writes refactor_tdd with correct plan_key and ticket_id', async () => {
+    const home = makeTmpDir();
+    process.env['CODOGOTCHI_HOME'] = home;
+    try {
+      const ticket = makeTicket('P17.03', 'verified');
+      await emitRefactorReviewGate(ticket, enabledConfig(), PLAN_KEY);
+
+      const gate = await readGate(home);
+      expect(gate['gate']).toBe('refactor_tdd');
       expect(gate['plan_key']).toBe(PLAN_KEY);
       expect(gate['ticket_id']).toBe('P17.03');
     } finally {
