@@ -1030,6 +1030,11 @@ export async function runDeliveryOrchestrator(
           'runner_unavailable';
         let runnerOutputText: string | undefined;
         let runnerStdout: string | undefined;
+        // P21.02 — parsed once at decide-time and reused by the zero-parse
+        // loud-floor check below, instead of re-parsing the same report text.
+        let actionableFindingsCrossCheck:
+          | ReturnType<typeof parseActionableFindings>
+          | undefined;
         let runnerStderr: string | undefined;
         let runnerSelfReport: string | null = null;
 
@@ -1141,12 +1146,13 @@ export async function runDeliveryOrchestrator(
               // runner outcome so a completed run whose report lists
               // findings is never silently recorded as `clean`.
               const reportTextForCrossCheck = result.stdout ?? result.rawOutput;
+              actionableFindingsCrossCheck =
+                reportTextForCrossCheck !== undefined
+                  ? parseActionableFindings(reportTextForCrossCheck)
+                  : undefined;
               const decided = decideAdvisoryRunnerOutcome(result, {
                 runnerWroteFiles,
-                actionableFindings:
-                  reportTextForCrossCheck !== undefined
-                    ? parseActionableFindings(reportTextForCrossCheck)
-                    : undefined,
+                actionableFindings: actionableFindingsCrossCheck,
               });
               outcome = decided.outcome;
               terminatedReason = decided.terminatedReason;
@@ -1217,7 +1223,8 @@ export async function runDeliveryOrchestrator(
           const suspiciousRegions: string[] = [];
           if (
             isSuspiciousActionableFindingsParse(
-              parseActionableFindings(reportText),
+              actionableFindingsCrossCheck ??
+                parseActionableFindings(reportText),
             )
           ) {
             suspiciousRegions.push('<actionable-findings>');
