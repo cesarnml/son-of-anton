@@ -86,6 +86,44 @@ describe('P20.01 — <refactor-suggestions> tag parser', () => {
     expect(resultMisnamed.suggestions).toEqual([]);
     expect(isSuspiciousRefactorSuggestionsParse(resultMisnamed)).toBe(true);
   });
+
+  it('treats an empty closed body as suspicious, not explicit None', () => {
+    const markdown = ['<refactor-suggestions>', '</refactor-suggestions>'].join(
+      '\n',
+    );
+    const result = parseRefactorSuggestions(markdown);
+    expect(result.found).toBe(true);
+    expect(result.closed).toBe(true);
+    expect(result.isExplicitNone).toBe(false);
+    expect(result.suggestions).toEqual([]);
+    expect(isSuspiciousRefactorSuggestionsParse(result)).toBe(true);
+  });
+
+  it('treats an unclosed block as suspicious even when its body reads None', () => {
+    const markdown = ['<refactor-suggestions>', 'None'].join('\n');
+    const result = parseRefactorSuggestions(markdown);
+    expect(result.closed).toBe(false);
+    expect(result.isExplicitNone).toBe(false);
+    expect(isSuspiciousRefactorSuggestionsParse(result)).toBe(true);
+  });
+
+  it('treats the last of multiple tag occurrences as authoritative', () => {
+    const markdown = [
+      'Example skeleton to copy:',
+      '<refactor-suggestions>',
+      '- example placeholder suggestion',
+      '</refactor-suggestions>',
+      '',
+      'Actual report output:',
+      '<refactor-suggestions>',
+      'None',
+      '</refactor-suggestions>',
+    ].join('\n');
+
+    const result = parseRefactorSuggestions(markdown);
+    expect(result.isExplicitNone).toBe(true);
+    expect(result.suggestions).toEqual([]);
+  });
 });
 
 describe('P20.01 — refactor suggestion decision validation', () => {
@@ -118,6 +156,26 @@ describe('P20.01 — refactor suggestion decision validation', () => {
         decision: 'accepted',
       }),
     ).not.toThrow();
+  });
+
+  it('throws on a malformed id', () => {
+    expect(() =>
+      validateRefactorSuggestionDecision({
+        id: 'foo',
+        summary: 'extract duplicated retry logic',
+        decision: 'accepted',
+      }),
+    ).toThrow(/id/i);
+  });
+
+  it('throws on an invalid decision value', () => {
+    expect(() =>
+      validateRefactorSuggestionDecision({
+        id: 'R1',
+        summary: 'extract duplicated retry logic',
+        decision: 'ignored' as never,
+      }),
+    ).toThrow(/decision/i);
   });
 });
 
@@ -194,6 +252,37 @@ describe('P20.01 — refactor-review reconciliation', () => {
     expect(result.kind).toBe('patched');
     if (result.kind === 'patched') {
       expect(result.commitShas).toEqual(['sha-head']);
+    }
+  });
+
+  it('blocks (Condition A) when a labeled commit covers one reviewed path but an unlabeled commit changes another', () => {
+    const twoReviewedPaths = [
+      'tools/delivery/refactor-review.ts',
+      'tools/delivery/config.ts',
+    ];
+    const result = reconcileRefactorReview({
+      artifactRows: [],
+      reportMarkdown: reportWithSuggestions,
+      reviewedHeadSha: 'sha-reviewed',
+      headSha: 'sha-head',
+      reviewedPaths: twoReviewedPaths,
+      listCommitSubjects: () => [
+        {
+          sha: 'sha-labeled',
+          subject: 'refactor(P20.01): extract retry helper [refactor-review]',
+        },
+        { sha: 'sha-unlabeled', subject: 'fix: unrelated tweak' },
+      ],
+      listCommitFiles: (sha) =>
+        sha === 'sha-labeled'
+          ? ['tools/delivery/refactor-review.ts']
+          : ['tools/delivery/config.ts'],
+      listChangedPathsInRange: () => twoReviewedPaths,
+    });
+
+    expect(result.kind).toBe('blocked');
+    if (result.kind === 'blocked') {
+      expect(result.condition).toBe('A');
     }
   });
 

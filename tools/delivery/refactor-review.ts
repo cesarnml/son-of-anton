@@ -40,17 +40,30 @@ export type RefactorSuggestionDecision = {
  * always carries an audit-visible rationale for suggestions the primary
  * agent did not accept.
  */
+const VALID_DECISION_VALUES: readonly RefactorSuggestionDecisionValue[] = [
+  'accepted',
+  'rejected',
+  'deferred',
+];
+
+const SUGGESTION_ID_PATTERN = /^R[1-9]\d*$/;
+
 export function validateRefactorSuggestionDecision(
   row: RefactorSuggestionDecision,
 ): void {
-  if (!row.id || row.id.trim() === '') {
+  if (!row.id || !SUGGESTION_ID_PATTERN.test(row.id)) {
     throw new Error(
-      'Refactor suggestion decision requires a non-blank id (e.g. "R1").',
+      `Refactor suggestion decision id "${String(row.id)}" is invalid. Expected the form "R1", "R2", ...`,
     );
   }
   if (!row.summary || row.summary.trim() === '') {
     throw new Error(
       `Refactor suggestion decision ${row.id} requires a non-blank summary.`,
+    );
+  }
+  if (!VALID_DECISION_VALUES.includes(row.decision)) {
+    throw new Error(
+      `Refactor suggestion decision ${row.id} has invalid decision "${String(row.decision)}". Expected one of: ${VALID_DECISION_VALUES.join(', ')}`,
     );
   }
   if (
@@ -79,11 +92,20 @@ export type RefactorSuggestionsParseResult = {
  * report. Barebones and strict by design: no heading recognition, no
  * terminator regex — the tag boundary is the only signal.
  *
+ * When more than one `<refactor-suggestions>` open tag appears (e.g. a
+ * template skeleton example quoted earlier in the report), the **last**
+ * occurrence is treated as authoritative — a report's real output section
+ * follows any quoted example, not the other way around.
+ *
  * - Tagged block with bullets: `found=true, closed=true, suggestions=[...]`.
- * - Literal `None` body: `isExplicitNone=true, suggestions=[]` (clean, not a
- *   drift warning).
+ * - Literal `None` body (only when the tag is properly closed): `closed=true,
+ *   isExplicitNone=true, suggestions=[]` — clean, not a drift warning.
  * - Missing close tag: `closed=false`, parses everything after the open tag
- *   to end-of-file.
+ *   to end-of-file. Always treated as suspicious regardless of body content —
+ *   the parser contract requires a balanced block before a `None` body can be
+ *   trusted as an honest clean signal.
+ * - Empty body (no content at all) is distinct from the literal `None` and is
+ *   never `isExplicitNone` — a genuinely clean report must say so explicitly.
  * - Tag missing or misnamed entirely: `found=false, suggestions=[]` — a
  *   0-parse the caller should treat as suspicious, distinct from a genuine
  *   clean `None` report.
@@ -91,8 +113,8 @@ export type RefactorSuggestionsParseResult = {
 export function parseRefactorSuggestions(
   markdown: string,
 ): RefactorSuggestionsParseResult {
-  const openMatch = OPEN_TAG.exec(markdown);
-  if (!openMatch) {
+  const openMatches = [...markdown.matchAll(new RegExp(OPEN_TAG, 'gi'))];
+  if (openMatches.length === 0) {
     return {
       found: false,
       closed: false,
@@ -100,8 +122,11 @@ export function parseRefactorSuggestions(
       suggestions: [],
     };
   }
+  const openMatch = openMatches[openMatches.length - 1]!;
 
-  const afterOpen = markdown.slice(openMatch.index + openMatch[0].length);
+  const afterOpen = markdown.slice(
+    (openMatch.index ?? 0) + openMatch[0].length,
+  );
   const closeMatch = CLOSE_TAG.exec(afterOpen);
   const closed = closeMatch !== null;
   const body = closed ? afterOpen.slice(0, closeMatch.index) : afterOpen;
@@ -113,8 +138,12 @@ export function parseRefactorSuggestions(
     .join('\n')
     .trim();
 
-  if (normalized === '' || /^none\.?$/i.test(normalized)) {
+  if (closed && /^none\.?$/i.test(normalized)) {
     return { found: true, closed, isExplicitNone: true, suggestions: [] };
+  }
+
+  if (normalized === '') {
+    return { found: true, closed, isExplicitNone: false, suggestions: [] };
   }
 
   const bulletLines = normalized
@@ -131,13 +160,14 @@ export function parseRefactorSuggestions(
 
 /**
  * True when the parse result should be treated as a silent-drift warning at
- * record time: the tag was missing/misnamed, or the tag was present but
- * yielded zero bullets without the literal `None` clean-signal.
+ * record time: the tag was missing/misnamed, the closing tag was absent, or
+ * the tag was present but yielded zero bullets without the literal `None`
+ * clean-signal.
  */
 export function isSuspiciousRefactorSuggestionsParse(
   result: RefactorSuggestionsParseResult,
 ): boolean {
-  if (!result.found) return true;
+  if (!result.found || !result.closed) return true;
   return result.suggestions.length === 0 && !result.isExplicitNone;
 }
 
@@ -214,6 +244,12 @@ export function reconcileRefactorReview(input: {
   | { kind: 'clean' }
   | { kind: 'patched'; commitShas: string[] }
   | { kind: 'blocked'; condition: 'A' | 'B'; message: string } {
+  const hasDeferredRowForSha = input.artifactRows.some(
+    (row) =>
+      row.outcome === 'deferred' &&
+      row.reviewedHeadSha === input.reviewedHeadSha,
+  );
+
   const labeledShas = detectRefactorReviewLabeledCommits({
     reviewedHeadSha: input.reviewedHeadSha,
     headSha: input.headSha,
@@ -221,29 +257,36 @@ export function reconcileRefactorReview(input: {
     listCommitSubjects: input.listCommitSubjects,
     listCommitFiles: input.listCommitFiles,
   });
-  if (labeledShas.length > 0) {
-    return { kind: 'patched', commitShas: labeledShas };
-  }
-
-  const hasDeferredRowForSha = input.artifactRows.some(
-    (row) =>
-      row.outcome === 'deferred' &&
-      row.reviewedHeadSha === input.reviewedHeadSha,
-  );
 
   const changedInRange =
     input.reviewedHeadSha === input.headSha
       ? []
       : input.listChangedPathsInRange(input.reviewedHeadSha, input.headSha);
   const reviewedSet = new Set(input.reviewedPaths);
-  const reviewedPathTouched = changedInRange.some((p) => reviewedSet.has(p));
+  const reviewedPathsChanged = changedInRange.filter((p) => reviewedSet.has(p));
 
-  if (reviewedPathTouched && !hasDeferredRowForSha) {
-    return {
-      kind: 'blocked',
-      condition: 'A',
-      message: REFACTOR_RECONCILIATION_BLOCKED_MESSAGE_A,
-    };
+  if (reviewedPathsChanged.length > 0 && !hasDeferredRowForSha) {
+    // Every changed reviewed path must be covered by a labeled commit —
+    // one qualifying commit does not vouch for reviewed-path changes made
+    // by a *different*, unlabeled commit in the same range.
+    const coveredPaths = new Set<string>();
+    for (const sha of labeledShas) {
+      for (const f of input.listCommitFiles(sha)) coveredPaths.add(f);
+    }
+    const uncoveredReviewedPaths = reviewedPathsChanged.filter(
+      (p) => !coveredPaths.has(p),
+    );
+    if (uncoveredReviewedPaths.length > 0) {
+      return {
+        kind: 'blocked',
+        condition: 'A',
+        message: REFACTOR_RECONCILIATION_BLOCKED_MESSAGE_A,
+      };
+    }
+  }
+
+  if (labeledShas.length > 0) {
+    return { kind: 'patched', commitShas: labeledShas };
   }
 
   const parsed = parseRefactorSuggestions(input.reportMarkdown);

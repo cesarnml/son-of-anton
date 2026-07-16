@@ -117,6 +117,7 @@ export type TicketState = TicketDefinition & {
   refactorRunnerArtifactPath?: string;
   refactorReviewPromptPath?: string;
   refactorReviewPromptWrittenAt?: string;
+  refactorReviewedHeadSha?: string;
   docOnly?: boolean;
   prNumber?: number;
   prUrl?: string;
