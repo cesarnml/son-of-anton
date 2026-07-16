@@ -44,8 +44,8 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `formatDeferredRefactorSuggestions` not exported from `tools/delivery/refactor-review.ts`.
+Why this path: split the surfacing logic into two pure functions (`extractDeferredRefactorReviewRows`, `formatDeferredRefactorSuggestions`) plus a thin CLI-side I/O wrapper (`printDeferredRefactorSuggestionsForAdvance`), matching the repo's convention of unit-testing the pure logic directly rather than the CLI dispatch switch. `formatDeferredRefactorSuggestions` returns `undefined` (not `''`) for zero rows specifically so the caller's `if (message)` check suppresses output correctly.
+Alternative considered: making `advance` always print a "Refactor review: N deferred suggestions" line even when N=0, for consistency with other always-present status fields. Rejected per the ticket's own Review Focus — a chatty `advance` regardless of policy is explicitly the failure mode this ticket exists to avoid, not just for the zero-deferred case but for tickets where the gate never ran at all.
+Deferred: nothing beyond what tickets 20.01–20.03 already deferred (`runner_on_red_strict`, automated follow-up ticket creation, pilot-metrics tooling).
+Contract note: none — `Type:` and `Scope:` match the implementation plan.
