@@ -260,19 +260,73 @@ export function coerceCodexCliClassification(input: {
   };
 }
 
-function parseRunnerStatusTrailer(stdout: string): string | null {
-  const lines = stdout
+const RUNNER_TERMINATION_OPEN_TAG = /<runner-termination>/i;
+const RUNNER_TERMINATION_CLOSE_TAG = /<\/runner-termination>/i;
+
+export type RunnerTerminationParseResult = {
+  /** Whether an opening `<runner-termination>` tag was found at all. */
+  found: boolean;
+  /** Whether a matching closing tag was found (false = parsed to EOF). */
+  closed: boolean;
+  /** The `runnerStatus:` value found inside the tag, if any. */
+  runnerStatus: string | null;
+};
+
+/**
+ * P21.01 — `runnerStatus` is read exclusively from a balanced
+ * `<runner-termination>` tag block, per
+ * `notes/public/subagent-report-parser-contract.md`. A bare `runnerStatus:`
+ * line in the surrounding prose (outside the tag) is no longer trusted — the
+ * old tail-scanning heuristic let runner-status prose from anywhere in the
+ * last 50 non-empty lines leak into classification. When more than one open
+ * tag appears, the last occurrence is authoritative (mirrors
+ * `parseRefactorSuggestions` / `parseActionableFindings`).
+ */
+export function parseRunnerTermination(
+  stdout: string,
+): RunnerTerminationParseResult {
+  const openMatches = [
+    ...stdout.matchAll(new RegExp(RUNNER_TERMINATION_OPEN_TAG, 'gi')),
+  ];
+  if (openMatches.length === 0) {
+    return { found: false, closed: false, runnerStatus: null };
+  }
+  const openMatch = openMatches[openMatches.length - 1]!;
+
+  const afterOpen = stdout.slice((openMatch.index ?? 0) + openMatch[0].length);
+  const closeMatch = RUNNER_TERMINATION_CLOSE_TAG.exec(afterOpen);
+  const closed = closeMatch !== null;
+  const body = closed ? afterOpen.slice(0, closeMatch.index) : afterOpen;
+
+  const lines = body
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  const tail = lines.slice(-50);
-  for (let i = tail.length - 1; i >= 0; i -= 1) {
-    const match = /^runnerStatus\s*:\s*(.+)$/i.exec(tail[i]!);
+  let runnerStatus: string | null = null;
+  for (const line of lines) {
+    const match = /^runnerStatus\s*:\s*(.+)$/i.exec(line);
     if (match) {
-      return match[1]!.trim();
+      runnerStatus = match[1]!.trim();
+      break;
     }
   }
-  return null;
+  return { found: true, closed, runnerStatus };
+}
+
+/**
+ * True when the `<runner-termination>` tag is missing or unclosed — the
+ * record-time loud floor's third machine-read region, symmetric to
+ * `isSuspiciousActionableFindingsParse` / `isSuspiciousAdvisoryObservationsParse`
+ * in `reconciliation.ts`.
+ */
+export function isSuspiciousRunnerTerminationParse(
+  result: RunnerTerminationParseResult,
+): boolean {
+  return !result.found || !result.closed;
+}
+
+function parseRunnerStatusTrailer(stdout: string): string | null {
+  return parseRunnerTermination(stdout).runnerStatus;
 }
 
 // Authentic rate-limit signal for codex-cli — derived from structured tokens

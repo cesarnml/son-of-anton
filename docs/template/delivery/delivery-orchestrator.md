@@ -55,7 +55,7 @@ Phase 14 makes the subagent-review ledger semantically honest. Operator-facing d
 - **Outcome vocabulary:** ledger rows use `clean | patched | deferred | skipped` reflecting what the primary agent actually did after the advisory pass.
 - **Reconciliation:** `reconcile-subagent-review` runs after `subagent-review` and before `open-pr`. It detects silent lies (unlabeled post-review edits, actionable findings with no patch or deferral) and exits non-zero with named resolution paths. `open-pr` invokes the same gate and accepts `--ack-reconciliation <patched|deferred|clean>` as an operator escape valve.
 - **Deferral:** `subagent-review record-deferred --reason "<rationale>"` appends a `deferred` row when findings are consciously not patched.
-- **Advisory observations:** non-blocking off-scope-but-real notes belong under the `Advisory Observations` report section, not the blocking `Actionable findings` section. The old `Findings for human review` wording is legacy terminology for this same non-blocking lane.
+- **Advisory observations:** non-blocking off-scope-but-real notes belong under the `<advisory-observations>` tagged region, not the blocking `<actionable-findings>` region. Both regions are balanced tag blocks per `notes/public/subagent-report-parser-contract.md` — there is no heading-format fallback.
 - **Adversarial prompt prologue:** broadening clauses (extra surfaces, advisory-observation bucket) appear before the narrowing "not a general code review" anchor in `adversarial-review-template.md`.
 
 ### Programmatic subagent runners
@@ -353,7 +353,7 @@ triage, the primary agent reads each parsed advisory observation, decides
 whether it is prudent to fix, and **applies patches directly to the configured
 `closeoutBranch`** where prudent. The `triage-advisory-observations` command itself is a state
 recorder — it scans completed subagent-review report sidecars, parses the
-`Advisory Observations` section (excluding `Actionable findings`), aligns
+`<advisory-observations>` tagged region (excluding `<actionable-findings>`), aligns
 the parsed observations with the operator's explicit dispositions, and
 writes the triage artifact at
 `docs/product/delivery/<phase>/advisory-observation-triage.json`. The
@@ -393,9 +393,24 @@ that lands in `docs/product/delivery/<phase>/`.
 
 Closeout/status summaries may warn when advisory observations are untriaged or
 when clean/completed subagent-review evidence is suspiciously missing or empty.
-Those warnings preserve the boundary: `Actionable findings` still govern
-pre-PR reconciliation blockers, while `Advisory Observations` require later
+Those warnings preserve the boundary: `<actionable-findings>` still governs
+pre-PR reconciliation blockers, while `<advisory-observations>` requires later
 operator disposition.
+
+**Consumer upgrade rule.** `parseActionableFindings` and
+`parseAdvisoryObservations` (`tools/delivery/reconciliation.ts`) read only
+the tagged contract (`<actionable-findings>`, `<advisory-observations>`) —
+there is no legacy heading-format fallback (see
+`notes/public/subagent-report-parser-contract.md`). This means a phase's
+`subagent-review` reports and its post-phase `triage-advisory-observations`
+pass must be read by the **same** parser version. **Do not update
+son-of-anton's own delivery tooling between a phase's first
+`subagent-review` invocation and its `triage-advisory-observations` run.**
+Upgrading mid-phase risks a parser that no longer recognizes reports written
+under the prior contract, which reads as a silent 0-parse rather than an
+upgrade error. Land tooling upgrades either before a phase's first
+`subagent-review`, or after its `triage-advisory-observations` has recorded
+the triage artifact.
 
 ## Ticket Context Reset
 
@@ -573,7 +588,7 @@ bun run deliver --plan <plan> reconcile-subagent-refactor-review
 
 **Ledger shape:** suggestion decisions record `id` (`R1`, `R2`, …), `summary`, `decision` (`accepted` / `rejected` / `deferred`), and `reason` (required for `rejected`/`deferred`). Deferred suggestions surface again at the next `advance` so they are not silently lost (see ticket 20.04).
 
-**Parser independence:** the `<refactor-suggestions>` tag parser (`tools/delivery/refactor-review.ts`) is a new, separate module from the adversarial gate's heading-based `parseAdvisoryObservations`/`extractReportSection` (`tools/delivery/reconciliation.ts`). The two gates' parsing logic do not share code and are not migrated toward each other by this feature.
+**Parser independence:** the `<refactor-suggestions>` tag parser (`tools/delivery/refactor-review.ts`) is a separate module from the adversarial gate's `<actionable-findings>`/`<advisory-observations>` tag parser (`tools/delivery/reconciliation.ts`, P21.01). Both are tag-based per `notes/public/subagent-report-parser-contract.md`, but the two gates' parsing logic do not share code and are not migrated toward each other by this feature.
 
 ## Subagent adversarial review (ticket stacks)
 

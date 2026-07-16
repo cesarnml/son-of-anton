@@ -98,9 +98,10 @@ path instead.
 After closeout lands a phase on the configured closeout branch, run
 `/soa triage-advisory-observations phase-N` before starting the next phase.
 That post-phase lane records explicit dispositions for non-blocking
-`Advisory Observations` from subagent-review reports. It does not patch source
-files and does not replace the blocking `Actionable findings` reconciliation
-gate.
+`<advisory-observations>` from subagent-review reports (a balanced tag block,
+per `notes/public/subagent-report-parser-contract.md`). It does not patch
+source files and does not replace the blocking `<actionable-findings>`
+reconciliation gate.
 
 For small, verified fixes that surface a review gap worth capturing, use
 `/soa quality-control phase-N: <description>` (or `/soa qc` for short). This
