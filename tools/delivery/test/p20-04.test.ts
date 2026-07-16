@@ -43,6 +43,32 @@ describe('P20.04 — extractDeferredRefactorReviewRows', () => {
     });
     expect(rows[0]!.reason).toBe('(no reason recorded)');
   });
+
+  it('degrades to no rows for structurally corrupt (but valid-JSON) artifacts, never throws', () => {
+    expect(extractDeferredRefactorReviewRows(null)).toEqual([]);
+    expect(extractDeferredRefactorReviewRows(42)).toEqual([]);
+    expect(extractDeferredRefactorReviewRows({})).toEqual([]);
+    expect(extractDeferredRefactorReviewRows({ invocations: null })).toEqual(
+      [],
+    );
+    expect(extractDeferredRefactorReviewRows({ invocations: {} })).toEqual([]);
+    expect(
+      extractDeferredRefactorReviewRows({ invocations: [null, 42, 'x'] }),
+    ).toEqual([]);
+  });
+
+  it('falls back to a placeholder reason when findings[0] is not a string', () => {
+    const rows = extractDeferredRefactorReviewRows({
+      invocations: [
+        {
+          outcome: 'deferred',
+          reviewedHeadSha: 'sha-1',
+          findings: [42, 'ignored'],
+        },
+      ],
+    });
+    expect(rows[0]!.reason).toBe('(no reason recorded)');
+  });
 });
 
 describe('P20.04 — formatDeferredRefactorSuggestions', () => {
