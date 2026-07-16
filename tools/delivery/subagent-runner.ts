@@ -746,10 +746,13 @@ export function tryRunner(
  * whose `terminatedReason` shows the runner spawned but produced no usable
  * review (`runner_failed`, `rate_limit`, `sandbox_denied` — the issue #105
  * case). A `ran` attempt with `terminatedReason: 'completed'` never advances
- * — that is a genuinely completed review. `advisory_violation` is decided
- * after the fallback loop (from write detection, not `terminatedReason`), so
- * it never reaches this check; the loop already stops on it via the
- * 'completed' path.
+ * — that is a genuinely completed review. An attempt that wrote files
+ * (`outcome: 'patched'`) never advances either, regardless of
+ * `terminatedReason` — a write is an advisory-only contract violation, and a
+ * later successful fallback must not mask it (the caller derives its own
+ * `advisory_violation` outcome from the same write signal after this
+ * function returns `false`, exactly as it does for a plain completed+write
+ * result).
  */
 export function shouldFallbackToOtherRunner(
   result: RunnerAttemptResult,
@@ -757,7 +760,7 @@ export function shouldFallbackToOtherRunner(
   if (result.status === 'unavailable' || result.status === 'timeout') {
     return true;
   }
-  if (result.status === 'ran') {
+  if (result.status === 'ran' && result.outcome !== 'patched') {
     return (
       result.terminatedReason === 'runner_failed' ||
       result.terminatedReason === 'rate_limit' ||

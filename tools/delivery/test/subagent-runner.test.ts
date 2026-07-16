@@ -639,6 +639,25 @@ describe('P21.03 — fallback advances on ran-but-failed runners', () => {
     expect(calls).toEqual(['codex-cli', 'claude-cli', 'cursor-cli']);
   });
 
+  it('does not advance when the first attempt wrote files even though it also classified as runner_failed — a write violation must not be masked by a later successful fallback', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli'
+        ? {
+            status: 'ran' as const,
+            outcome: 'patched' as const,
+            terminatedReason: 'runner_failed' as const,
+          }
+        : ranWith('completed');
+    });
+    expect(result.ranKind).toBe('codex-cli');
+    expect(result.fallbackFrom).toBeNull();
+    expect(result.fallbackLevel).toBe('preferred');
+    expect(calls).toEqual(['codex-cli']);
+  });
+
   it('a genuinely completed ran result still returns immediately with no fallback', () => {
     expect(runSubagentWithFallback).toBeDefined();
     const calls: string[] = [];
