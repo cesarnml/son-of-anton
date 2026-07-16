@@ -63,18 +63,47 @@ export function parsePlan(
  * one-element array — single-line plans parse identically to today.
  */
 export function parseOriginIssueNumbers(markdown: string): number[] {
-  // Epic-scoped only, per the documented contract — no whole-document
-  // fallback when `## Epic` is absent (a phase's `## Epic` section is
-  // required by preflight; a stray `Origin issue:` line elsewhere in the
-  // doc must not silently count).
-  const epicSection =
-    markdown.match(/## Epic\s+([\s\S]*?)\n## /)?.[1] ??
-    markdown.match(/## Epic\s+([\s\S]*)$/)?.[1] ??
-    '';
+  const epicSection = extractEpicSection(markdown);
   const matches = [
     ...epicSection.matchAll(/^Origin issue:\s*#(\d+)\s*$/gm),
   ].map((match) => Number(match[1]));
   return [...new Set(matches)];
+}
+
+/**
+ * P21.06 — Epic-scoped only, per the documented contract: no whole-document
+ * fallback when `## Epic` is absent (a phase's `## Epic` section is
+ * required by preflight; a stray `Origin issue:` line elsewhere in the doc
+ * must not silently count). Fence-aware: a `## `-looking line inside a
+ * ` ``` `/`~~~` fenced code block does not end the section — only a real
+ * heading line does.
+ */
+function extractEpicSection(markdown: string): string {
+  const lines = markdown.split('\n');
+  const startIndex = lines.findIndex((line) => /^## Epic\s*$/.test(line));
+  if (startIndex === -1) return '';
+
+  const collected: string[] = [];
+  let fenceChar: string | undefined;
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    const fenceMatch = line.match(/^\s*([`~]{3,})/);
+    if (fenceMatch) {
+      const char = fenceMatch[1]!.charAt(0);
+      if (!fenceChar) {
+        fenceChar = char;
+      } else if (char === fenceChar) {
+        fenceChar = undefined;
+      }
+      collected.push(line);
+      continue;
+    }
+    if (!fenceChar && /^## /.test(line)) {
+      break;
+    }
+    collected.push(line);
+  }
+  return collected.join('\n');
 }
 
 export function derivePlanKey(planPath: string): string {

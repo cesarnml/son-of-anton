@@ -46,6 +46,14 @@ describe('planning', () => {
     ).toEqual([78, 83]);
   });
 
+  it('does not truncate the Epic section at a heading-like line inside a fenced code block', () => {
+    expect(
+      parseOriginIssueNumbers(
+        '## Epic\n\nOrigin issue: #78\n\n```\n## fake heading inside a fence\n```\n\nOrigin issue: #83\n\n## Product contract\n',
+      ),
+    ).toEqual([78, 83]);
+  });
+
   it('rejects near-miss formats — strictness is preserved', () => {
     expect(
       parseOriginIssueNumbers(
