@@ -205,6 +205,16 @@ export type DeliveryNotificationEvent =
       prUrl?: string;
     }
   | {
+      kind: 'subagent_review_recorded';
+      planKey: string;
+      ticketId: string;
+      ticketTitle: string;
+      branch: string;
+      outcome: SubagentRunnerOutcome;
+      terminatedReason?: string;
+      findingsCount?: number;
+    }
+  | {
       kind: 'ticket_completed';
       planKey: string;
       ticketId: string;

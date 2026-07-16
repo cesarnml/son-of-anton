@@ -84,6 +84,7 @@ import {
   eventsForReconcileLateReviewCommand,
   eventsForRecordReviewCommand,
   eventsForStartCommand,
+  eventsForSubagentReviewCommand,
   formatReviewWindowMessage,
   resolveNotifier,
   type DeliveryNotifier,
@@ -946,6 +947,15 @@ export async function runDeliveryOrchestrator(
           );
           await saveState(cwd, nextState);
           console.log(formatStatus(nextState, context.config));
+          await emitNotificationWarnings(
+            notifier,
+            cwd,
+            eventsForSubagentReviewCommand(
+              nextState,
+              subagentTarget.id,
+              dispatch.outcome,
+            ),
+          );
           return 0;
         }
 
@@ -1333,6 +1343,24 @@ export async function runDeliveryOrchestrator(
         }
         await saveState(cwd, nextState);
         console.log(formatStatus(nextState, context.config));
+        await emitNotificationWarnings(
+          notifier,
+          cwd,
+          eventsForSubagentReviewCommand(
+            nextState,
+            subagentTarget.id,
+            outcome,
+            {
+              ...(outcome === 'skipped' ? { terminatedReason } : {}),
+              ...(outcome === 'completed_with_findings'
+                ? {
+                    findingsCount:
+                      actionableFindingsCrossCheck?.findings.length ?? 0,
+                  }
+                : {}),
+            },
+          ),
+        );
         return 0;
       }
       case 'reconcile-subagent-review': {
