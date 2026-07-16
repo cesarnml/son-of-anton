@@ -167,6 +167,7 @@ import {
   isValidRefactorReviewPromptContent,
   reconcileRefactorReview,
   recordRefactorReviewOutcome,
+  requiresRefactorReviewBeforeAdversarial,
   writeRefactorReviewPrompt,
 } from './refactor-review';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -626,6 +627,35 @@ export async function runDeliveryOrchestrator(
           );
         }
 
+        const writeIsDocOnly = isPlatformLocalBranchDocOnly(
+          writeTarget.worktreePath,
+          writeTarget.baseBranch,
+          context.config.runtime,
+        );
+
+        // P20.03: the refactor gate (write-subagent-refactor-review ->
+        // subagent-refactor-review -> reconcile-subagent-refactor-review)
+        // runs after post-verify and before this step, but only when
+        // refactorReview is "runner_on_red" AND the ticket is `Red: required`
+        // AND not doc-only — reusing the adversarial gate's own doc-only
+        // detection rather than reimplementing it. `refactorReview:
+        // "disabled"` (the repo default) must leave this precondition check
+        // a no-op so today's adversarial-only flow is byte-for-byte
+        // unchanged.
+        if (
+          requiresRefactorReviewBeforeAdversarial({
+            refactorReviewPolicy: context.config.reviewPolicy.refactorReview,
+            redPolicy: writeTarget.redPolicy,
+            isDocOnly: writeIsDocOnly,
+            refactorReviewOutcome: writeTarget.refactorReviewOutcome,
+          })
+        ) {
+          throw new Error(
+            `Ticket ${writeTarget.id} requires the refactor-review gate before write-subagent-adversarial-review under refactorReview: "runner_on_red". ` +
+              `Run write-subagent-refactor-review -> subagent-refactor-review -> reconcile-subagent-refactor-review first.`,
+          );
+        }
+
         const writePolicy = context.config.reviewPolicy.subagentReview;
         if (writePolicy === 'disabled') {
           throw new Error(
@@ -633,11 +663,6 @@ export async function runDeliveryOrchestrator(
           );
         }
 
-        const writeIsDocOnly = isPlatformLocalBranchDocOnly(
-          writeTarget.worktreePath,
-          writeTarget.baseBranch,
-          context.config.runtime,
-        );
         if (writePolicy === 'skip_doc_only' && writeIsDocOnly) {
           throw new Error(
             `Ticket ${writeTarget.id} is doc-only under skip_doc_only — subagent review auto-skips and no adversarial prompt is required. Run subagent-review next.`,
