@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   decideAdvisoryRunnerOutcome,
+  decideSubagentOutcomeFromRunner,
   validateRunnerArtifact,
 } from '../subagent-runner';
 import type {
@@ -86,6 +87,26 @@ describe('P21.02 — completed_with_findings cross-check', () => {
     const decided = decideAdvisoryRunnerOutcome(ranResult(), {
       runnerWroteFiles: false,
     });
+
+    expect(decided.outcome).toBe('clean');
+  });
+
+  it('decideSubagentOutcomeFromRunner (deprecated recorder path) also cross-checks findings', () => {
+    const report = [
+      '<actionable-findings>',
+      '- unchecked null deref in handler',
+      '</actionable-findings>',
+    ].join('\n');
+
+    const decided = decideSubagentOutcomeFromRunner(ranResult(), {
+      actionableFindings: parseActionableFindings(report),
+    });
+
+    expect(decided.outcome).toBe('completed_with_findings');
+  });
+
+  it('decideSubagentOutcomeFromRunner still records clean with no findings info supplied', () => {
+    const decided = decideSubagentOutcomeFromRunner(ranResult());
 
     expect(decided.outcome).toBe('clean');
   });
