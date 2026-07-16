@@ -1,6 +1,6 @@
 # Phase 21: Subagent-Review Contract and Runner Fidelity
 
-**Delivery status:** Product plan approved — decomposition in progress.
+**Delivery status:** Decomposition complete, preflight PASS — ready for `/soa execute phase-21`.
 
 Origin issue: #78
 Origin issue: #83
