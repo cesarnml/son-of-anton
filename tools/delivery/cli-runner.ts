@@ -160,6 +160,7 @@ import {
   tryReadSubagentRunnerArtifact,
   tryRunner,
   writeSubagentReviewOutcome,
+  type ResolvedRunnerOptions,
   type SubagentRunnerTerminatedReason,
 } from './subagent-runner';
 import {
@@ -1043,10 +1044,7 @@ export async function runDeliveryOrchestrator(
         // P21.04 — resolved per the attempt actually spawned; overwritten
         // each loop iteration so it reflects whichever kind's iteration ran
         // last (the winning kind on success, or the final failed attempt).
-        let resolvedRunnerOptionsForAttempt: {
-          model?: string;
-          effort?: string;
-        } = {};
+        let resolvedRunnerOptionsForAttempt: ResolvedRunnerOptions = {};
 
         const fallbackOutcome = runSubagentWithFallback(
           subagentSelection.kind,
@@ -1204,8 +1202,7 @@ export async function runDeliveryOrchestrator(
           },
         );
 
-        const usedRunner: 'claude-cli' | 'codex-cli' | 'skipped' =
-          fallbackOutcome.ranKind;
+        const usedRunner = fallbackOutcome.ranKind;
         const fallbackLevel = fallbackOutcome.fallbackLevel;
         const fallbackFrom = fallbackOutcome.fallbackFrom;
 
