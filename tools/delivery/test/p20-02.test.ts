@@ -245,4 +245,70 @@ describe('P20.02 — runProgrammaticSubagentReview (generic runner core reuse)',
     expect(result.usedRunner).toBe('skipped');
     expect(result.outcome).toBe('skipped');
   });
+
+  it('detects a rewrite of an already-dirty path via the worktree fingerprint', () => {
+    let fingerprintCall = 0;
+    const result = runProgrammaticSubagentReview({
+      requestedRunner: 'codex-cli',
+      reviewPrompt: SUBSTANTIVE_PROMPT,
+      worktreePath: '/tmp/p20_02',
+      spawn: () => ({ status: 0, stdout: 'clean review', stderr: '' }),
+      readHeadSha: () => 'sha-fixed',
+      // Same dirty path before and after — path-membership alone sees no
+      // change, but the file's content changed underneath it.
+      listDirtyPaths: () => ['already/dirty.ts'],
+      listDiffPaths: () => [],
+      readWorktreeFingerprint: () => {
+        fingerprintCall += 1;
+        return fingerprintCall === 1
+          ? 'fingerprint-before'
+          : 'fingerprint-after';
+      },
+      classify: () => ({
+        terminatedReason: 'completed',
+        runnerSelfReport: 'completed',
+      }),
+    });
+
+    expect(result.runnerWroteFiles).toBe(true);
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('advisory_violation');
+  });
+
+  it('detects writes made by a runner that timed out before a successful fallback', () => {
+    let spawnCall = 0;
+    let dirtyPathsCall = 0;
+    const result = runProgrammaticSubagentReview({
+      requestedRunner: 'codex-cli',
+      reviewPrompt: SUBSTANTIVE_PROMPT,
+      worktreePath: '/tmp/p20_02',
+      spawn: () => {
+        spawnCall += 1;
+        if (spawnCall === 1) {
+          // First attempt (codex-cli) times out after writing a file.
+          return { status: null, signal: 'SIGTERM', stdout: '', stderr: '' };
+        }
+        // Fallback attempt (claude-cli) completes cleanly.
+        return { status: 0, stdout: 'clean review', stderr: '' };
+      },
+      readHeadSha: () => 'sha-fixed',
+      listDirtyPaths: () => {
+        dirtyPathsCall += 1;
+        // Only the very first call (the pre-loop snapshot) is clean. Every
+        // call after that — including the timed-out attempt's own pre-run
+        // snapshot — sees the file the timed-out process left behind,
+        // since nothing cleans it up before the whole-invocation check.
+        return dirtyPathsCall === 1 ? [] : ['left-behind.ts'];
+      },
+      listDiffPaths: () => [],
+      classify: () => ({
+        terminatedReason: 'completed',
+        runnerSelfReport: 'completed',
+      }),
+    });
+
+    expect(result.runnerWroteFiles).toBe(true);
+    expect(result.outcome).toBe('skipped');
+    expect(result.terminatedReason).toBe('advisory_violation');
+  });
 });
