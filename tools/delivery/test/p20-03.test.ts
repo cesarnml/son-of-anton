@@ -1,9 +1,29 @@
 import { describe, expect, it } from 'bun:test';
 
-import { requiresRefactorReviewBeforeAdversarial } from '../refactor-review';
+import {
+  isRefactorGateEligible,
+  requiresRefactorReviewBeforeAdversarial,
+} from '../refactor-review';
 import { openPullRequest } from '../orchestrator';
+import { resolveNextCommand } from '../format';
 import type { DeliveryOrchestratorContext } from '../context';
 import type { DeliveryState } from '../types';
+import type { ResolvedOrchestratorConfig } from '../runtime-config';
+
+const baseConfig: ResolvedOrchestratorConfig = {
+  defaultBranch: 'main',
+  deliveryBaseBranch: 'main',
+  closeoutBranch: 'main',
+  planRoot: 'docs',
+  runtime: 'bun',
+  packageManager: 'bun',
+  ticketBoundaryMode: 'cook',
+  reviewPolicy: {
+    subagentReview: 'skip_doc_only',
+    prReview: 'skip_doc_only',
+    refactorReview: 'runner_on_red',
+  },
+};
 
 describe('P20.03 — requiresRefactorReviewBeforeAdversarial gate-placement predicate', () => {
   it('is true for a Red:required, non-doc-only ticket under runner_on_red with no recorded outcome', () => {
@@ -134,6 +154,145 @@ function makeContext(
     invocation: 'bun run deliver',
   } as unknown as DeliveryOrchestratorContext;
 }
+
+describe('P20.03 — isRefactorGateEligible (shared eligibility for status routing and CLI command guards)', () => {
+  it('is true for a Red:required, non-doc-only ticket under runner_on_red', () => {
+    expect(
+      isRefactorGateEligible({
+        refactorReviewPolicy: 'runner_on_red',
+        redPolicy: 'required',
+        isDocOnly: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('is false when refactorReview is disabled', () => {
+    expect(
+      isRefactorGateEligible({
+        refactorReviewPolicy: 'disabled',
+        redPolicy: 'required',
+        isDocOnly: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('is false for a Red:skip ticket', () => {
+    expect(
+      isRefactorGateEligible({
+        refactorReviewPolicy: 'runner_on_red',
+        redPolicy: 'skip',
+        isDocOnly: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('is false for a doc-only ticket', () => {
+    expect(
+      isRefactorGateEligible({
+        refactorReviewPolicy: 'runner_on_red',
+        redPolicy: 'required',
+        isDocOnly: true,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('P20.03 — resolveVerifiedNextCommand routes through the refactor gate', () => {
+  it('routes to write-subagent-refactor-review when eligible and no prompt is recorded yet', () => {
+    const next = resolveNextCommand(
+      'verified',
+      baseConfig,
+      'docs/product/delivery/phase-20/implementation-plan.md',
+      'P20.03',
+      {
+        redPolicy: 'required',
+        docOnly: false,
+        refactorReviewOutcome: undefined,
+        refactorReviewPromptPath: undefined,
+      },
+    );
+    expect(next).toContain('write-subagent-refactor-review');
+  });
+
+  it('routes to subagent-refactor-review once a prompt is recorded but no outcome yet', () => {
+    const next = resolveNextCommand(
+      'verified',
+      baseConfig,
+      'docs/product/delivery/phase-20/implementation-plan.md',
+      'P20.03',
+      {
+        redPolicy: 'required',
+        docOnly: false,
+        refactorReviewOutcome: undefined,
+        refactorReviewPromptPath:
+          'docs/product/delivery/phase-20/reviews/P20.03-refactor-review.prompt.md',
+      },
+    );
+    expect(next).toContain('subagent-refactor-review');
+    expect(next).not.toContain('write-subagent-refactor-review');
+  });
+
+  it('falls through to the existing adversarial routing once a refactor outcome is recorded', () => {
+    const next = resolveNextCommand(
+      'verified',
+      baseConfig,
+      'docs/product/delivery/phase-20/implementation-plan.md',
+      'P20.03',
+      {
+        redPolicy: 'required',
+        docOnly: false,
+        refactorReviewOutcome: 'clean',
+        refactorReviewPromptPath:
+          'docs/product/delivery/phase-20/reviews/P20.03-refactor-review.prompt.md',
+        subagentAdversarialPromptPath: undefined,
+        verifyOutcome: 'clean',
+      },
+    );
+    expect(next).toContain('write-subagent-adversarial-review');
+  });
+
+  it('falls through to the existing adversarial routing when the ticket is Red:skip, ignoring refactorReview', () => {
+    const next = resolveNextCommand(
+      'verified',
+      baseConfig,
+      'docs/product/delivery/phase-20/implementation-plan.md',
+      'P20.03',
+      {
+        redPolicy: 'skip',
+        docOnly: false,
+        refactorReviewOutcome: undefined,
+        refactorReviewPromptPath: undefined,
+        subagentAdversarialPromptPath: undefined,
+        verifyOutcome: 'clean',
+      },
+    );
+    expect(next).not.toContain('refactor-review');
+    expect(next).toContain('write-subagent-adversarial-review');
+  });
+
+  it('falls through to the existing adversarial routing when refactorReview is disabled', () => {
+    const disabledConfig: ResolvedOrchestratorConfig = {
+      ...baseConfig,
+      reviewPolicy: { ...baseConfig.reviewPolicy, refactorReview: 'disabled' },
+    };
+    const next = resolveNextCommand(
+      'verified',
+      disabledConfig,
+      'docs/product/delivery/phase-20/implementation-plan.md',
+      'P20.03',
+      {
+        redPolicy: 'required',
+        docOnly: false,
+        refactorReviewOutcome: undefined,
+        refactorReviewPromptPath: undefined,
+        subagentAdversarialPromptPath: undefined,
+        verifyOutcome: 'clean',
+      },
+    );
+    expect(next).not.toContain('refactor-review');
+    expect(next).toContain('write-subagent-adversarial-review');
+  });
+});
 
 describe('P20.03 — open-pr soft enforcement under runner_on_red', () => {
   it('does not block open-pr when no refactor-review outcome/artifact was ever recorded', async () => {

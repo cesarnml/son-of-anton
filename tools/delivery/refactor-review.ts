@@ -453,18 +453,35 @@ export function recordRefactorReviewOutcome(input: {
 }
 
 /**
+ * P20.03 — shared eligibility predicate: does the refactor gate apply to
+ * this ticket at all? `true` only when `refactorReviewPolicy` is
+ * `"runner_on_red"` (the repo default, `"disabled"`, always resolves
+ * `false`), the ticket is `Red: required`, and it is not doc-only. Used both
+ * to decide `status`'s next-command routing and to gate each of the three
+ * refactor CLI commands (`write-subagent-refactor-review`,
+ * `subagent-refactor-review`, `reconcile-subagent-refactor-review`) so a
+ * `Red: skip` or doc-only ticket cannot have any of those steps attempted
+ * even when invoked directly and `refactorReview` is `"runner_on_red"`.
+ */
+export function isRefactorGateEligible(input: {
+  refactorReviewPolicy: RefactorReviewValue;
+  redPolicy: RedPolicy;
+  isDocOnly: boolean;
+}): boolean {
+  return (
+    input.refactorReviewPolicy === 'runner_on_red' &&
+    input.redPolicy === 'required' &&
+    !input.isDocOnly
+  );
+}
+
+/**
  * P20.03 — gate-placement predicate: does `write-subagent-adversarial-review`
  * need to block until the refactor gate has recorded an outcome first?
  *
- * `true` only when all of:
- * - `refactorReviewPolicy` is `"runner_on_red"` (the repo default,
- *   `"disabled"`, always resolves `false` — today's adversarial-only flow
- *   must stay byte-for-byte unchanged).
- * - the ticket is `Red: required` (a `Red: skip` ticket bypasses
- *   structurally, same as it bypasses the Red step itself).
- * - the ticket is not doc-only (reuses the caller's doc-only detection —
- *   this function does not reimplement it).
- * - no refactor-review outcome has been recorded yet.
+ * `true` only when the ticket is eligible for the refactor gate (see
+ * {@link isRefactorGateEligible}) and no refactor-review outcome has been
+ * recorded yet.
  */
 export function requiresRefactorReviewBeforeAdversarial(input: {
   refactorReviewPolicy: RefactorReviewValue;
@@ -472,8 +489,6 @@ export function requiresRefactorReviewBeforeAdversarial(input: {
   isDocOnly: boolean;
   refactorReviewOutcome: SubagentRunnerOutcome | undefined;
 }): boolean {
-  if (input.refactorReviewPolicy !== 'runner_on_red') return false;
-  if (input.redPolicy !== 'required') return false;
-  if (input.isDocOnly) return false;
+  if (!isRefactorGateEligible(input)) return false;
   return input.refactorReviewOutcome === undefined;
 }
