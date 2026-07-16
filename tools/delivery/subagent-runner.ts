@@ -543,12 +543,16 @@ export function coerceClaudeCliClassification(input: {
 /**
  * P14.02 — Runner availability fallback.
  *
- * Attempts the operator-selected runner first. On `unavailable`/`timeout`,
- * falls back to the other configured runner. The return value records what
- * actually ran (`ranKind`), what was originally requested when fallback
- * fired (`fallbackFrom`), and the bucket (`preferred|fallback|failed_all`).
- * When both runners are unavailable, `fallbackFrom` preserves the originally
- * requested kind so the skipped row remains auditable.
+ * Attempts the operator-selected runner first. Falls back to the next
+ * configured runner on `unavailable`/`timeout`, and — as of P21.03 — on a
+ * `ran` attempt whose `terminatedReason` shows it produced no usable review
+ * (`runner_failed`, `rate_limit`, `sandbox_denied`); see
+ * {@link shouldFallbackToOtherRunner} for the exact predicate. The return
+ * value records what actually ran (`ranKind`), what was originally requested
+ * when fallback fired (`fallbackFrom`), and the bucket
+ * (`preferred|fallback|failed_all`). When every runner fails, `fallbackFrom`
+ * preserves the originally requested kind so the skipped row remains
+ * auditable.
  */
 export function runSubagentWithFallback(
   requested: ProgrammaticSubagentRunner,
