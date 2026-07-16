@@ -1,4 +1,5 @@
 import type { ReviewPolicyStageValue, TicketBoundaryMode } from './config';
+import type { SubagentRunnerOutcome } from './subagent-runner';
 
 export type RunPolicy = {
   ticketBoundaryMode: TicketBoundaryMode;
@@ -109,6 +110,13 @@ export type TicketState = TicketDefinition & {
   subagentRunnerArtifactPath?: string;
   subagentAdversarialPromptPath?: string;
   subagentAdversarialPromptWrittenAt?: string;
+  refactorReviewOutcome?: SubagentRunnerOutcome;
+  refactorReviewCompletedAt?: string;
+  refactorReviewPatchCommits?: InternalReviewPatchCommit[];
+  refactorReviewAgent?: string;
+  refactorRunnerArtifactPath?: string;
+  refactorReviewPromptPath?: string;
+  refactorReviewPromptWrittenAt?: string;
   docOnly?: boolean;
   prNumber?: number;
   prUrl?: string;
