@@ -87,6 +87,13 @@ export type SubagentRunnerInvocation = {
    * fallback was needed.
    */
   fallbackFrom?: SubagentRunnerKind | null;
+  /**
+   * P21.04 — the model/effort that actually ran for this attempt, resolved
+   * per {@link resolveRunnerOptions}. Absent/`null` when the platform
+   * default was used (no flag, no config entry).
+   */
+  runnerModel?: string | null;
+  runnerEffort?: string | null;
   findings: string[];
   probedSurfaces: string[];
   patches: string[];
@@ -123,6 +130,56 @@ export type RunnerAttemptResult =
   | { status: 'unavailable' }
   | { status: 'timeout' };
 
+/**
+ * P21.04 — resolved per-attempt `{model?, effort?}` for one runner in the
+ * fallback chain. Kept as a single small shape so the fallback loop (P21.03)
+ * consumes it uniformly across the requested runner and every fallback
+ * attempt.
+ */
+export type ResolvedRunnerOptions = {
+  model?: string;
+  effort?: string;
+};
+
+/**
+ * P21.04 — precedence per platform: flag (requested runner only) > config
+ * entry > platform default. `flagModel`/`flagEffort` apply only when
+ * `runner === requestedRunner` — a fallback attempt resolves purely from
+ * `configOptions` for its own platform, never inheriting the originally
+ * requested runner's flag values. Fails fast (throws) on values a platform
+ * cannot express, before any spawn happens.
+ */
+export function resolveRunnerOptions(input: {
+  runner: ProgrammaticSubagentRunner;
+  requestedRunner: ProgrammaticSubagentRunner;
+  flagModel?: string;
+  flagEffort?: string;
+  configOptions?: Partial<
+    Record<ProgrammaticSubagentRunner, ResolvedRunnerOptions>
+  >;
+}): ResolvedRunnerOptions {
+  const isRequested = input.runner === input.requestedRunner;
+  const configEntry = input.configOptions?.[input.runner];
+
+  const model = isRequested
+    ? (input.flagModel ?? configEntry?.model)
+    : configEntry?.model;
+  const effort = isRequested
+    ? (input.flagEffort ?? configEntry?.effort)
+    : configEntry?.effort;
+
+  if (effort !== undefined && input.runner === 'cursor-cli') {
+    throw new Error(
+      `cursor-cli has no effort flag — effort rides the model slug. Remove the effort value for cursor-cli.`,
+    );
+  }
+
+  return {
+    ...(model !== undefined ? { model } : {}),
+    ...(effort !== undefined ? { effort } : {}),
+  };
+}
+
 export function buildRunnerSpawnCommand(
   runner: ProgrammaticSubagentRunner,
   reviewPrompt: string,
@@ -130,10 +187,20 @@ export function buildRunnerSpawnCommand(
     outputLastMessagePath?: string;
     /** Ticket worktree path; required for cursor-cli headless runs. */
     workspacePath?: string;
+    model?: string;
+    effort?: string;
   } = {},
 ): { bin: string; args: string[] } {
   if (runner === 'claude-cli') {
-    return { bin: 'claude', args: ['-p', reviewPrompt] };
+    return {
+      bin: 'claude',
+      args: [
+        '-p',
+        ...(options.model ? ['--model', options.model] : []),
+        ...(options.effort ? ['--effort', options.effort] : []),
+        reviewPrompt,
+      ],
+    };
   }
   if (runner === 'cursor-cli') {
     return {
@@ -146,6 +213,7 @@ export function buildRunnerSpawnCommand(
         ...(options.workspacePath
           ? ['--workspace', options.workspacePath]
           : []),
+        ...(options.model ? ['--model', options.model] : []),
         reviewPrompt,
       ],
     };
@@ -159,6 +227,10 @@ export function buildRunnerSpawnCommand(
         : []),
       '--color',
       'never',
+      ...(options.model ? ['-m', options.model] : []),
+      ...(options.effort
+        ? ['-c', `model_reasoning_effort=${options.effort}`]
+        : []),
       reviewPrompt,
     ],
   };
@@ -902,6 +974,8 @@ export type BuildRunnerInvocationOptions = {
   primaryAgent?: string;
   runnerSelfReport?: string | null;
   fallbackFrom?: SubagentRunnerKind | null;
+  runnerModel?: string | null;
+  runnerEffort?: string | null;
   findings?: string[];
   probedSurfaces?: string[];
   patches?: string[];
@@ -940,6 +1014,12 @@ export function buildRunnerInvocation(
       : {}),
     ...(options.fallbackFrom !== undefined
       ? { fallbackFrom: options.fallbackFrom }
+      : {}),
+    ...(options.runnerModel !== undefined
+      ? { runnerModel: options.runnerModel }
+      : {}),
+    ...(options.runnerEffort !== undefined
+      ? { runnerEffort: options.runnerEffort }
       : {}),
     findings: options.findings ?? [],
     probedSurfaces: options.probedSurfaces ?? [],
@@ -1035,6 +1115,20 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
   ) {
     return null;
   }
+  if (
+    obj['runnerModel'] !== undefined &&
+    obj['runnerModel'] !== null &&
+    typeof obj['runnerModel'] !== 'string'
+  ) {
+    return null;
+  }
+  if (
+    obj['runnerEffort'] !== undefined &&
+    obj['runnerEffort'] !== null &&
+    typeof obj['runnerEffort'] !== 'string'
+  ) {
+    return null;
+  }
 
   // The validator preserves input shape: Phase-14 fields are emitted only when
   // present in the source row. Readers should apply `getPrimaryAgent` /
@@ -1068,6 +1162,12 @@ function validateInvocation(value: unknown): SubagentRunnerInvocation | null {
       : {}),
     ...(obj['fallbackFrom'] !== undefined
       ? { fallbackFrom: obj['fallbackFrom'] as SubagentRunnerKind | null }
+      : {}),
+    ...(obj['runnerModel'] !== undefined
+      ? { runnerModel: obj['runnerModel'] as string | null }
+      : {}),
+    ...(obj['runnerEffort'] !== undefined
+      ? { runnerEffort: obj['runnerEffort'] as string | null }
       : {}),
     findings,
     probedSurfaces,
