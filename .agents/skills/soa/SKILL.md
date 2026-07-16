@@ -120,10 +120,11 @@ Accepts a concrete idea (inline description), a draft from `/soa ideate` (`docs/
 Take the approved `docs/product/plans/phase-N.md` and produce a detailed delivery plan with exact ticket decomposition.
 
 1. Read the product plan at the given path (or ask for it). Refuse to proceed if no approved product plan exists — send the developer to `/soa plan` first.
-2. **Invoke the `soa-grill-me` skill** in **Mode 2 (delivery decomposition)** — pass the product plan and focus on: schema/migration strategy, API route structure, ticket granularity, PR slice boundaries, dependency order, test strategy, exit conditions per ticket.
-3. **Stop and seek developer approval of the ticket list** before writing files.
-4. Before writing any ticket file, read the canonical template at `docs/template/stubs/ticket.template.md`. Do not use existing ticket files as format references — they may predate the current template and will produce format drift if copied. Then write `docs/product/delivery/phase-N/implementation-plan.md` and individual `ticket-NN-*.md` files per that template.
-5. After files are written and developer approves, surface this prompt:
+2. If the product plan or the developer's framing names a GitHub issue this phase originates from, capture it. Ask if it's ambiguous.
+3. **Invoke the `soa-grill-me` skill** in **Mode 2 (delivery decomposition)** — pass the product plan and focus on: schema/migration strategy, API route structure, ticket granularity, PR slice boundaries, dependency order, test strategy, exit conditions per ticket.
+4. **Stop and seek developer approval of the ticket list** before writing files.
+5. Before writing any ticket file, read the canonical template at `docs/template/stubs/ticket.template.md`. Do not use existing ticket files as format references — they may predate the current template and will produce format drift if copied. Then write `docs/product/delivery/phase-N/implementation-plan.md` and individual `ticket-NN-*.md` files per that template. If an origin issue was captured in step 2, record it in the `## Epic` section as `Origin issue: #<N>` exactly — the orchestrator parses that literal format and appends `Closes #<N>` to the phase's final ticket's PR body only, since the issue isn't resolved until that last stacked PR lands on the closeout branch.
+6. After files are written and developer approves, surface this prompt:
 
    > Files written. Run `/soa preflight phase-N` to verify template compliance before starting execution.
 

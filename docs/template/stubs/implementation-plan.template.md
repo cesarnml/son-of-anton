@@ -6,6 +6,8 @@
 
 [Optional: link to the engineering epic or product doc this phase belongs to.]
 
+[Optional: `Origin issue: #<N>` — if this phase originates from a GitHub issue, record it on its own line in this exact format. The orchestrator appends `Closes #<N>` to the PR body of this phase's FINAL ticket only (not every ticket's PR) — the issue isn't actually resolved until that last stacked PR lands on the closeout branch.]
+
 ## Product contract
 
 [What the user or developer will be able to do when this phase is complete that they cannot do today.]

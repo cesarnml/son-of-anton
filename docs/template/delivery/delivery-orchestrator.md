@@ -981,5 +981,6 @@ PR descriptions are maintained as delivery metadata, not one-shot text.
 - in `cook`, `advance` auto-starts the next pending ticket and prints the next handoff path
 - in `gated`, `advance` stops and prints reset guidance plus the canonical resume prompt; `start` still owns next-ticket handoff creation
 - `start` (zero-arg) finds the next pending ticket, creates its worktree and branch, writes its handoff, and prints the handoff path; explicit `start <ticket-id>` form is unchanged
+- when `implementation-plan.md`'s `## Epic` section has an `Origin issue: #<N>` line, `open-pr` appends a `- Closes #<N>` bullet to the **final ticket's** PR body only — earlier tickets in the stack land on intermediate branches, not `closeoutBranch`, so the issue isn't actually resolved until the last stacked PR merges through closeout
 
 This matters because the repo squash-merges PRs onto `closeoutBranch`, so the PR body needs to mention prudent ai-cr follow-up work before the stack moves on.
