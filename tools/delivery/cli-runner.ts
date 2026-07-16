@@ -1297,6 +1297,12 @@ export async function runDeliveryOrchestrator(
           );
         }
 
+        await emitRefactorReviewGate(
+          writeTarget,
+          context.config,
+          state.planKey,
+        );
+
         const written = writeRefactorReviewPrompt({
           repoRoot: cwd,
           reviewsDirPath: state.reviewsDirPath,
@@ -3006,6 +3012,18 @@ export async function emitPostRedGate(
 ): Promise<void> {
   await writeGateEvent(config, {
     gate: GATE_NAMES.GREEN_TDD,
+    planKey,
+    ticketId: ticket.id,
+  });
+}
+
+export async function emitRefactorReviewGate(
+  ticket: TicketState,
+  config: ResolvedOrchestratorConfig,
+  planKey: string,
+): Promise<void> {
+  await writeGateEvent(config, {
+    gate: GATE_NAMES.REFACTOR_TDD,
     planKey,
     ticketId: ticket.id,
   });
