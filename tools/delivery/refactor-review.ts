@@ -28,6 +28,8 @@ import { dirname, join } from 'node:path';
 
 import type { DeliveryState, InternalReviewPatchCommit } from './types';
 import type { SubagentRunnerOutcome } from './subagent-runner';
+import type { RefactorReviewValue } from './config';
+import type { RedPolicy } from './ticket-metadata';
 
 const REFACTOR_REVIEW_SUBJECT_PATTERN = /\[refactor-review\]/i;
 
@@ -448,4 +450,30 @@ export function recordRefactorReviewOutcome(input: {
         : t,
     ),
   };
+}
+
+/**
+ * P20.03 — gate-placement predicate: does `write-subagent-adversarial-review`
+ * need to block until the refactor gate has recorded an outcome first?
+ *
+ * `true` only when all of:
+ * - `refactorReviewPolicy` is `"runner_on_red"` (the repo default,
+ *   `"disabled"`, always resolves `false` — today's adversarial-only flow
+ *   must stay byte-for-byte unchanged).
+ * - the ticket is `Red: required` (a `Red: skip` ticket bypasses
+ *   structurally, same as it bypasses the Red step itself).
+ * - the ticket is not doc-only (reuses the caller's doc-only detection —
+ *   this function does not reimplement it).
+ * - no refactor-review outcome has been recorded yet.
+ */
+export function requiresRefactorReviewBeforeAdversarial(input: {
+  refactorReviewPolicy: RefactorReviewValue;
+  redPolicy: RedPolicy;
+  isDocOnly: boolean;
+  refactorReviewOutcome: SubagentRunnerOutcome | undefined;
+}): boolean {
+  if (input.refactorReviewPolicy !== 'runner_on_red') return false;
+  if (input.redPolicy !== 'required') return false;
+  if (input.isDocOnly) return false;
+  return input.refactorReviewOutcome === undefined;
 }
