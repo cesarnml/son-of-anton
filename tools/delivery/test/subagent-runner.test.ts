@@ -569,7 +569,9 @@ describe('P21.03 — fallback advances on ran-but-failed runners', () => {
     const calls: string[] = [];
     const result = runSubagentWithFallback!('codex-cli', (kind) => {
       calls.push(kind);
-      return kind === 'codex-cli' ? ranWith('runner_failed') : ranWith('completed');
+      return kind === 'codex-cli'
+        ? ranWith('runner_failed')
+        : ranWith('completed');
     });
     expect(result.ranKind).toBe('claude-cli');
     expect(result.fallbackFrom).toBe('codex-cli');
@@ -582,7 +584,9 @@ describe('P21.03 — fallback advances on ran-but-failed runners', () => {
     const calls: string[] = [];
     const result = runSubagentWithFallback!('codex-cli', (kind) => {
       calls.push(kind);
-      return kind === 'codex-cli' ? ranWith('rate_limit') : ranWith('completed');
+      return kind === 'codex-cli'
+        ? ranWith('rate_limit')
+        : ranWith('completed');
     });
     expect(result.ranKind).toBe('claude-cli');
     expect(result.fallbackFrom).toBe('codex-cli');
@@ -594,7 +598,9 @@ describe('P21.03 — fallback advances on ran-but-failed runners', () => {
     const calls: string[] = [];
     const result = runSubagentWithFallback!('codex-cli', (kind) => {
       calls.push(kind);
-      return kind === 'codex-cli' ? ranWith('sandbox_denied') : ranWith('completed');
+      return kind === 'codex-cli'
+        ? ranWith('sandbox_denied')
+        : ranWith('completed');
     });
     expect(result.ranKind).toBe('claude-cli');
     expect(result.fallbackFrom).toBe('codex-cli');
@@ -625,7 +631,11 @@ describe('P21.03 — fallback advances on ran-but-failed runners', () => {
     expect(result.ranKind).toBe('skipped');
     expect(result.fallbackLevel).toBe('failed_all');
     expect(result.fallbackFrom).toBe('codex-cli');
-    expect(result.attemptedKinds).toEqual(['codex-cli', 'claude-cli', 'cursor-cli']);
+    expect(result.attemptedKinds).toEqual([
+      'codex-cli',
+      'claude-cli',
+      'cursor-cli',
+    ]);
     expect(calls).toEqual(['codex-cli', 'claude-cli', 'cursor-cli']);
   });
 

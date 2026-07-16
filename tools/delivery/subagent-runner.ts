@@ -568,7 +568,7 @@ export function runSubagentWithFallback(
     attemptedKinds.push(kind);
     const result = attempt(kind);
     lastResult = result;
-    if (result.status === 'ran') {
+    if (result.status === 'ran' && !shouldFallbackToOtherRunner(result)) {
       return {
         ranKind: kind,
         fallbackFrom: index === 0 ? null : requested,
@@ -737,15 +737,30 @@ export function tryRunner(
 }
 
 /**
- * The narrow set of runner-attempt outcomes that justify falling back to the
- * other runner. Binary-availability failures and timeouts only — never
- * ambiguous output (rate_limit, sandbox_denied, exit-code-0-with-no-work),
- * which should surface honestly through terminatedReason instead.
+ * P21.03 — the set of runner-attempt outcomes that justify falling back to
+ * the other runner: binary-availability failures/timeouts, and `ran` attempts
+ * whose `terminatedReason` shows the runner spawned but produced no usable
+ * review (`runner_failed`, `rate_limit`, `sandbox_denied` — the issue #105
+ * case). A `ran` attempt with `terminatedReason: 'completed'` never advances
+ * — that is a genuinely completed review. `advisory_violation` is decided
+ * after the fallback loop (from write detection, not `terminatedReason`), so
+ * it never reaches this check; the loop already stops on it via the
+ * 'completed' path.
  */
 export function shouldFallbackToOtherRunner(
   result: RunnerAttemptResult,
 ): boolean {
-  return result.status === 'unavailable' || result.status === 'timeout';
+  if (result.status === 'unavailable' || result.status === 'timeout') {
+    return true;
+  }
+  if (result.status === 'ran') {
+    return (
+      result.terminatedReason === 'runner_failed' ||
+      result.terminatedReason === 'rate_limit' ||
+      result.terminatedReason === 'sandbox_denied'
+    );
+  }
+  return false;
 }
 
 /**

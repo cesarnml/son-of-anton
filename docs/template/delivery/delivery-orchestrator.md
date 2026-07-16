@@ -85,6 +85,8 @@ Prerequisites: install the binary on PATH. For `cursor-cli`, run `agent login` o
 
 Fallback order: try the operator-selected runner first, then each other programmatic runner in stable order (`claude-cli` → `codex-cli` → `cursor-cli`, with the requested runner moved to the front). Ledger rows record `runnerKind` (what ran) and `fallbackFrom` (what was requested when fallback fired).
 
+Fallback triggers on: the runner being unavailable or timing out, and — as of P21.03 — a runner that spawned but produced no usable review (`ran` with `terminatedReason` of `runner_failed`, `rate_limit`, or `sandbox_denied`). It does **not** trigger on `advisory_violation` (the runner reviewed but broke the no-writes contract) or a genuinely completed `ran` result — those record honestly and stop the chain. Each runner in the chain is attempted at most once; when every runner fails, the row records `skipped` with `fallbackLevel: 'failed_all'` and preserves the originally-requested kind in `fallbackFrom`, with the full attempt chain in `attemptedKinds`.
+
 ## Stance
 
 The orchestrator is repo tooling, not app runtime code.
