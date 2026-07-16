@@ -45,6 +45,20 @@
       "patches": [
         "644f47c1c9ae96c0d6ff3c1c0f98a7ae7af77367"
       ]
+    },
+    {
+      "runnerKind": "operator-recorder",
+      "reviewedHeadSha": "644f47c1c9ae96c0d6ff3c1c0f98a7ae7af77367",
+      "outcome": "deferred",
+      "completedAt": "2026-07-16T15:09:37.680Z",
+      "terminatedReason": "completed",
+      "schemaVersion": 2,
+      "primaryAgent": "claude",
+      "findings": [
+        "No further refactor content: the only unlabeled commits since the recorded patch are the orchestrator's own ledger-artifact bookkeeping commits, created because the patch was first recorded with a truncated (short) sha and then corrected to the full sha via --force. The single real refactor-review patch (644f47c1c9ae96c0d6ff3c1c0f98a7ae7af77367) already carries the [refactor-review] tag and is recorded above."
+      ],
+      "probedSurfaces": [],
+      "patches": []
     }
   ]
 }
