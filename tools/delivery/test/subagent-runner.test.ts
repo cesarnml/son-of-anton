@@ -550,6 +550,128 @@ describe('P14.02 — runSubagentWithFallback', () => {
   });
 });
 
+describe('P21.03 — fallback advances on ran-but-failed runners', () => {
+  const ranWith = (
+    terminatedReason:
+      | 'completed'
+      | 'runner_failed'
+      | 'rate_limit'
+      | 'sandbox_denied'
+      | 'advisory_violation',
+  ) => ({
+    status: 'ran' as const,
+    outcome: 'clean' as const,
+    terminatedReason,
+  });
+
+  it('advances to the next runner when codex-cli spawns but returns runner_failed (issue #105 repro)', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli'
+        ? ranWith('runner_failed')
+        : ranWith('completed');
+    });
+    expect(result.ranKind).toBe('claude-cli');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(result.fallbackLevel).toBe('fallback');
+    expect(calls).toEqual(['codex-cli', 'claude-cli']);
+  });
+
+  it('advances to the next runner when the requested runner returns ran + rate_limit', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli'
+        ? ranWith('rate_limit')
+        : ranWith('completed');
+    });
+    expect(result.ranKind).toBe('claude-cli');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(calls).toEqual(['codex-cli', 'claude-cli']);
+  });
+
+  it('advances to the next runner when the requested runner returns ran + sandbox_denied', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli'
+        ? ranWith('sandbox_denied')
+        : ranWith('completed');
+    });
+    expect(result.ranKind).toBe('claude-cli');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(calls).toEqual(['codex-cli', 'claude-cli']);
+  });
+
+  it('does not advance on ran + advisory_violation — preserves the violation row', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return ranWith('advisory_violation');
+    });
+    expect(result.ranKind).toBe('codex-cli');
+    expect(result.fallbackFrom).toBeNull();
+    expect(result.fallbackLevel).toBe('preferred');
+    expect(result.result).toEqual(ranWith('advisory_violation'));
+    expect(calls).toEqual(['codex-cli']);
+  });
+
+  it('records failed_all with the full attempted chain when every runner fails with a ran-but-failed reason', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return ranWith('runner_failed');
+    });
+    expect(result.ranKind).toBe('skipped');
+    expect(result.fallbackLevel).toBe('failed_all');
+    expect(result.fallbackFrom).toBe('codex-cli');
+    expect(result.attemptedKinds).toEqual([
+      'codex-cli',
+      'claude-cli',
+      'cursor-cli',
+    ]);
+    expect(calls).toEqual(['codex-cli', 'claude-cli', 'cursor-cli']);
+  });
+
+  it('does not advance when the first attempt wrote files even though it also classified as runner_failed — a write violation must not be masked by a later successful fallback', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return kind === 'codex-cli'
+        ? {
+            status: 'ran' as const,
+            outcome: 'patched' as const,
+            terminatedReason: 'runner_failed' as const,
+          }
+        : ranWith('completed');
+    });
+    expect(result.ranKind).toBe('codex-cli');
+    expect(result.fallbackFrom).toBeNull();
+    expect(result.fallbackLevel).toBe('preferred');
+    expect(calls).toEqual(['codex-cli']);
+  });
+
+  it('a genuinely completed ran result still returns immediately with no fallback', () => {
+    expect(runSubagentWithFallback).toBeDefined();
+    const calls: string[] = [];
+    const result = runSubagentWithFallback!('codex-cli', (kind) => {
+      calls.push(kind);
+      return ranWith('completed');
+    });
+    expect(result.ranKind).toBe('codex-cli');
+    expect(result.fallbackFrom).toBeNull();
+    expect(result.fallbackLevel).toBe('preferred');
+    expect(calls).toEqual(['codex-cli']);
+  });
+});
+
 describe('P14.05 — stderr trace discipline', () => {
   it('writes the model report without stderr admixture', () => {
     const repoRoot = mkdtempSync(join(tmpdir(), 'soa-p14-05-report-'));

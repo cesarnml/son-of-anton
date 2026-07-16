@@ -543,12 +543,16 @@ export function coerceClaudeCliClassification(input: {
 /**
  * P14.02 — Runner availability fallback.
  *
- * Attempts the operator-selected runner first. On `unavailable`/`timeout`,
- * falls back to the other configured runner. The return value records what
- * actually ran (`ranKind`), what was originally requested when fallback
- * fired (`fallbackFrom`), and the bucket (`preferred|fallback|failed_all`).
- * When both runners are unavailable, `fallbackFrom` preserves the originally
- * requested kind so the skipped row remains auditable.
+ * Attempts the operator-selected runner first. Falls back to the next
+ * configured runner on `unavailable`/`timeout`, and — as of P21.03 — on a
+ * `ran` attempt whose `terminatedReason` shows it produced no usable review
+ * (`runner_failed`, `rate_limit`, `sandbox_denied`); see
+ * {@link shouldFallbackToOtherRunner} for the exact predicate. The return
+ * value records what actually ran (`ranKind`), what was originally requested
+ * when fallback fired (`fallbackFrom`), and the bucket
+ * (`preferred|fallback|failed_all`). When every runner fails, `fallbackFrom`
+ * preserves the originally requested kind so the skipped row remains
+ * auditable.
  */
 export function runSubagentWithFallback(
   requested: ProgrammaticSubagentRunner,
@@ -568,7 +572,7 @@ export function runSubagentWithFallback(
     attemptedKinds.push(kind);
     const result = attempt(kind);
     lastResult = result;
-    if (result.status === 'ran') {
+    if (result.status === 'ran' && !shouldFallbackToOtherRunner(result)) {
       return {
         ranKind: kind,
         fallbackFrom: index === 0 ? null : requested,
@@ -737,15 +741,33 @@ export function tryRunner(
 }
 
 /**
- * The narrow set of runner-attempt outcomes that justify falling back to the
- * other runner. Binary-availability failures and timeouts only — never
- * ambiguous output (rate_limit, sandbox_denied, exit-code-0-with-no-work),
- * which should surface honestly through terminatedReason instead.
+ * P21.03 — the set of runner-attempt outcomes that justify falling back to
+ * the other runner: binary-availability failures/timeouts, and `ran` attempts
+ * whose `terminatedReason` shows the runner spawned but produced no usable
+ * review (`runner_failed`, `rate_limit`, `sandbox_denied` — the issue #105
+ * case). A `ran` attempt with `terminatedReason: 'completed'` never advances
+ * — that is a genuinely completed review. An attempt that wrote files
+ * (`outcome: 'patched'`) never advances either, regardless of
+ * `terminatedReason` — a write is an advisory-only contract violation, and a
+ * later successful fallback must not mask it (the caller derives its own
+ * `advisory_violation` outcome from the same write signal after this
+ * function returns `false`, exactly as it does for a plain completed+write
+ * result).
  */
 export function shouldFallbackToOtherRunner(
   result: RunnerAttemptResult,
 ): boolean {
-  return result.status === 'unavailable' || result.status === 'timeout';
+  if (result.status === 'unavailable' || result.status === 'timeout') {
+    return true;
+  }
+  if (result.status === 'ran' && result.outcome !== 'patched') {
+    return (
+      result.terminatedReason === 'runner_failed' ||
+      result.terminatedReason === 'rate_limit' ||
+      result.terminatedReason === 'sandbox_denied'
+    );
+  }
+  return false;
 }
 
 /**
