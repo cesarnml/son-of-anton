@@ -42,4 +42,4 @@ The phase achieved its stated goal: a working, tested, off-by-default `refactorR
 - When `runner_on_red_strict` is eventually built, add the "does status routing account for this" check as an explicit Review Focus line item, not an incidental subagent-review catch.
 - Consider a `file <path>` sanity check as a standing habit after any `Edit` call on a large source file, given the NUL-byte incident's detection was accidental.
 
-_Created: 2026-07-16. PRs #106, #107, #108, #109 open, awaiting developer review and closeout._
+_Created: 2026-07-16. PRs #106, #107, #108, #109 merged to main via closeout-stack; advisory observations triaged the same day._
