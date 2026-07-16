@@ -22,6 +22,14 @@ describe('planning', () => {
     ).toEqual([]);
   });
 
+  it('returns an empty list when the markdown has no ## Epic section — stays Epic-scoped, no whole-document fallback', () => {
+    expect(
+      parseOriginIssueNumbers(
+        '# Some Plan\n\nOrigin issue: #99\n\n## Product contract\n',
+      ),
+    ).toEqual([]);
+  });
+
   it('parses five Origin issue lines in document order', () => {
     expect(
       parseOriginIssueNumbers(

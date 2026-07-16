@@ -63,10 +63,14 @@ export function parsePlan(
  * one-element array — single-line plans parse identically to today.
  */
 export function parseOriginIssueNumbers(markdown: string): number[] {
+  // Epic-scoped only, per the documented contract — no whole-document
+  // fallback when `## Epic` is absent (a phase's `## Epic` section is
+  // required by preflight; a stray `Origin issue:` line elsewhere in the
+  // doc must not silently count).
   const epicSection =
     markdown.match(/## Epic\s+([\s\S]*?)\n## /)?.[1] ??
     markdown.match(/## Epic\s+([\s\S]*)$/)?.[1] ??
-    markdown;
+    '';
   const matches = [
     ...epicSection.matchAll(/^Origin issue:\s*#(\d+)\s*$/gm),
   ].map((match) => Number(match[1]));
