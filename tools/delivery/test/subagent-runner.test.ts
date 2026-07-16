@@ -239,16 +239,32 @@ const runSubagentWithFallback = (
 ).runSubagentWithFallback;
 
 describe('P14.02 — coerceCodexCliClassification', () => {
-  it('trusts runnerStatus: completed even when stderr resembles rate-limit prose', () => {
+  it('trusts runnerStatus: completed inside the <runner-termination> tag even when stderr resembles rate-limit prose', () => {
     expect(coerceCodexCliClassification).toBeDefined();
     const result = coerceCodexCliClassification!({
       exitCode: 0,
-      stdout: 'findings...\n\nrunnerStatus: completed\n',
+      stdout:
+        'findings...\n\n<runner-termination>\nrunnerStatus: completed\n</runner-termination>\n',
       stderr: 'warning: you may have hit your rate limit on prior call\n',
     });
     expect(result.outcome).toBe('clean');
     expect(result.terminatedReason).toBe('completed');
     expect(result.runnerSelfReport).toBe('completed');
+  });
+
+  it('P21.01 — ignores a bare runnerStatus: line outside the <runner-termination> tag (no leak)', () => {
+    expect(coerceCodexCliClassification).toBeDefined();
+    const result = coerceCodexCliClassification!({
+      exitCode: 0,
+      stdout: 'findings...\n\nrunnerStatus: completed\n',
+      stderr: '',
+    });
+    // The bare trailer is no longer trusted (no tag), so runnerSelfReport is
+    // null — but the coercer still falls through to exitCode===0 + non-empty
+    // stdout, so outcome/terminatedReason are unaffected.
+    expect(result.runnerSelfReport).toBeNull();
+    expect(result.outcome).toBe('clean');
+    expect(result.terminatedReason).toBe('completed');
   });
 
   it('classifies authentic rate-limit signal (structured) as skipped/rate_limit', () => {
@@ -308,6 +324,19 @@ describe('P14.02 — coerceClaudeCliClassification (symmetric to codex-cli)', ()
     expect(result.terminatedReason).toBe('completed');
   });
 
+  it('P21.01 — trusts runnerStatus: completed inside the <runner-termination> tag', () => {
+    expect(coerceClaudeCliClassification).toBeDefined();
+    const result = coerceClaudeCliClassification!({
+      exitCode: 0,
+      stdout:
+        'review report ...\n\n<runner-termination>\nrunnerStatus: completed\nterminatedReason: finished the review\n</runner-termination>\n',
+      stderr: '',
+    });
+    expect(result.outcome).toBe('clean');
+    expect(result.terminatedReason).toBe('completed');
+    expect(result.runnerSelfReport).toBe('completed');
+  });
+
   it('classifies authentic Anthropic rate_limit_error JSON token as skipped/rate_limit', () => {
     expect(coerceClaudeCliClassification).toBeDefined();
     const result = coerceClaudeCliClassification!({
@@ -333,11 +362,12 @@ describe('P14.02 — coerceClaudeCliClassification (symmetric to codex-cli)', ()
 });
 
 describe('cursor-cli — coerceCursorCliClassification', () => {
-  it('trusts runnerStatus: completed when stdout is a full review', () => {
+  it('trusts runnerStatus: completed inside the <runner-termination> tag when stdout is a full review', () => {
     expect(coerceCursorCliClassification).toBeDefined();
     const result = coerceCursorCliClassification!({
       exitCode: 0,
-      stdout: 'Actionable findings\nNone.\n\nrunnerStatus: completed\n',
+      stdout:
+        '<actionable-findings>\nNone\n</actionable-findings>\n\n<runner-termination>\nrunnerStatus: completed\n</runner-termination>\n',
       stderr: '',
     });
     expect(result.outcome).toBe('clean');
@@ -362,7 +392,7 @@ describe('cursor-cli — coerceCursorCliClassification', () => {
     const result = coerceCursorCliClassification!({
       exitCode: 0,
       stdout:
-        'Finding: preserves existing rate limit retry behavior.\n\nrunnerStatus: completed',
+        'Finding: preserves existing rate limit retry behavior.\n\n<runner-termination>\nrunnerStatus: completed\n</runner-termination>',
       stderr: '',
     });
     expect(result.outcome).toBe('clean');

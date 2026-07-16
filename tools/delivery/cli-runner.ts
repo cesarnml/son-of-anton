@@ -127,6 +127,10 @@ import {
   startTicket as startTicketImpl,
 } from './ticket-flow';
 import {
+  isSuspiciousActionableFindingsParse,
+  isSuspiciousAdvisoryObservationsParse,
+  parseActionableFindings,
+  parseAdvisoryObservationsResult,
   ReconciliationBlockedError,
   reconcileReview,
   recordAcknowledgment,
@@ -142,6 +146,8 @@ import {
   decideAdvisoryRunnerOutcome,
   decideSubagentReviewMode,
   findDeliveryDocPaths,
+  isSuspiciousRunnerTerminationParse,
+  parseRunnerTermination,
   parseSubagentReviewArgs,
   readSubagentRunnerArtifact,
   resolvePrimaryAgent,
@@ -1185,6 +1191,48 @@ export async function runDeliveryOrchestrator(
             stdout: runnerStdout ?? runnerOutputText,
             stderr: runnerStderr ?? '',
           });
+        }
+
+        // P21.01 — zero-parse loud floor: warn while the primary agent is
+        // still in-session, at the moment the report lands. Only meaningful
+        // when the runner actually produced a report (terminatedReason ===
+        // 'completed'); a runner_failed/rate_limit/skipped row has no report
+        // to judge. Not a retry loop — one warning line, no re-invocation.
+        // Triage-time surfacing (advisory-observation-warnings.ts) remains
+        // the backstop for anything missed here.
+        if (terminatedReason === 'completed') {
+          const reportText = runnerStdout ?? runnerOutputText ?? '';
+          const suspiciousRegions: string[] = [];
+          if (
+            isSuspiciousActionableFindingsParse(
+              parseActionableFindings(reportText),
+            )
+          ) {
+            suspiciousRegions.push('<actionable-findings>');
+          }
+          if (
+            isSuspiciousAdvisoryObservationsParse(
+              parseAdvisoryObservationsResult(reportText),
+            )
+          ) {
+            suspiciousRegions.push('<advisory-observations>');
+          }
+          if (
+            isSuspiciousRunnerTerminationParse(
+              parseRunnerTermination(reportText),
+            )
+          ) {
+            suspiciousRegions.push('<runner-termination>');
+          }
+          if (suspiciousRegions.length > 0) {
+            console.log(
+              `subagent-review: zero-parse warning for ${subagentTarget.id} — ` +
+                `${suspiciousRegions.join(', ')} missing, malformed (unclosed/misnamed), ` +
+                'or empty without the literal "None". Review the raw report and either ' +
+                're-run subagent-review or hand-normalize the framing (structure only, ' +
+                'never findings).',
+            );
+          }
         }
 
         const invocation = buildRunnerInvocation(usedRunner, headSha, outcome, {
