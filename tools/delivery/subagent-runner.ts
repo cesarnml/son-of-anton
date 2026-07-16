@@ -1,13 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import type { ActionableFindingsParseResult } from './reconciliation';
+
 export type SubagentRunnerOutcome =
   | 'clean'
   | 'patched'
   | 'deferred'
-  | 'skipped';
+  | 'skipped'
+  | 'completed_with_findings';
 
-export const SUBAGENT_LEDGER_SCHEMA_VERSION = 1;
+/**
+ * P21.02 bumps to 2: `completed_with_findings` joins the outcome vocabulary.
+ * v1 rows (no `schemaVersion`, or `schemaVersion: 1`) remain valid on read —
+ * `validateInvocation` only checks membership in `VALID_OUTCOMES`, not the
+ * row's own `schemaVersion`, so legacy rows are unaffected by this bump.
+ */
+export const SUBAGENT_LEDGER_SCHEMA_VERSION = 2;
 
 export type SubagentRunnerKind =
   | 'claude-cli'
@@ -746,6 +755,7 @@ export function shouldFallbackToOtherRunner(
  */
 export function decideSubagentOutcomeFromRunner(
   result: Extract<RunnerAttemptResult, { status: 'ran' }>,
+  info: { actionableFindings?: ActionableFindingsParseResult } = {},
 ): {
   outcome: SubagentRunnerOutcome;
   terminatedReason: SubagentRunnerTerminatedReason;
@@ -753,7 +763,34 @@ export function decideSubagentOutcomeFromRunner(
   if (result.terminatedReason !== 'completed' && result.outcome === 'clean') {
     return { outcome: 'skipped', terminatedReason: result.terminatedReason };
   }
+  if (
+    result.outcome === 'clean' &&
+    hasHonestFindings(info.actionableFindings)
+  ) {
+    return {
+      outcome: 'completed_with_findings',
+      terminatedReason: result.terminatedReason,
+    };
+  }
   return { outcome: result.outcome, terminatedReason: result.terminatedReason };
+}
+
+/**
+ * P21.02 — a report only proves it is findings-bearing when the tag is
+ * present, properly closed, and yields at least one bullet that is not the
+ * literal `None` clean-signal. A missing/unclosed/misnamed tag is a parse
+ * drift warning (handled elsewhere), not evidence of findings.
+ */
+function hasHonestFindings(
+  actionableFindings: ActionableFindingsParseResult | undefined,
+): boolean {
+  return (
+    actionableFindings !== undefined &&
+    actionableFindings.found &&
+    actionableFindings.closed &&
+    !actionableFindings.isExplicitNone &&
+    actionableFindings.findings.length > 0
+  );
 }
 
 /**
@@ -772,7 +809,16 @@ export function decideSubagentOutcomeFromRunner(
  */
 export function decideAdvisoryRunnerOutcome(
   result: Extract<RunnerAttemptResult, { status: 'ran' }>,
-  info: { runnerWroteFiles: boolean },
+  info: {
+    runnerWroteFiles: boolean;
+    /**
+     * P21.02 — the P21.01 tag-parsed `<actionable-findings>` result for this
+     * runner's report, when the caller has one available. Omitted at call
+     * sites (e.g. the refactor-review gate, a separate parser/domain) means
+     * "no cross-check possible" and preserves prior `clean` behavior.
+     */
+    actionableFindings?: ActionableFindingsParseResult;
+  },
 ): {
   outcome: SubagentRunnerOutcome;
   terminatedReason: SubagentRunnerTerminatedReason;
@@ -782,6 +828,12 @@ export function decideAdvisoryRunnerOutcome(
   }
   if (result.terminatedReason !== 'completed') {
     return { outcome: 'skipped', terminatedReason: result.terminatedReason };
+  }
+  if (hasHonestFindings(info.actionableFindings)) {
+    return {
+      outcome: 'completed_with_findings',
+      terminatedReason: 'completed',
+    };
   }
   return { outcome: 'clean', terminatedReason: 'completed' };
 }
@@ -798,6 +850,7 @@ const VALID_OUTCOMES: SubagentRunnerOutcome[] = [
   'patched',
   'deferred',
   'skipped',
+  'completed_with_findings',
 ];
 const VALID_TERMINATED_REASONS: SubagentRunnerTerminatedReason[] = [
   'completed',

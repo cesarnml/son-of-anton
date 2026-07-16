@@ -52,11 +52,24 @@ Phase 14 makes the subagent-review ledger semantically honest. Operator-facing d
 
 - **Artifact triplet:** `reviews/<ticket>-subagent-review.{prompt.md, report.md, ledger.json}` — prompt, report, ledger. No dual-name fallback for pre-Phase-14 filenames.
 - **Runner selection:** `--subagent <claude-cli|codex-cli|cursor-cli>` at invocation time; optional project default `subagentRunner` in `orchestrator.config.json`. Precedence: flag > config field > hard error (SoA ships no silent default).
-- **Outcome vocabulary:** ledger rows use `clean | patched | deferred | skipped` reflecting what the primary agent actually did after the advisory pass.
+- **Outcome vocabulary:** ledger rows use `clean | patched | deferred | skipped | completed_with_findings` reflecting what the primary agent actually did after the advisory pass. `completed_with_findings` (P21.02) is recorder-derived, not primary-agent-declared: the runner terminated `completed` and its `<actionable-findings>` block lists one or more findings, so the row cannot honestly claim `clean` — see the outcome-honesty cross-check below.
 - **Reconciliation:** `reconcile-subagent-review` runs after `subagent-review` and before `open-pr`. It detects silent lies (unlabeled post-review edits, actionable findings with no patch or deferral) and exits non-zero with named resolution paths. `open-pr` invokes the same gate and accepts `--ack-reconciliation <patched|deferred|clean>` as an operator escape valve.
 - **Deferral:** `subagent-review record-deferred --reason "<rationale>"` appends a `deferred` row when findings are consciously not patched.
 - **Advisory observations:** non-blocking off-scope-but-real notes belong under the `<advisory-observations>` tagged region, not the blocking `<actionable-findings>` region. Both regions are balanced tag blocks per `notes/public/subagent-report-parser-contract.md` — there is no heading-format fallback.
 - **Adversarial prompt prologue:** broadening clauses (extra surfaces, advisory-observation bucket) appear before the narrowing "not a general code review" anchor in `adversarial-review-template.md`.
+
+### P21.02 — outcome-honesty cross-check
+
+`decideAdvisoryRunnerOutcome` (and the recorder-mode `decideSubagentOutcomeFromRunner`) cross-check the runner's terminated reason against the P21.01 tag-parsed `<actionable-findings>` result before recording `clean`:
+
+- runner terminated `completed` and the report's `<actionable-findings>` block is closed and lists one or more findings → `completed_with_findings`, never `clean`
+- runner terminated `completed` and the block is the literal `None` → `clean`
+- any non-`completed` termination reason (`rate_limit`, `sandbox_denied`, `runner_unavailable`, `runner_failed`, or a detected `advisory_violation`) → still collapses to `skipped` with the original reason preserved, exactly as before this ticket
+- a call site that has no parsed findings result to pass (e.g. the refactor-review gate's `runProgrammaticSubagentReview`, which uses a different tag and a different domain) keeps recording `clean` on a completed run — the cross-check only fires when the caller supplies an `actionableFindings` parse result
+
+`reconcile-subagent-review` semantics are unchanged by this ticket: it already blocks `open-pr` on unpatched/undeferred actionable findings regardless of the ledger row's label, so `completed_with_findings` closes an honesty gap in the ledger without changing what the reconcile gate enforces.
+
+**Ledger schema version 2:** `SUBAGENT_LEDGER_SCHEMA_VERSION` bumps from 1 to 2 to cover the new outcome value. Reads are fully tolerant of v1 rows — validation checks each row's `outcome` against the current (now five-member) `VALID_OUTCOMES` list, not against the row's own `schemaVersion`, so pre-existing v1 rows (including codogotchi's existing invocation history) continue to validate unchanged.
 
 ### Programmatic subagent runners
 

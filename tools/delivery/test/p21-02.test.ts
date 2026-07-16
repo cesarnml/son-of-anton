@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { decideAdvisoryRunnerOutcome, validateRunnerArtifact } from '../subagent-runner';
-import type { RunnerAttemptResult, SubagentRunnerArtifact } from '../subagent-runner';
+import {
+  decideAdvisoryRunnerOutcome,
+  validateRunnerArtifact,
+} from '../subagent-runner';
+import type {
+  RunnerAttemptResult,
+  SubagentRunnerArtifact,
+} from '../subagent-runner';
 import { parseActionableFindings } from '../reconciliation';
 
 function ranResult(
@@ -33,9 +39,11 @@ describe('P21.02 — completed_with_findings cross-check', () => {
   });
 
   it('records clean when the report has literal None', () => {
-    const report = ['<actionable-findings>', 'None', '</actionable-findings>'].join(
-      '\n',
-    );
+    const report = [
+      '<actionable-findings>',
+      'None',
+      '</actionable-findings>',
+    ].join('\n');
 
     const decided = decideAdvisoryRunnerOutcome(ranResult(), {
       runnerWroteFiles: false,
@@ -99,7 +107,7 @@ describe('P21.02 — completed_with_findings cross-check', () => {
       ],
     };
 
-    const validated = validateRunnerArtifact(JSON.stringify(artifact));
+    const validated = validateRunnerArtifact(artifact);
     expect(validated).not.toBeNull();
     expect(validated!.invocations[0]?.outcome).toBe('clean');
     expect(validated!.invocations[0]?.schemaVersion).toBeUndefined();
@@ -123,7 +131,7 @@ describe('P21.02 — completed_with_findings cross-check', () => {
       ],
     };
 
-    const validated = validateRunnerArtifact(JSON.stringify(artifact));
+    const validated = validateRunnerArtifact(artifact);
     expect(validated).not.toBeNull();
     expect(validated!.invocations[0]?.outcome).toBe('completed_with_findings');
   });

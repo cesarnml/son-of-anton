@@ -252,10 +252,23 @@ terminatedReason: one short sentence explaining why this status was reported.
 ```
 
 `runnerStatus` is one of `completed | rate_limit | sandbox_denied |
-runner_unavailable`. `completed` means you finished the review per this
-template. The other three values are honest failure modes — the CLI
-refuses to record `outcome: clean` for any non-`completed` `terminatedReason`,
-so do not claim `completed` if you stopped early.
+runner_unavailable`. `completed` means you **finished the review** per this
+template — it says nothing about what you found. The other three values are
+honest failure modes — the CLI refuses to record `outcome: clean` or
+`outcome: completed_with_findings` for any non-`completed` `terminatedReason`
+(both collapse to `skipped` with the original reason preserved), so do not
+claim `completed` if you stopped early.
+
+**"Runner completed" vs. "review clean":** these are two different facts and
+the recorded ledger `outcome` keeps them distinct. `runnerStatus: completed`
+only means the runner finished the review per this template. Whether the
+review is _clean_ depends on the `<actionable-findings>` block: a completed
+run whose block is the literal `None` records `outcome: clean`; a completed
+run whose block lists one or more findings records
+`outcome: completed_with_findings` instead — never `clean`, even though the
+runner finished normally. `decideAdvisoryRunnerOutcome` (P21.02) enforces this
+cross-check so a findings-bearing report can never be silently recorded as a
+clean review.
 
 ```
 

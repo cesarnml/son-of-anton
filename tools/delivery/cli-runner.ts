@@ -1021,7 +1021,11 @@ export async function runDeliveryOrchestrator(
 
         const RUNNER_TIMEOUT_MS = 10 * 60 * 1000;
 
-        let outcome: 'clean' | 'patched' | 'skipped' = 'skipped';
+        let outcome:
+          | 'clean'
+          | 'patched'
+          | 'skipped'
+          | 'completed_with_findings' = 'skipped';
         let terminatedReason: SubagentRunnerTerminatedReason =
           'runner_unavailable';
         let runnerOutputText: string | undefined;
@@ -1133,8 +1137,16 @@ export async function runDeliveryOrchestrator(
                 runnerHeadBefore !== runnerHeadAfter ||
                 listDirtyPaths().some((p) => !preRunDirtyPaths.has(p));
 
+              // P21.02 — cross-check the P21.01 tag-parsed report against the
+              // runner outcome so a completed run whose report lists
+              // findings is never silently recorded as `clean`.
+              const reportTextForCrossCheck = result.stdout ?? result.rawOutput;
               const decided = decideAdvisoryRunnerOutcome(result, {
                 runnerWroteFiles,
+                actionableFindings:
+                  reportTextForCrossCheck !== undefined
+                    ? parseActionableFindings(reportTextForCrossCheck)
+                    : undefined,
               });
               outcome = decided.outcome;
               terminatedReason = decided.terminatedReason;
