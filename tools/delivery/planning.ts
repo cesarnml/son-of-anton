@@ -53,9 +53,24 @@ export function parsePlan(
   });
 }
 
-export function parseOriginIssueNumber(markdown: string): number | undefined {
-  const match = markdown.match(/Origin issue:\s*#(\d+)/);
-  return match ? Number(match[1]) : undefined;
+/**
+ * P21.06 — multi-line-aware: returns every `Origin issue: #<N>` line in the
+ * `## Epic` section, in document order, deduplicated. Strict per line — the
+ * line must contain nothing but `Origin issue: #<N>` (optional trailing
+ * whitespace); near-miss forms (`Origin Issue #76`, `origin issue: 76`,
+ * trailing punctuation or prose after the number) are rejected, same
+ * discipline as before. A single `Origin issue: #<N>` line parses to a
+ * one-element array — single-line plans parse identically to today.
+ */
+export function parseOriginIssueNumbers(markdown: string): number[] {
+  const epicSection =
+    markdown.match(/## Epic\s+([\s\S]*?)\n## /)?.[1] ??
+    markdown.match(/## Epic\s+([\s\S]*)$/)?.[1] ??
+    markdown;
+  const matches = [
+    ...epicSection.matchAll(/^Origin issue:\s*#(\d+)\s*$/gm),
+  ].map((match) => Number(match[1]));
+  return [...new Set(matches)];
 }
 
 export function derivePlanKey(planPath: string): string {

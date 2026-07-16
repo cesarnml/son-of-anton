@@ -148,11 +148,14 @@ export type DeliveryState = {
   reviewPollIntervalMinutes: number;
   reviewPollMaxWaitMinutes: number;
   runPolicy?: RunPolicy;
-  // Origin issue this phase implements, e.g. `Origin issue: #76` in implementation-plan.md's
-  // `## Epic` section. The phase's final ticket's PR body gets a `Closes #N` line — earlier
-  // tickets' PRs do not, since the issue isn't resolved until the last stacked PR lands on
-  // the closeout branch.
-  originIssueNumber?: number;
+  // Origin issue(s) this phase implements, e.g. one or more `Origin issue: #76`
+  // lines in implementation-plan.md's `## Epic` section (P21.06). The phase's
+  // final ticket's PR body gets one `Closes #N` line per issue — earlier
+  // tickets' PRs do not, since no issue is resolved until the last stacked PR
+  // lands on the closeout branch. `normalizeDeliveryStateFromPersisted` reads
+  // a legacy single-value `originIssueNumber` field into this array at load
+  // time so pre-P21.06 state files load without migration.
+  originIssueNumbers?: number[];
   tickets: TicketState[];
 };
 
