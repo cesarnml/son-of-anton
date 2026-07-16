@@ -164,6 +164,8 @@ import {
   deriveRefactorReviewLedgerPath,
   deriveRefactorReviewOutcomePath,
   deriveRefactorReviewTracePath,
+  extractDeferredRefactorReviewRows,
+  formatDeferredRefactorSuggestions,
   isRefactorGateEligible,
   isValidRefactorReviewPromptContent,
   reconcileRefactorReview,
@@ -1973,6 +1975,7 @@ export async function runDeliveryOrchestrator(
           findPrimaryWorktreePath(wt, context.config),
         );
         console.log(formatStatus(nextState, context.config));
+        printDeferredRefactorSuggestionsForAdvance(cwd, state, nextState);
         await emitGateForTransitions(state, nextState, context.config);
         const boundaryGuidance = formatAdvanceBoundaryGuidance(
           state,
@@ -3325,6 +3328,53 @@ async function runReconcileSubagentReview(
   console.log(
     'reconcile-subagent-review: ledger is consistent with git state.',
   );
+}
+
+/**
+ * P20.04 — prints any `deferred` refactor-review suggestions for the ticket
+ * that `advance` just marked `done`, so a human sees them at this natural
+ * stopping point rather than only in a post-phase sweep. Silent (no output,
+ * no error) when no refactor-review ledger exists for that ticket, or when
+ * it exists but has zero `deferred` rows.
+ */
+function printDeferredRefactorSuggestionsForAdvance(
+  cwd: string,
+  prevState: DeliveryState,
+  nextState: DeliveryState,
+): void {
+  const completedTicket = nextState.tickets.find((t) => {
+    const before = prevState.tickets.find((b) => b.id === t.id);
+    return t.status === 'done' && before && before.status !== 'done';
+  });
+  if (!completedTicket) return;
+
+  const ledgerRel =
+    completedTicket.refactorRunnerArtifactPath ??
+    deriveRefactorReviewLedgerPath(
+      nextState.reviewsDirPath,
+      completedTicket.id,
+    );
+  const ledgerAbs = resolve(cwd, ledgerRel);
+  if (!existsSync(ledgerAbs)) return;
+
+  let artifact: { invocations?: Array<Record<string, unknown>> };
+  try {
+    artifact = JSON.parse(readFileSync(ledgerAbs, 'utf-8'));
+  } catch {
+    return;
+  }
+  const rows = extractDeferredRefactorReviewRows({
+    invocations: (artifact.invocations ?? []) as Array<{
+      outcome: string;
+      reviewedHeadSha: string;
+      findings?: string[];
+    }>,
+  });
+  const message = formatDeferredRefactorSuggestions(completedTicket.id, rows);
+  if (message) {
+    console.log('');
+    console.log(message);
+  }
 }
 
 function loadRefactorReconciliationContext(

@@ -492,3 +492,49 @@ export function requiresRefactorReviewBeforeAdversarial(input: {
   if (!isRefactorGateEligible(input)) return false;
   return input.refactorReviewOutcome === undefined;
 }
+
+/**
+ * P20.04 — advance-time surfacing of deferred refactor suggestions.
+ *
+ * A `deferred` ledger invocation carries its rationale in `findings[0]`
+ * (the `--reason` given to `record-deferred`). Extracting this as a pure
+ * function keeps the "which rows count as deferred" logic testable
+ * independent of file I/O.
+ */
+export type DeferredRefactorReviewRow = {
+  reason: string;
+  reviewedHeadSha: string;
+};
+
+export function extractDeferredRefactorReviewRows(artifact: {
+  invocations: Array<{
+    outcome: string;
+    reviewedHeadSha: string;
+    findings?: string[];
+  }>;
+}): DeferredRefactorReviewRow[] {
+  return artifact.invocations
+    .filter((row) => row.outcome === 'deferred')
+    .map((row) => ({
+      reason: row.findings?.[0]?.trim() || '(no reason recorded)',
+      reviewedHeadSha: row.reviewedHeadSha,
+    }));
+}
+
+/**
+ * Formats deferred rows for `advance`'s console output. Returns `undefined`
+ * (not an empty string) when there is nothing to print, so the caller can
+ * skip printing entirely — a ticket with no refactor-review ledger, or a
+ * ledger with zero `deferred` rows, must produce no extra output at all.
+ */
+export function formatDeferredRefactorSuggestions(
+  ticketId: string,
+  rows: DeferredRefactorReviewRow[],
+): string | undefined {
+  if (rows.length === 0) return undefined;
+  const lines = rows.map((row) => `  - ${row.reason}`);
+  return [
+    `Deferred refactor-review suggestions for ${ticketId} (not silently lost):`,
+    ...lines,
+  ].join('\n');
+}
