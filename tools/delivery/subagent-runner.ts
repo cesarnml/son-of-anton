@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import {
+  RUNNERS_SUPPORTING_EFFORT,
+  type SubagentRunnerOptionEntry,
+  type SubagentRunnerOptions,
+} from './config';
 import type { ActionableFindingsParseResult } from './reconciliation';
 
 export type SubagentRunnerOutcome =
@@ -132,14 +137,13 @@ export type RunnerAttemptResult =
 
 /**
  * P21.04 — resolved per-attempt `{model?, effort?}` for one runner in the
- * fallback chain. Kept as a single small shape so the fallback loop (P21.03)
- * consumes it uniformly across the requested runner and every fallback
- * attempt.
+ * fallback chain. Aliases the config-schema shape (`SubagentRunnerOptionEntry`
+ * in `config.ts`) rather than redeclaring it, so config validation and
+ * runtime resolution share one source of truth for the shape. Kept as a
+ * single small type so the fallback loop (P21.03) consumes it uniformly
+ * across the requested runner and every fallback attempt.
  */
-export type ResolvedRunnerOptions = {
-  model?: string;
-  effort?: string;
-};
+export type ResolvedRunnerOptions = SubagentRunnerOptionEntry;
 
 /**
  * P21.04 — precedence per platform: flag (requested runner only) > config
@@ -154,9 +158,7 @@ export function resolveRunnerOptions(input: {
   requestedRunner: ProgrammaticSubagentRunner;
   flagModel?: string;
   flagEffort?: string;
-  configOptions?: Partial<
-    Record<ProgrammaticSubagentRunner, ResolvedRunnerOptions>
-  >;
+  configOptions?: SubagentRunnerOptions;
 }): ResolvedRunnerOptions {
   const isRequested = input.runner === input.requestedRunner;
   const configEntry = input.configOptions?.[input.runner];
@@ -168,9 +170,12 @@ export function resolveRunnerOptions(input: {
     ? (input.flagEffort ?? configEntry?.effort)
     : configEntry?.effort;
 
-  if (effort !== undefined && input.runner === 'cursor-cli') {
+  if (
+    effort !== undefined &&
+    !(RUNNERS_SUPPORTING_EFFORT as readonly string[]).includes(input.runner)
+  ) {
     throw new Error(
-      `cursor-cli has no effort flag — effort rides the model slug. Remove the effort value for cursor-cli.`,
+      `${input.runner} has no effort flag — effort rides the model slug. Remove the effort value for ${input.runner}.`,
     );
   }
 

@@ -316,12 +316,11 @@ function parseSubagentRunnerOptions(raw: unknown): SubagentRunnerOptions {
     const entry: SubagentRunnerOptionEntry = {};
 
     if (entryObj.model !== undefined) {
-      if (typeof entryObj.model !== 'string' || entryObj.model.trim() === '') {
-        throw new Error(
-          `Invalid subagentRunnerOptions["${platform}"].model in orchestrator.config.json. Expected a non-blank string.`,
-        );
-      }
-      entry.model = entryObj.model.trim();
+      entry.model = optionalNonBlankString(
+        entryObj.model,
+        `subagentRunnerOptions["${platform}"].model`,
+        'orchestrator.config.json',
+      );
     }
 
     if (entryObj.effort !== undefined) {
@@ -332,15 +331,11 @@ function parseSubagentRunnerOptions(raw: unknown): SubagentRunnerOptions {
           `orchestrator.config.json subagentRunnerOptions["${platform}"].effort is not supported — ${platform} has no effort flag. Remove it.`,
         );
       }
-      if (
-        typeof entryObj.effort !== 'string' ||
-        entryObj.effort.trim() === ''
-      ) {
-        throw new Error(
-          `Invalid subagentRunnerOptions["${platform}"].effort in orchestrator.config.json. Expected a non-blank string.`,
-        );
-      }
-      const trimmedEffort = entryObj.effort.trim();
+      const trimmedEffort = optionalNonBlankString(
+        entryObj.effort,
+        `subagentRunnerOptions["${platform}"].effort`,
+        'orchestrator.config.json',
+      ) as string;
       if (
         platform === 'claude-cli' &&
         !(VALID_CLAUDE_EFFORT_TIERS as readonly string[]).includes(

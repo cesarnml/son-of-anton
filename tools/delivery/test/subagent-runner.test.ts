@@ -861,9 +861,26 @@ describe('P21.04 — ledger fidelity for runnerModel/runnerEffort', () => {
     expect(validated?.invocations[0]?.runnerEffort).toBe('high');
   });
 
-  it('leaves runnerModel/runnerEffort absent for a default run', () => {
+  it('omits runnerModel/runnerEffort when buildRunnerInvocation options are omitted', () => {
     const invocation = buildRunnerInvocation('claude-cli', 'sha', 'clean');
     expect(invocation.runnerModel).toBeUndefined();
     expect(invocation.runnerEffort).toBeUndefined();
+  });
+
+  it('round-trips explicit null runnerModel/runnerEffort for a default run — the production ledger-row shape recorded by the subagent-review CLI (resolvedOptions.model/.effort ?? null)', () => {
+    const invocation = buildRunnerInvocation('claude-cli', 'sha', 'clean', {
+      runnerModel: null,
+      runnerEffort: null,
+    });
+    expect(invocation.runnerModel).toBeNull();
+    expect(invocation.runnerEffort).toBeNull();
+
+    const artifact: SubagentRunnerArtifact = {
+      ticket: 'P21.04',
+      invocations: [invocation],
+    };
+    const validated = validateRunnerArtifact(artifact);
+    expect(validated?.invocations[0]?.runnerModel).toBeNull();
+    expect(validated?.invocations[0]?.runnerEffort).toBeNull();
   });
 });
