@@ -49,8 +49,9 @@ Red: required
 
 > Append here (do not edit above) when behavior or trade-offs change during implementation.
 
-Red first: [what test failed first]
-Why this path: [why this implementation was the smallest acceptable]
-Alternative considered: [one rejected alternative and why]
-Deferred: [what was intentionally left out of this ticket]
-Contract note: record any deviation from the ticket metadata contract here, including missing/incorrect `Type:` or non-compliant `Scope:` fields, and why it happened.
+Red first: `write-subagent-refactor-review` throwing "Export named 'recordRefactorReviewOutcome' not found" (module didn't exist yet).
+Why this path: reused the generic runner-invocation primitives from `subagent-runner.ts` (`tryRunner`, `runSubagentWithFallback`, `decideAdvisoryRunnerOutcome`, `coerce*Classification`) via a new `runProgrammaticSubagentReview` orchestration function rather than duplicating the spawn/fallback loop inline a second time.
+Alternative considered: mirroring the adversarial gate's inline runner-invocation block verbatim inside the new CLI case. Rejected because it would duplicate ~150 lines of spawn/fallback logic the ticket explicitly asked not to duplicate.
+Deferred: gate placement into the main ticket-status machine (ticket 20.03's scope).
+Trade-off: `recordRefactorReviewOutcome` deliberately does **not** transition `TicketState.status` — it updates only the `refactorReview*` fields introduced in ticket 20.01. This keeps the three new commands independently invocable (per this ticket's Review Focus) without colliding with the adversarial gate's existing `verified -> subagent_review_complete` transition on the same ticket, since ticket 20.03 has not yet wired the refactor gate into that sequence.
+Post-subagent-review patch: `write-subagent-refactor-review` now requires `--prompt-file` (no generic auto-built fallback) after the review found the auto-builder's boilerplate content could pass the placeholder-rejection floor without being primary-authored. `record-deferred`'s first-ever-invocation path now resolves the real worktree HEAD instead of a `"unknown"` sentinel that let reconciliation silently report success. `runProgrammaticSubagentReview`'s advisory-write detection now also runs once across the whole invocation (catching writes made by a runner that timed out before a successful fallback) and accepts an optional worktree-content fingerprint (catching a rewrite of a path already dirty before the invocation).

@@ -1225,12 +1225,17 @@ export async function runDeliveryOrchestrator(
           );
         }
 
-        const promptContent = parsed.promptFile
-          ? readFileSync(resolve(cwd, parsed.promptFile), 'utf-8')
-          : resolveRefactorReviewPromptContent({
-              repoRoot: cwd,
-              ticket: writeTarget,
-            });
+        if (!parsed.promptFile) {
+          throw new Error(
+            `write-subagent-refactor-review requires --prompt-file <path>. The refactor-review brief must be a primary-agent-authored, filled-in ` +
+              `docs/template/delivery/refactor-review-template.md — there is no generic auto-built fallback, unlike the adversarial gate's changed-files ` +
+              `prompt (which is itself boilerplate, not a substitute for real authorship).`,
+          );
+        }
+        const promptContent = readFileSync(
+          resolve(cwd, parsed.promptFile),
+          'utf-8',
+        );
 
         if (!isValidRefactorReviewPromptContent(promptContent)) {
           throw new Error(
@@ -1308,10 +1313,22 @@ export async function runDeliveryOrchestrator(
             existingArtifact?.invocations[
               existingArtifact.invocations.length - 1
             ];
+          const currentWorktreeHeadSha = (() => {
+            const r = spawnSync('git', ['rev-parse', 'HEAD'], {
+              cwd: deferTarget.worktreePath,
+              encoding: 'utf-8',
+            });
+            return r.status === 0 ? r.stdout.trim() : '';
+          })();
           const reviewedHead =
             lastInvocation?.reviewedHeadSha ??
             deferTarget.refactorReviewedHeadSha ??
-            'unknown';
+            currentWorktreeHeadSha;
+          if (!reviewedHead) {
+            throw new Error(
+              `record-deferred could not resolve a HEAD sha for ${deferTarget.id}'s worktree at ${deferTarget.worktreePath}. Is it a valid git checkout?`,
+            );
+          }
           const primaryAgentForDefer = resolvePrimaryAgent({
             flag: parsed.primary,
             configField: context.config.primaryAgent,
@@ -1525,6 +1542,27 @@ export async function runDeliveryOrchestrator(
               .split('\n')
               .map((line) => line.trim())
               .filter(Boolean);
+          },
+          readWorktreeFingerprint: () => {
+            // Content-level fingerprint so a runner that rewrites a path
+            // already dirty before the invocation still trips the
+            // advisory-only contract, not just a new dirty path appearing.
+            const diff = spawnSync('git', ['diff'], {
+              cwd: worktreePath,
+              encoding: 'utf-8',
+            });
+            const cached = spawnSync('git', ['diff', '--cached'], {
+              cwd: worktreePath,
+              encoding: 'utf-8',
+            });
+            const untracked = spawnSync(
+              'git',
+              ['ls-files', '--others', '--exclude-standard'],
+              { cwd: worktreePath, encoding: 'utf-8' },
+            );
+            return [diff.stdout, cached.stdout, untracked.stdout]
+              .map((s) => s ?? '')
+              .join(' ');
           },
           classify: ({ runner, exitCode, stdout, stderr }) => {
             const classified =
@@ -3182,64 +3220,6 @@ async function runReconcileSubagentReview(
   console.log(
     'reconcile-subagent-review: ledger is consistent with git state.',
   );
-}
-
-function resolveRefactorReviewPromptContent(input: {
-  repoRoot: string;
-  ticket: TicketState;
-}): string {
-  const ticket = input.ticket;
-  let ticketSpec = '';
-  try {
-    ticketSpec = readFileSync(
-      resolve(input.repoRoot, ticket.ticketFile),
-      'utf-8',
-    );
-  } catch {
-    // Surfaced via the content validator, which rejects empty/stub prompts.
-  }
-  const changedFiles = (() => {
-    try {
-      const out = spawnSync(
-        'git',
-        ['diff', '--name-only', `${ticket.baseBranch}...HEAD`],
-        { cwd: ticket.worktreePath, encoding: 'utf-8' },
-      );
-      return (out.stdout ?? '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  })();
-  const fileList = changedFiles.length
-    ? changedFiles.map((f) => `- ${f}`).join('\n')
-    : '- (no changed files detected)';
-
-  return [
-    `# Refactor-review for ${ticket.id} — ${ticket.title}`,
-    '',
-    `Base branch: ${ticket.baseBranch}`,
-    `Branch: ${ticket.branch}`,
-    '',
-    '## Ticket scope',
-    '',
-    ticketSpec.trim() || '(ticket spec unavailable)',
-    '',
-    '## Files changed in this diff',
-    '',
-    fileList,
-    '',
-    '## Local-quality signals to check',
-    '',
-    'Duplication, naming, dead code, complexity, and test-name/behavior alignment —',
-    'per `docs/template/delivery/refactor-review-template.md`. Not correctness or',
-    'invariant/attack-surface hunting; that is the separate adversarial gate.',
-    '',
-    'Output strictly per the `Required output format` section of the refactor-review template,',
-    'including the literal `<refactor-suggestions>` tag block.',
-  ].join('\n');
 }
 
 function loadRefactorReconciliationContext(

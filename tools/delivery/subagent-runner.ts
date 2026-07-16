@@ -1233,6 +1233,15 @@ export type ProgrammaticSubagentReviewInput = {
   readHeadSha: () => string;
   listDirtyPaths: () => string[];
   listDiffPaths: (revisionRange: string) => string[];
+  /**
+   * Optional content-level fingerprint of the worktree (e.g. a hash of
+   * `git diff` + `git diff --cached` + untracked-file listing). When
+   * supplied, a write that rewrites an *already-dirty* path (same path,
+   * different content) is detected even though path-membership alone would
+   * see no new dirty path. When omitted, write detection falls back to
+   * path-membership only.
+   */
+  readWorktreeFingerprint?: () => string;
   classify: (input: {
     runner: ProgrammaticSubagentRunner;
     exitCode: number | null;
@@ -1263,6 +1272,8 @@ export function runProgrammaticSubagentReview(
   input: ProgrammaticSubagentReviewInput,
 ): ProgrammaticSubagentReviewResult {
   const headSha = input.readHeadSha();
+  const initialDirtyPaths = new Set(input.listDirtyPaths());
+  const initialFingerprint = input.readWorktreeFingerprint?.();
   let runnerSelfReport: string | null = null;
   let runnerWroteFiles = false;
   let writePaths: string[] = [];
@@ -1337,6 +1348,29 @@ export function runProgrammaticSubagentReview(
       return result;
     },
   );
+
+  // Whole-invocation write check, independent of per-attempt status. This
+  // catches writes made by a runner that timed out before its fallback
+  // (tryRunner never calls checkHasChanges on a timeout) and, when a
+  // fingerprint is supplied, writes that rewrite a path already dirty before
+  // this invocation started (path-membership alone cannot see those).
+  const finalHeadSha = input.readHeadSha();
+  const finalDirtyPaths = input.listDirtyPaths();
+  const wholeInvocationWrite =
+    finalHeadSha !== headSha ||
+    finalDirtyPaths.some((p) => !initialDirtyPaths.has(p)) ||
+    (initialFingerprint !== undefined &&
+      input.readWorktreeFingerprint?.() !== initialFingerprint);
+  if (wholeInvocationWrite) {
+    runnerWroteFiles = true;
+    if (writePaths.length === 0) {
+      const wroteHeadPaths =
+        finalHeadSha !== headSha
+          ? input.listDiffPaths(`${headSha}..${finalHeadSha}`)
+          : [];
+      writePaths = [...wroteHeadPaths, ...finalDirtyPaths];
+    }
+  }
 
   const lastResult = fallbackOutcome.result;
   if (lastResult.status !== 'ran') {
