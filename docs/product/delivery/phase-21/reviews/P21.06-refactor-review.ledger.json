@@ -1,0 +1,22 @@
+{
+  "ticket": "P21.06",
+  "invocations": [
+    {
+      "runnerKind": "cursor-cli",
+      "reviewedHeadSha": "526f39e51d5304904b72091ab62425adf3ce1012",
+      "outcome": "clean",
+      "completedAt": "2026-07-16T16:21:55.360Z",
+      "terminatedReason": "completed",
+      "rawOutput": "docs/product/delivery/phase-21/reviews/P21.06-refactor-review.report.md",
+      "filledPrompt": "docs/product/delivery/phase-21/reviews/P21.06-refactor-review.prompt.md",
+      "fallbackLevel": "preferred",
+      "schemaVersion": 2,
+      "primaryAgent": "claude",
+      "runnerSelfReport": null,
+      "fallbackFrom": null,
+      "findings": [],
+      "probedSurfaces": [],
+      "patches": []
+    }
+  ]
+}
