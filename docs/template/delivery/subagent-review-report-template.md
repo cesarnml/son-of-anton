@@ -132,6 +132,14 @@ downstream tooling, not just style preference.
   end-of-file, which is always treated as suspicious (even if the body looks
   like a clean `None`) and prints a warning at `subagent-review` record time.
 
+- **`runnerStatus: completed` is not the same fact as a clean review.**
+  `completed` in `<runner-termination>` only means you finished the review
+  per this template. Whether the review is clean is decided separately from
+  the `<actionable-findings>` block: literal `None` records `outcome: clean`;
+  one or more findings records `outcome: completed_with_findings` instead —
+  the ledger never records `clean` for a report that lists findings, even
+  when the runner terminated normally.
+
 - **Write `None` (no trailing period) on its own line** when a tagged region
   has no entries. `None`/`none.`/`None.` are all recognized case-insensitively,
   but only inside a properly closed tag — a literal `None` before a missing
