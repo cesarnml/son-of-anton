@@ -20,7 +20,7 @@
     },
     {
       "runnerKind": "operator-recorder",
-      "reviewedHeadSha": "76b7968288e0ed082f9bae4e97c736d0825b20fe",
+      "reviewedHeadSha": "b37b54a1cd8b2e7d76d51c8de9219994b90de81a",
       "outcome": "patched",
       "completedAt": "2026-07-16T14:49:04.346Z",
       "terminatedReason": "completed",
@@ -30,25 +30,7 @@
       "fallbackFrom": null,
       "findings": [],
       "probedSurfaces": [],
-      "patches": [
-        "76b7968288e0ed082f9bae4e97c736d0825b20fe"
-      ]
-    },
-    {
-      "runnerKind": "operator-recorder",
-      "reviewedHeadSha": "76b7968288e0ed082f9bae4e97c736d0825b20fe",
-      "completedAt": "2026-07-16T14:52:01.009Z",
-      "terminatedReason": "completed",
-      "findings": [],
-      "probedSurfaces": [],
-      "patches": [
-        "76b7968288e0ed082f9bae4e97c736d0825b20fe"
-      ],
-      "schemaVersion": 1,
-      "primaryAgent": "claude",
-      "runnerSelfReport": null,
-      "fallbackFrom": null,
-      "outcome": "patched"
+      "patches": ["76b7968288e0ed082f9bae4e97c736d0825b20fe"]
     }
   ]
 }
