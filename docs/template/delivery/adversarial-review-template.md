@@ -88,7 +88,7 @@ Surfaces for this review:
 
 #### Diff-derived attack surfaces
 
-In addition to the ticket-spec-derived surfaces above, probe each of the seven
+In addition to the ticket-spec-derived surfaces above, probe each of the nine
 diff-derived classes below. These are the finding classes external code review
 (e.g. CodeRabbit) catches consistently and the prior template did not name. The
 primary agent must enumerate concrete surfaces drawn from this diff against each
@@ -129,6 +129,32 @@ class. The subagent must report coverage for every class using the form
    does not match what the diff actually does? Read the Rationale and contract
    docs and surface drift in **Advisory Observations** — do not patch
    ticket docs. Output form: `[probed]` / `[N/A — reason]` / `[blocked —
+   missing-input]`.
+8. **Control signal starved by a change-gated callback** — for any setting,
+   flag, or value that must propagate into a running view, process, or
+   consumer, trace the single runtime path that re-reads it and identify the
+   condition that path executes under. If that condition is unrelated to the
+   value's own change (a delta/threshold gate, a handler bound to a different
+   event, a periodic-but-conditional emit), the value is starved whenever
+   that condition doesn't hold — a control signal must ride a path triggered
+   by its own change, not piggyback on an unrelated gated emit. Corollary:
+   persisting a value is not applying it; a write meant to affect a running
+   consumer needs an explicit live-apply call, distinct from whatever reads
+   the value at startup or on the next unrelated trigger. Probe every
+   settings toggle, flag write, or live-updated derived value for this gap.
+   Output form: `[probed]` / `[N/A — reason]` / `[blocked — missing-input]`.
+9. **Source identity collapsed into a shared render/output target** — when
+   multiple logical source records can fold, cap, or route into one shared
+   presentation, cache, or output key (a UI row folded into a grouped view, a
+   window/session mapped to a shared slot, several inputs writing one
+   aggregate), does every consumer that acts on a source key (show/hide,
+   refresh, invalidate, label, prune) resolve it through the same
+   source-to-target mapping the rendering/output path uses — or does at
+   least one consumer act on the raw source identity directly, becoming a
+   silent no-op or reading stale/wrong state whenever the fold is active?
+   Check both individual-item and bulk/aggregate actions separately, since
+   bulk paths often derive their target set differently than the per-item
+   path. Output form: `[probed]` / `[N/A — reason]` / `[blocked —
    missing-input]`.
 
 ### Diff context
@@ -199,7 +225,7 @@ report, the block contains the single literal line `None` (no bullets).
 For each invariant: `[held | broken | untested]` — one line explaining what you tried.
 
 **Surface results**
-For each attack surface (both ticket-spec-derived and the seven diff-derived classes):
+For each attack surface (both ticket-spec-derived and the nine diff-derived classes):
 `[probed | N/A — <reason> | blocked — missing-input]`
 If probed: what you tried and what you found (one to three sentences).
 
