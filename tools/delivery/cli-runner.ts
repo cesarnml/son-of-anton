@@ -1270,9 +1270,17 @@ export async function runDeliveryOrchestrator(
           invocation,
         );
 
+        // P21.02 — `completed_with_findings` is a ledger-row-only honesty
+        // label; the ticket-state transition tracked by `recordSubagentReview`
+        // still only distinguishes clean/patched/skipped. Findings-bearing
+        // reports are not silently waved through: `reconcile-subagent-review`
+        // reads the ledger/report directly and blocks `open-pr` on unpatched
+        // actionable findings regardless of this state-level label.
+        const stateOutcome =
+          outcome === 'completed_with_findings' ? 'clean' : outcome;
         const nextState = recordSubagentReview(
           state,
-          outcome,
+          stateOutcome,
           isDocOnly,
           policy,
           undefined,

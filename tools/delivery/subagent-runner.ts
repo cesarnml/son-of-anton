@@ -776,20 +776,24 @@ export function decideSubagentOutcomeFromRunner(
 }
 
 /**
- * P21.02 — a report only proves it is findings-bearing when the tag is
- * present, properly closed, and yields at least one bullet that is not the
- * literal `None` clean-signal. A missing/unclosed/misnamed tag is a parse
- * drift warning (handled elsewhere), not evidence of findings.
+ * P21.02 — a report proves it is findings-bearing whenever the parser
+ * extracted at least one bullet, whether or not the closing tag was found.
+ * `closed` is deliberately NOT part of this check: an unclosed
+ * `<actionable-findings>` block that still yields bullet lines (parsed to
+ * EOF) is a template-format violation, not evidence the report is clean —
+ * treating it as `clean` would re-create the exact silent-drop failure
+ * P21.01 introduced the tag parser to prevent. `isSuspiciousActionableFindingsParse`
+ * still fires its separate record-time drift warning for the unclosed tag
+ * regardless of this outcome. `findings.length > 0` alone is sufficient:
+ * the parser never returns a non-empty `items`/`findings` array alongside
+ * `isExplicitNone: true` (the literal `None` body always yields an empty
+ * array), so no separate `!isExplicitNone` check is needed.
  */
 function hasHonestFindings(
   actionableFindings: ActionableFindingsParseResult | undefined,
 ): boolean {
   return (
-    actionableFindings !== undefined &&
-    actionableFindings.found &&
-    actionableFindings.closed &&
-    !actionableFindings.isExplicitNone &&
-    actionableFindings.findings.length > 0
+    actionableFindings !== undefined && actionableFindings.findings.length > 0
   );
 }
 
