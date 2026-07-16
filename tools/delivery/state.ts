@@ -180,12 +180,12 @@ function normalizeLegacyTicketStatus(status: string | undefined): TicketStatus {
 }
 
 /**
- * P21.06 — pre-P21.06 state files persist a single `originIssueNumber`
- * field. Read it into `originIssueNumbers` at load time so existing state
- * files load without a migration step; `originIssueNumbers`, when already
- * present, wins (a state file written by P21.06+ never has the legacy field).
+ * P21.06 — coerces a persisted state object's origin-issue field(s) into the
+ * current `originIssueNumbers` shape. The new array field wins when present;
+ * otherwise a pre-P21.06 single `originIssueNumber` scalar is wrapped into a
+ * one-element array, so existing state files load without a migration step.
  */
-function normalizeLegacyOriginIssueNumbers(
+function coerceOriginIssueNumbersFromPersisted(
   root: Record<string, unknown>,
 ): Pick<DeliveryState, 'originIssueNumbers'> {
   if (Array.isArray(root.originIssueNumbers)) {
@@ -201,7 +201,7 @@ export function normalizeDeliveryStateFromPersisted(
   raw: unknown,
 ): DeliveryState {
   const root = raw as Record<string, unknown>;
-  const { originIssueNumbers } = normalizeLegacyOriginIssueNumbers(root);
+  const { originIssueNumbers } = coerceOriginIssueNumbersFromPersisted(root);
   const rawTickets = root.tickets;
 
   if (!Array.isArray(rawTickets)) {
