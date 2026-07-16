@@ -3357,19 +3357,13 @@ function printDeferredRefactorSuggestionsForAdvance(
   const ledgerAbs = resolve(cwd, ledgerRel);
   if (!existsSync(ledgerAbs)) return;
 
-  let artifact: { invocations?: Array<Record<string, unknown>> };
+  let artifact: unknown;
   try {
     artifact = JSON.parse(readFileSync(ledgerAbs, 'utf-8'));
   } catch {
     return;
   }
-  const rows = extractDeferredRefactorReviewRows({
-    invocations: (artifact.invocations ?? []) as Array<{
-      outcome: string;
-      reviewedHeadSha: string;
-      findings?: string[];
-    }>,
-  });
+  const rows = extractDeferredRefactorReviewRows(artifact);
   const message = formatDeferredRefactorSuggestions(completedTicket.id, rows);
   if (message) {
     console.log('');

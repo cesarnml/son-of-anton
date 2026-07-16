@@ -506,19 +506,35 @@ export type DeferredRefactorReviewRow = {
   reviewedHeadSha: string;
 };
 
-export function extractDeferredRefactorReviewRows(artifact: {
-  invocations: Array<{
-    outcome: string;
-    reviewedHeadSha: string;
-    findings?: string[];
-  }>;
-}): DeferredRefactorReviewRow[] {
-  return artifact.invocations
-    .filter((row) => row.outcome === 'deferred')
-    .map((row) => ({
-      reason: row.findings?.[0]?.trim() || '(no reason recorded)',
-      reviewedHeadSha: row.reviewedHeadSha,
-    }));
+/**
+ * Accepts an arbitrary parsed value, not a typed shape — this reads
+ * untrusted on-disk JSON (a hand-editable ledger file), and a structurally
+ * corrupt-but-valid-JSON artifact (non-array `invocations`, null rows,
+ * non-string `findings`) must degrade to "no deferred rows found", not
+ * throw. `advance` has already changed and saved delivery state by the time
+ * this runs; a crash here must not be possible.
+ */
+export function extractDeferredRefactorReviewRows(
+  artifact: unknown,
+): DeferredRefactorReviewRow[] {
+  if (typeof artifact !== 'object' || artifact === null) return [];
+  const invocations = (artifact as { invocations?: unknown }).invocations;
+  if (!Array.isArray(invocations)) return [];
+
+  const rows: DeferredRefactorReviewRow[] = [];
+  for (const row of invocations) {
+    if (typeof row !== 'object' || row === null) continue;
+    const r = row as Record<string, unknown>;
+    if (r.outcome !== 'deferred') continue;
+    const reviewedHeadSha =
+      typeof r.reviewedHeadSha === 'string' ? r.reviewedHeadSha : '';
+    const firstFinding = Array.isArray(r.findings) ? r.findings[0] : undefined;
+    const reason =
+      (typeof firstFinding === 'string' ? firstFinding.trim() : '') ||
+      '(no reason recorded)';
+    rows.push({ reason, reviewedHeadSha });
+  }
+  return rows;
 }
 
 /**
