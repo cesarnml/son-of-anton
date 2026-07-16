@@ -641,7 +641,7 @@ When `reviewPolicy.subagentReview` is `"required"` or `"skip_doc_only"`, code ti
 
 **Step 1 — Author the prompt (`write-subagent-adversarial-review`):**
 
-1. Read `docs/template/delivery/adversarial-review-template.md`. Fill in invariants, attack surfaces (including the seven diff-derived classes), and diff context from the current ticket diff and spec. This is primary-agent work — the subagent does not author its own brief.
+1. Read `docs/template/delivery/adversarial-review-template.md`. Fill in invariants, attack surfaces (including the nine diff-derived classes), and diff context from the current ticket diff and spec. This is primary-agent work — the subagent does not author its own brief.
 2. Record the filled prompt:
 
 ```bash

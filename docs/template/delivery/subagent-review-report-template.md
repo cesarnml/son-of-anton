@@ -55,7 +55,7 @@ line per invariant explaining what was tried.
 **Surface results**
 
 For every attack surface from the prompt — both ticket-spec-derived and the
-seven diff-derived classes — emit one line as `[probed | N/A — <reason> |
+nine diff-derived classes — emit one line as `[probed | N/A — <reason> |
 blocked — missing-input]`. If probed, one to three sentences on what was
 tried and what was found.
 
