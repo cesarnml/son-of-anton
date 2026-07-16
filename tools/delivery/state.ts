@@ -469,6 +469,29 @@ function syncStateWithPlan(
         subagentAdversarialPromptWrittenAt:
           previous?.subagentAdversarialPromptWrittenAt ??
           inferredTicket?.subagentAdversarialPromptWrittenAt,
+        refactorReviewOutcome:
+          previous?.refactorReviewOutcome ??
+          inferredTicket?.refactorReviewOutcome,
+        refactorReviewCompletedAt:
+          previous?.refactorReviewCompletedAt ??
+          inferredTicket?.refactorReviewCompletedAt,
+        refactorReviewPatchCommits:
+          previous?.refactorReviewPatchCommits ??
+          inferredTicket?.refactorReviewPatchCommits,
+        refactorReviewAgent:
+          previous?.refactorReviewAgent ?? inferredTicket?.refactorReviewAgent,
+        refactorRunnerArtifactPath:
+          previous?.refactorRunnerArtifactPath ??
+          inferredTicket?.refactorRunnerArtifactPath,
+        refactorReviewPromptPath:
+          previous?.refactorReviewPromptPath ??
+          inferredTicket?.refactorReviewPromptPath,
+        refactorReviewPromptWrittenAt:
+          previous?.refactorReviewPromptWrittenAt ??
+          inferredTicket?.refactorReviewPromptWrittenAt,
+        refactorReviewedHeadSha:
+          previous?.refactorReviewedHeadSha ??
+          inferredTicket?.refactorReviewedHeadSha,
         prNumber: previous?.prNumber ?? inferredTicket?.prNumber,
         prUrl: previous?.prUrl ?? inferredTicket?.prUrl,
         prOpenedAt: previous?.prOpenedAt ?? inferredTicket?.prOpenedAt,
