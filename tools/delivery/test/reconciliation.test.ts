@@ -515,6 +515,43 @@ describe('P14.03 — reconcileReview', () => {
     if (result.kind !== 'blocked') return;
     expect(result.condition).toBe('B');
   });
+
+  it('blocks Condition B when a closed, non-empty, non-None actionable-findings tag contains prose instead of bullets', () => {
+    // Regression: the bullet-only tag extractor has no prose fallback by
+    // design, so `findings.length > 0` alone let a real finding written as
+    // prose (not `- ` bulleted) inside a properly closed tag silently pass
+    // reconciliation as clean. Found dogfooding P21.01's own adversarial
+    // review — the subagent's real report had this exact shape.
+    expect(RM.reconcileReview).toBeDefined();
+    const result = RM.reconcileReview!({
+      ...baseInput,
+      reportMarkdown:
+        '<actionable-findings>\nThis is a real finding written as a paragraph, not a bullet.\n</actionable-findings>\n',
+    });
+    expect(result.kind).toBe('blocked');
+    if (result.kind !== 'blocked') return;
+    expect(result.condition).toBe('B');
+  });
+
+  it('blocks Condition B when the actionable-findings tag is missing entirely from a non-empty report', () => {
+    expect(RM.reconcileReview).toBeDefined();
+    const result = RM.reconcileReview!({
+      ...baseInput,
+      reportMarkdown: '**Invariant results**\n1. held.\n',
+    });
+    expect(result.kind).toBe('blocked');
+    if (result.kind !== 'blocked') return;
+    expect(result.condition).toBe('B');
+  });
+
+  it('does NOT block when reportMarkdown is empty (operator-recorder path — no runner invoked, no report file)', () => {
+    expect(RM.reconcileReview).toBeDefined();
+    const result = RM.reconcileReview!({
+      ...baseInput,
+      reportMarkdown: '',
+    });
+    expect(result).toEqual({ kind: 'clean' });
+  });
 });
 
 describe('P14.03 — recordDeferred', () => {

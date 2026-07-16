@@ -345,8 +345,20 @@ export function reconcileReview(input: {
     };
   }
 
+  // Block on suspicious parses too, not only on successfully-extracted
+  // bullets: a closed, non-empty, non-`None` `<actionable-findings>` tag
+  // whose body is prose rather than `- ` bullets parses to zero findings
+  // (the barebones bullet-only extractor has no prose fallback by design),
+  // so `findings.length > 0` alone would silently wave through a report that
+  // has real actionable content just because the subagent didn't bullet it.
+  // Gated on a report actually existing: the operator-recorder path (no
+  // `--subagent` runner invoked) legitimately has no report file at all, and
+  // that empty-markdown case must stay non-blocking exactly as before.
+  const hasReport = input.reportMarkdown.trim() !== '';
+  const actionableParse = parseActionableFindings(input.reportMarkdown);
   const findingsExist =
-    parseActionableFindings(input.reportMarkdown).findings.length > 0;
+    actionableParse.findings.length > 0 ||
+    (hasReport && isSuspiciousActionableFindingsParse(actionableParse));
   if (findingsExist && !isAcknowledged) {
     return {
       kind: 'blocked',
