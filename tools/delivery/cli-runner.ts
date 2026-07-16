@@ -1562,7 +1562,7 @@ export async function runDeliveryOrchestrator(
             );
             return [diff.stdout, cached.stdout, untracked.stdout]
               .map((s) => s ?? '')
-              .join(' ');
+              .join(' ');
           },
           classify: ({ runner, exitCode, stdout, stderr }) => {
             const classified =
