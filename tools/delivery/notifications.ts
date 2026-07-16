@@ -454,6 +454,27 @@ export function formatReviewWindowMessage(
   ].join('\n');
 }
 
+/**
+ * P21.05 — message-honesty phrasing per outcome (#83): states what was
+ * actually found, never "passed" for a findings-bearing report.
+ */
+function formatSubagentReviewRecordedSummary(event: {
+  outcome: SubagentRunnerOutcome;
+  terminatedReason?: string;
+  findingsCount?: number;
+}): string {
+  switch (event.outcome) {
+    case 'completed_with_findings':
+      return `found ${event.findingsCount ?? 0} actionable finding(s)`;
+    case 'skipped':
+      return `skipped${event.terminatedReason ? ` (${event.terminatedReason})` : ''}`;
+    case 'clean':
+      return 'passed, no actionable findings';
+    default:
+      return `recorded as ${event.outcome}`;
+  }
+}
+
 export function formatNotificationMessage(
   _cwd: string,
   event: DeliveryNotificationEvent,
@@ -505,25 +526,13 @@ export function formatNotificationMessage(
       ]
         .filter((line): line is string => line !== undefined)
         .join('\n');
-    case 'subagent_review_recorded': {
-      // P21.05 — message text states what was actually found, never
-      // "passed" for a findings-bearing report (#83 message-honesty
-      // discipline mirrored from the external-review recorder path).
-      const summary =
-        event.outcome === 'completed_with_findings'
-          ? `found ${event.findingsCount ?? 0} actionable finding(s)`
-          : event.outcome === 'skipped'
-            ? `skipped${event.terminatedReason ? ` (${event.terminatedReason})` : ''}`
-            : event.outcome === 'clean'
-              ? 'passed, no actionable findings'
-              : `recorded as ${event.outcome}`;
+    case 'subagent_review_recorded':
       return [
         header,
-        `${event.ticketId} subagent review ${summary}.`,
+        `${event.ticketId} subagent review ${formatSubagentReviewRecordedSummary(event)}.`,
         event.ticketTitle,
         `Branch: ${event.branch}`,
       ].join('\n');
-    }
     case 'ticket_completed':
       return [
         header,

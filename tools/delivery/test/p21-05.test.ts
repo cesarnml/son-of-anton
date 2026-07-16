@@ -63,7 +63,7 @@ describe('P21.05 — eventsForSubagentReviewCommand', () => {
     });
   });
 
-  it('produces no event when the ticket is not found — no event for commands that did not record a subagent-review outcome', () => {
+  it('produces no event when the ticket is not found', () => {
     const state = makeState(PLAN_KEY, [makeTicket(TICKET_ID)]);
 
     const events = eventsForSubagentReviewCommand(state, 'P21.99', 'clean');
@@ -128,7 +128,7 @@ describe('P21.05 — payload text differs meaningfully by outcome', () => {
 });
 
 describe('P21.05 — notifier failure stays best-effort', () => {
-  it('surfaces a warning for a throwing notifier without failing the command', async () => {
+  it('keeps notification failures best-effort', async () => {
     const originalToken = process.env.TELEGRAM_BOT_TOKEN;
     const originalChatId = process.env.TELEGRAM_CHAT_ID;
     const originalWebhook = process.env.DISCORD_WEBHOOK_URL;
